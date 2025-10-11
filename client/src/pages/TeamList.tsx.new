@@ -1,0 +1,132 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Typography,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Box,
+  Stack
+} from '@mui/material';
+import { Team } from '../types';
+import { teamService } from '../services/api.service';
+
+const defaultTeam: Omit<Team, '_id'> = {
+  name: '',
+  captain: '',
+  members: []
+};
+
+const TeamList: React.FC = () => {
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [open, setOpen] = useState(false);
+  const [newTeam, setNewTeam] = useState<Omit<Team, '_id'>>(defaultTeam);
+
+  useEffect(() => {
+    fetchTeams();
+  }, []);
+
+  const fetchTeams = async () => {
+    try {
+      const response = await teamService.getAll();
+      setTeams(response.data);
+    } catch (error) {
+      console.error('Error fetching teams:', error);
+    }
+  };
+
+  const handleOpen = () => setOpen(true);
+  const handleClose = () => {
+    setOpen(false);
+    setNewTeam(defaultTeam);
+  };
+
+  const handleSubmit = async () => {
+    if (!newTeam.name || !newTeam.captain) {
+      return; // Don't submit if required fields are empty
+    }
+    try {
+      await teamService.create(newTeam);
+      handleClose();
+      fetchTeams();
+    } catch (error) {
+      console.error('Error creating team:', error);
+    }
+  };
+
+  return (
+    <Box sx={{ p: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+        <Typography variant="h5">Teams</Typography>
+        <Button variant="contained" color="primary" onClick={handleOpen}>
+          Add Team
+        </Button>
+      </Box>
+
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>Name</TableCell>
+              <TableCell>Captain</TableCell>
+              <TableCell>Members</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {teams.map((team) => (
+              <TableRow key={team._id}>
+                <TableCell>{team.name}</TableCell>
+                <TableCell>{team.captain}</TableCell>
+                <TableCell>{team.members.length}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      <Dialog open={open} onClose={handleClose}>
+        <DialogTitle>Create New Team</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 2, minWidth: 400 }}>
+            <TextField
+              label="Team Name"
+              value={newTeam.name}
+              onChange={(e) => setNewTeam({ ...newTeam, name: e.target.value })}
+              fullWidth
+              required
+            />
+            <TextField
+              label="Captain"
+              value={newTeam.captain}
+              onChange={(e) => setNewTeam({ ...newTeam, captain: e.target.value })}
+              fullWidth
+              required
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleClose}>Cancel</Button>
+          <Button 
+            onClick={handleSubmit} 
+            variant="contained" 
+            color="primary"
+            disabled={!newTeam.name || !newTeam.captain}
+          >
+            Create
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+};
+
+export default TeamList;

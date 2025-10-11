@@ -1,0 +1,173 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Typography,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Box,
+  Stack
+} from '@mui/material';
+import { Player } from '../types';
+import { playerService } from '../services/api.service';
+
+const defaultPlayer: Omit<Player, '_id'> = {
+  name: '',
+  age: 0,
+  role: 'batsman',
+  battingStyle: 'right-handed',
+  bowlingStyle: '',
+  teams: []
+};
+
+const PlayerList: React.FC = () => {
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [open, setOpen] = useState(false);
+  const [newPlayer, setNewPlayer] = useState<Omit<Player, '_id'>>(defaultPlayer);
+
+  useEffect(() => {
+    fetchPlayers();
+  }, []);
+
+  const fetchPlayers = async () => {
+    try {
+      const response = await playerService.getAll();
+      setPlayers(response.data);
+    } catch (error) {
+      console.error('Error fetching players:', error);
+    }
+  };
+
+  const handleOpen = () => setOpen(true);
+  const handleClose = () => {
+    setOpen(false);
+    setNewPlayer(defaultPlayer);
+  };
+
+  const handleSubmit = async () => {
+    if (!newPlayer.name || newPlayer.age <= 0) {
+      return; // Don't submit if required fields are empty or invalid
+    }
+    try {
+      await playerService.create(newPlayer);
+      handleClose();
+      fetchPlayers();
+    } catch (error) {
+      console.error('Error creating player:', error);
+    }
+  };
+
+  return (
+    <Box sx={{ p: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+        <Typography variant="h5">Players</Typography>
+        <Button variant="contained" color="primary" onClick={handleOpen}>
+          Add Player
+        </Button>
+      </Box>
+
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>Name</TableCell>
+              <TableCell>Age</TableCell>
+              <TableCell>Role</TableCell>
+              <TableCell>Batting Style</TableCell>
+              <TableCell>Bowling Style</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {players.map((player) => (
+              <TableRow key={player._id}>
+                <TableCell>{player.name}</TableCell>
+                <TableCell>{player.age}</TableCell>
+                <TableCell>{player.role}</TableCell>
+                <TableCell>{player.battingStyle}</TableCell>
+                <TableCell>{player.bowlingStyle}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      <Dialog open={open} onClose={handleClose}>
+        <DialogTitle>Create New Player</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 2, minWidth: 400 }}>
+            <TextField
+              label="Name"
+              value={newPlayer.name}
+              onChange={(e) => setNewPlayer({ ...newPlayer, name: e.target.value })}
+              fullWidth
+              required
+            />
+            <TextField
+              label="Age"
+              type="number"
+              value={newPlayer.age}
+              onChange={(e) => setNewPlayer({ ...newPlayer, age: parseInt(e.target.value) || 0 })}
+              fullWidth
+              required
+            />
+            <FormControl fullWidth>
+              <InputLabel>Role</InputLabel>
+              <Select
+                value={newPlayer.role}
+                label="Role"
+                onChange={(e) => setNewPlayer({ ...newPlayer, role: e.target.value as Player['role'] })}
+              >
+                <MenuItem value="batsman">Batsman</MenuItem>
+                <MenuItem value="bowler">Bowler</MenuItem>
+                <MenuItem value="all-rounder">All-Rounder</MenuItem>
+              </Select>
+            </FormControl>
+            <FormControl fullWidth>
+              <InputLabel>Batting Style</InputLabel>
+              <Select
+                value={newPlayer.battingStyle}
+                label="Batting Style"
+                onChange={(e) => setNewPlayer({ ...newPlayer, battingStyle: e.target.value as 'right-handed' | 'left-handed' })}
+              >
+                <MenuItem value="right-handed">Right Handed</MenuItem>
+                <MenuItem value="left-handed">Left Handed</MenuItem>
+              </Select>
+            </FormControl>
+            <TextField
+              label="Bowling Style"
+              value={newPlayer.bowlingStyle}
+              onChange={(e) => setNewPlayer({ ...newPlayer, bowlingStyle: e.target.value })}
+              fullWidth
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleClose}>Cancel</Button>
+          <Button 
+            onClick={handleSubmit} 
+            variant="contained" 
+            color="primary"
+            disabled={!newPlayer.name || newPlayer.age <= 0}
+          >
+            Create
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+};
+
+export default PlayerList;
