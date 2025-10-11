@@ -1,0 +1,7 @@
+{
+  "buildCommand": "chmod +x ./build.sh && ./build.sh",
+  "startCommand": "cd server && npm start",
+  "env": {
+    "NODE_VERSION": "18.x"
+  }
+}
