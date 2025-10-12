@@ -14,6 +14,9 @@ import {
   Tab,
   Card,
   CardContent,
+  Container,
+  useTheme,
+  useMediaQuery
 } from '@mui/material';
 import { useParams } from 'react-router-dom';
 import { Match, Team, Player, BattingStats, BowlingStats } from '../types';
@@ -22,6 +25,9 @@ import MatchCommentary from '../components/MatchCommentary';
 
 const MatchSummary: React.FC = () => {
   const { matchId } = useParams();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  
   const [match, setMatch] = useState<Match | null>(null);
   const [teams, setTeams] = useState<{ [key: string]: Team }>({});
   const [players, setPlayers] = useState<{ [key: string]: Player }>({});
@@ -162,7 +168,8 @@ const MatchSummary: React.FC = () => {
               borderRadius: '12px',
               boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
               border: '1px solid #e0e0e0',
-              mb: 3
+              mb: 3,
+              overflowX: 'auto'
             }}
           >
             <Table size="small">
@@ -239,6 +246,7 @@ const MatchSummary: React.FC = () => {
               borderRadius: '12px',
               boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
               border: '1px solid #e0e0e0',
+              overflowX: 'auto'
             }}
           >
             <Table size="small">
@@ -446,11 +454,12 @@ const MatchSummary: React.FC = () => {
   };
 
   return (
-    <Box
+    <Container 
+      maxWidth="lg" 
       sx={{
         minHeight: '100vh',
         background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
-        padding: 3,
+        padding: { xs: 1, sm: 3 },
       }}
     >
       <Paper
@@ -458,7 +467,7 @@ const MatchSummary: React.FC = () => {
         sx={{
           maxWidth: '1200px',
           margin: '0 auto',
-          padding: 4,
+          padding: { xs: 2, sm: 4 },
           borderRadius: 3,
           background: '#ffffff',
           border: '1px solid rgba(0,0,0,0.1)',
@@ -499,12 +508,15 @@ const MatchSummary: React.FC = () => {
           <Tabs 
             value={tabValue} 
             onChange={handleTabChange} 
+            variant={isMobile ? "scrollable" : "standard"}
+            scrollButtons="auto"
             sx={{ 
               borderBottom: 1, 
               borderColor: 'divider',
               '& .MuiTab-root': {
                 fontWeight: 'bold',
-                fontSize: '1rem'
+                fontSize: { xs: '0.875rem', sm: '1rem' },
+                minWidth: { xs: 'auto', sm: 160 }
               }
             }}
           >
@@ -547,7 +559,7 @@ const MatchSummary: React.FC = () => {
           </Box>
         )}
       </Paper>
-    </Box>
+    </Container>
   );
 };
 

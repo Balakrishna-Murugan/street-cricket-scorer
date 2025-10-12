@@ -22,7 +22,14 @@ import {
   CircularProgress,
   Select,
   MenuItem,
-  FormControl
+  FormControl,
+  Card,
+  CardContent,
+  CardActions,
+  Container,
+  useTheme,
+  useMediaQuery,
+  Chip
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -42,6 +49,9 @@ const defaultTeam: TeamFormData = {
 };
 
 const TeamList: React.FC = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  
   const [players, setPlayers] = useState<Player[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [open, setOpen] = useState(false);
@@ -177,7 +187,7 @@ const TeamList: React.FC = () => {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Container maxWidth="lg" sx={{ p: { xs: 1, sm: 3 } }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
         <Typography variant="h5">Teams</Typography>
         <Button 
@@ -185,17 +195,73 @@ const TeamList: React.FC = () => {
           color="primary" 
           onClick={handleOpen}
           disabled={loading}
+          size={isMobile ? "small" : "medium"}
         >
           Add Team
         </Button>
       </Box>
 
-      <TableContainer component={Paper}>
-        {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-            <CircularProgress />
-          </Box>
-        ) : (
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+          <CircularProgress />
+        </Box>
+      ) : isMobile ? (
+        // Mobile Card Layout
+        <Stack spacing={2}>
+          {teams.map((team) => (
+            <Card key={team._id}>
+              <CardContent>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                  <Typography variant="h6" component="h2">
+                    {team.name}
+                  </Typography>
+                  <Chip 
+                    label={`${team.members.length} members`} 
+                    color="primary" 
+                    size="small"
+                  />
+                </Box>
+                <Stack spacing={1}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="body2" color="text.secondary">Captain:</Typography>
+                    <Typography variant="body2">
+                      {typeof team.captain === 'object' ? team.captain.name : team.captain || 'No Captain'}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="body2" color="text.secondary">Total Members:</Typography>
+                    <Typography variant="body2">{team.members.length}</Typography>
+                  </Box>
+                </Stack>
+              </CardContent>
+              <CardActions>
+                <Button
+                  onClick={() => handleEdit(team)}
+                  color="primary"
+                  size="small"
+                  startIcon={<EditIcon />}
+                >
+                  Edit
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (window.confirm('Are you sure you want to delete this team?')) {
+                      handleDelete(team._id!);
+                    }
+                  }}
+                  color="error"
+                  size="small"
+                  startIcon={<DeleteIcon />}
+                >
+                  Delete
+                </Button>
+              </CardActions>
+            </Card>
+          ))}
+        </Stack>
+      ) : (
+        // Desktop Table Layout
+        <TableContainer component={Paper}>
           <Table>
             <TableHead>
               <TableRow>
@@ -235,10 +301,16 @@ const TeamList: React.FC = () => {
               ))}
             </TableBody>
           </Table>
-        )}
-      </TableContainer>
+        </TableContainer>
+      )}
 
-      <Dialog open={open} onClose={handleClose}>
+      <Dialog 
+        open={open} 
+        onClose={handleClose}
+        fullScreen={isMobile}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>{editingTeam ? 'Edit Team' : 'Create New Team'}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 2, minWidth: 400 }}>
@@ -302,7 +374,7 @@ const TeamList: React.FC = () => {
           {error}
         </Alert>
       </Snackbar>
-    </Box>
+    </Container>
   );
 };
 

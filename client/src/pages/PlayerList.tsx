@@ -23,7 +23,14 @@ import {
   IconButton,
   Snackbar,
   Alert,
-  CircularProgress
+  CircularProgress,
+  Card,
+  CardContent,
+  CardActions,
+  Container,
+  useTheme,
+  useMediaQuery,
+  Chip
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -40,6 +47,9 @@ const defaultPlayer: Omit<Player, '_id'> = {
 };
 
 const PlayerList: React.FC = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  
   const [players, setPlayers] = useState<Player[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [open, setOpen] = useState(false);
@@ -141,20 +151,93 @@ const PlayerList: React.FC = () => {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Container maxWidth="lg" sx={{ p: { xs: 1, sm: 3 } }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
         <Typography variant="h5">Players</Typography>
-        <Button variant="contained" color="primary" onClick={handleOpen}>
+        <Button 
+          variant="contained" 
+          color="primary" 
+          onClick={handleOpen}
+          size={isMobile ? "small" : "medium"}
+        >
           Add Player
         </Button>
       </Box>
 
-      <TableContainer component={Paper}>
-        {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-            <CircularProgress />
-          </Box>
-        ) : (
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+          <CircularProgress />
+        </Box>
+      ) : isMobile ? (
+        // Mobile Card Layout
+        <Stack spacing={2}>
+          {players.map((player) => (
+            <Card key={player._id}>
+              <CardContent>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                  <Typography variant="h6" component="h2">
+                    {player.name}
+                  </Typography>
+                  <Chip 
+                    label={player.role} 
+                    color="primary" 
+                    size="small"
+                  />
+                </Box>
+                <Stack spacing={1}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="body2" color="text.secondary">Age:</Typography>
+                    <Typography variant="body2">{player.age}</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="body2" color="text.secondary">Batting:</Typography>
+                    <Typography variant="body2">{player.battingStyle}</Typography>
+                  </Box>
+                  {player.bowlingStyle && (
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Typography variant="body2" color="text.secondary">Bowling:</Typography>
+                      <Typography variant="body2">{player.bowlingStyle}</Typography>
+                    </Box>
+                  )}
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="body2" color="text.secondary">Team:</Typography>
+                    <Typography variant="body2">
+                      {player.teams && player.teams.length > 0 ? (
+                        typeof player.teams[0] === 'object' ? player.teams[0].name : 
+                        teams.find(t => t._id === player.teams![0])?.name || 'Unknown'
+                      ) : 'No Team'}
+                    </Typography>
+                  </Box>
+                </Stack>
+              </CardContent>
+              <CardActions>
+                <Button
+                  onClick={() => handleEdit(player)}
+                  color="primary"
+                  size="small"
+                  startIcon={<EditIcon />}
+                >
+                  Edit
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (window.confirm('Are you sure you want to delete this player?')) {
+                      handleDelete(player._id!);
+                    }
+                  }}
+                  color="error"
+                  size="small"
+                  startIcon={<DeleteIcon />}
+                >
+                  Delete
+                </Button>
+              </CardActions>
+            </Card>
+          ))}
+        </Stack>
+      ) : (
+        // Desktop Table Layout
+        <TableContainer component={Paper}>
           <Table>
             <TableHead>
               <TableRow>
@@ -205,10 +288,16 @@ const PlayerList: React.FC = () => {
               ))}
             </TableBody>
           </Table>
-        )}
-      </TableContainer>
+        </TableContainer>
+      )}
 
-      <Dialog open={open} onClose={handleClose}>
+      <Dialog 
+        open={open} 
+        onClose={handleClose}
+        fullScreen={isMobile}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>{editingPlayer ? 'Edit Player' : 'Create New Player'}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 2, minWidth: 400 }}>
@@ -300,7 +389,7 @@ const PlayerList: React.FC = () => {
           {error}
         </Alert>
       </Snackbar>
-    </Box>
+    </Container>
   );
 };
 
