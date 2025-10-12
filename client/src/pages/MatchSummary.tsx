@@ -71,7 +71,13 @@ const MatchSummary: React.FC = () => {
   };
 
   const renderInningsSummary = (inningData: any, inningNumber: number) => {
-    const battingTeamName = teams[inningData.battingTeam]?.name || 'Unknown Team';
+    // FIXED: Handle both string ID and populated object for battingTeam
+    const battingTeamId = typeof inningData.battingTeam === 'string' 
+      ? inningData.battingTeam 
+      : inningData.battingTeam._id;
+    const battingTeamName = teams[battingTeamId]?.name || 
+      (typeof inningData.battingTeam === 'object' ? inningData.battingTeam.name : null) ||
+      'Unknown Team';
 
     return (
       <Box sx={{ mb: 4 }}>

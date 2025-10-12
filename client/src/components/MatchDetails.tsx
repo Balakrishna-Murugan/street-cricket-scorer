@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Typography, Button, Stack, Chip } from '@mui/material';
+import { Box, Typography, Button, Stack, Chip, useTheme, useMediaQuery } from '@mui/material';
 import { Player, BallOutcome } from '../types';
 
 interface MatchDetailsProps {
@@ -19,6 +19,7 @@ interface MatchDetailsProps {
   isAdmin?: boolean;
   isOverInProgress?: boolean;
   isOverCompleted?: boolean;
+  isMatchCompleted?: boolean;
   overCompletionMessage?: string;
   onStartNewOver?: () => void;
   onEndOver?: () => void;
@@ -40,10 +41,13 @@ const MatchDetails: React.FC<MatchDetailsProps> = ({
   isAdmin = false,
   isOverInProgress = false,
   isOverCompleted = false,
+  isMatchCompleted = false,
   overCompletionMessage = '',
   onStartNewOver,
   onEndOver,
 }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const formatOvers = (totalBalls: number) => {
     const completeOvers = Math.floor(totalBalls / 6);
     const remainingBalls = totalBalls % 6;
@@ -81,25 +85,41 @@ const MatchDetails: React.FC<MatchDetailsProps> = ({
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-        {/* Left side - Score */}
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#1976d2' }}>
+      <Box 
+        sx={{ 
+          display: 'flex', 
+          flexDirection: isMobile ? 'column' : 'row',
+          justifyContent: 'space-between', 
+          alignItems: isMobile ? 'center' : 'flex-start', 
+          mb: 2,
+          gap: 2 
+        }}
+      >
+        {/* Score Section */}
+        <Box sx={{ textAlign: isMobile ? 'center' : 'left' }}>
+          <Typography 
+            variant={isMobile ? "h3" : "h4"} 
+            sx={{ fontWeight: 'bold', color: '#1976d2' }}
+          >
             {totalRuns}/{wickets}
           </Typography>
-          <Typography variant="h6" sx={{ color: '#666' }}>
+          <Typography 
+            variant={isMobile ? "h5" : "h6"} 
+            sx={{ color: '#666' }}
+          >
             Overs: {totalBalls !== undefined ? formatOvers(totalBalls) : formatOversFromDecimal(overs)}
           </Typography>
         </Box>
 
-        {/* Right side - Over Management */}
-        {isAdmin && (
+        {/* Over Management Section */}
+        {isAdmin && !isMatchCompleted && (
           <Box sx={{ 
             p: 2,
             background: '#f8f9fa',
             borderRadius: '8px',
             border: '1px solid #e9ecef',
-            minWidth: '200px'
+            width: isMobile ? '100%' : '250px',
+            maxWidth: isMobile ? '400px' : '250px'
           }}>
             <Typography 
               variant="subtitle2" 
@@ -107,7 +127,8 @@ const MatchDetails: React.FC<MatchDetailsProps> = ({
               sx={{ 
                 color: '#2c3e50',
                 fontWeight: 'bold',
-                mb: 1
+                mb: 1,
+                textAlign: isMobile ? 'center' : 'left'
               }}
             >
               🏏 Over Control
@@ -115,12 +136,13 @@ const MatchDetails: React.FC<MatchDetailsProps> = ({
             <Stack direction="column" spacing={1}>
               <Button
                 variant="contained"
-                size="small"
+                size={isMobile ? "medium" : "small"}
                 onClick={onStartNewOver}
                 disabled={isOverInProgress || isOverCompleted}
+                fullWidth
                 sx={{
-                  fontSize: '0.75rem',
-                  py: 0.5,
+                  fontSize: isMobile ? '0.875rem' : '0.75rem',
+                  py: isMobile ? 1 : 0.5,
                   background: 'linear-gradient(45deg, #4CAF50 30%, #8BC34A 90%)',
                   '&:disabled': {
                     background: '#ccc',
@@ -131,12 +153,13 @@ const MatchDetails: React.FC<MatchDetailsProps> = ({
               </Button>
               <Button
                 variant="outlined"
-                size="small"
+                size={isMobile ? "medium" : "small"}
                 onClick={onEndOver}
                 disabled={!isOverInProgress || isOverCompleted}
+                fullWidth
                 sx={{
-                  fontSize: '0.75rem',
-                  py: 0.5,
+                  fontSize: isMobile ? '0.875rem' : '0.75rem',
+                  py: isMobile ? 1 : 0.5,
                   color: '#FF8A65',
                   borderColor: '#FF8A65',
                 }}
@@ -146,12 +169,13 @@ const MatchDetails: React.FC<MatchDetailsProps> = ({
               <Typography 
                 variant="caption" 
                 sx={{ 
-                  color: isOverCompleted ? '#f57c00' : isOverInProgress ? '#4caf50' : '#666',
+                  color: isMatchCompleted ? '#d32f2f' : isOverCompleted ? '#f57c00' : isOverInProgress ? '#4caf50' : '#666',
                   fontWeight: 'bold',
                   textAlign: 'center'
                 }}
               >
-                {isOverCompleted ? '✅ Over Complete' :
+                {isMatchCompleted ? '🏆 Match Completed!' :
+                 isOverCompleted ? '✅ Over Complete' :
                  isOverInProgress ? '🏏 In Progress' : 
                  '⏸️ Not Started'}
               </Typography>
@@ -165,18 +189,26 @@ const MatchDetails: React.FC<MatchDetailsProps> = ({
           This Over:
         </Typography>
         {currentOverBalls.length > 0 ? (
-          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
+          <Stack 
+            direction="row" 
+            spacing={1} 
+            sx={{ 
+              flexWrap: 'wrap', 
+              gap: 1,
+              justifyContent: isMobile ? 'center' : 'flex-start'
+            }}
+          >
             {currentOverBalls.map((ball, index) => (
               <Chip
                 key={index}
                 label={getBallChipLabel(ball)}
                 color={getBallChipColor(ball)}
-                size="small"
+                size={isMobile ? "medium" : "small"}
                 sx={{ 
-                  minWidth: '28px',
-                  height: '28px',
+                  minWidth: isMobile ? '32px' : '28px',
+                  height: isMobile ? '32px' : '28px',
                   fontWeight: 'bold',
-                  fontSize: '0.7rem',
+                  fontSize: isMobile ? '0.8rem' : '0.7rem',
                   '& .MuiChip-label': {
                     px: 0.5
                   }
@@ -185,14 +217,28 @@ const MatchDetails: React.FC<MatchDetailsProps> = ({
             ))}
           </Stack>
         ) : (
-          <Typography variant="body2" sx={{ color: '#666', fontStyle: 'italic' }}>
+          <Typography 
+            variant="body2" 
+            sx={{ 
+              color: '#666', 
+              fontStyle: 'italic',
+              textAlign: isMobile ? 'center' : 'left'
+            }}
+          >
             No balls bowled yet
           </Typography>
         )}
       </Box>
 
-      <Box sx={{ display: 'flex', gap: 4, mb: 2 }}>
-        <Box>
+      <Box 
+        sx={{ 
+          display: 'flex', 
+          flexDirection: isMobile ? 'column' : 'row',
+          gap: isMobile ? 2 : 4, 
+          mb: 2 
+        }}
+      >
+        <Box sx={{ textAlign: isMobile ? 'center' : 'left' }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
             {players.find(p => p._id === striker)?.name || 'Select Striker'} *
           </Typography>
@@ -200,7 +246,7 @@ const MatchDetails: React.FC<MatchDetailsProps> = ({
             {strikerStats.runs}({strikerStats.balls})
           </Typography>
         </Box>
-        <Box>
+        <Box sx={{ textAlign: isMobile ? 'center' : 'left' }}>
           <Typography variant="subtitle2">
             {players.find(p => p._id === nonStriker)?.name || 'Select Non-striker'}
           </Typography>
@@ -210,7 +256,7 @@ const MatchDetails: React.FC<MatchDetailsProps> = ({
         </Box>
       </Box>
 
-      <Box>
+      <Box sx={{ textAlign: isMobile ? 'center' : 'left' }}>
         <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
           Bowler: {players.find(p => p._id === bowler)?.name || 'Select Bowler'}
         </Typography>

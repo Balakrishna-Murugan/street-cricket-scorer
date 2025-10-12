@@ -21,6 +21,82 @@ const theme = createTheme({
       main: '#dc004e',
     },
   },
+  breakpoints: {
+    values: {
+      xs: 0,
+      sm: 600,
+      md: 900,
+      lg: 1200,
+      xl: 1536,
+    },
+  },
+  components: {
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          minHeight: '44px', // Minimum touch target size
+          '@media (max-width:600px)': {
+            minHeight: '48px', // Larger touch targets on mobile
+            fontSize: '1rem',
+          },
+        },
+      },
+    },
+    MuiIconButton: {
+      styleOverrides: {
+        root: {
+          minWidth: '44px',
+          minHeight: '44px',
+          '@media (max-width:600px)': {
+            minWidth: '48px',
+            minHeight: '48px',
+          },
+        },
+      },
+    },
+    MuiTableCell: {
+      styleOverrides: {
+        root: {
+          '@media (max-width:600px)': {
+            padding: '8px 4px',
+            fontSize: '0.75rem',
+          },
+        },
+      },
+    },
+    MuiChip: {
+      styleOverrides: {
+        root: {
+          '@media (max-width:600px)': {
+            minHeight: '28px',
+            fontSize: '0.75rem',
+          },
+        },
+      },
+    },
+  },
+  typography: {
+    h3: {
+      '@media (max-width:600px)': {
+        fontSize: '1.8rem',
+      },
+    },
+    h4: {
+      '@media (max-width:600px)': {
+        fontSize: '1.5rem',
+      },
+    },
+    h5: {
+      '@media (max-width:600px)': {
+        fontSize: '1.25rem',
+      },
+    },
+    h6: {
+      '@media (max-width:600px)': {
+        fontSize: '1.1rem',
+      },
+    },
+  },
 });
 
 function App() {
@@ -36,7 +112,12 @@ function App() {
               <AuthGuard>
                 <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
                   <Header />
-                  <Box sx={{ p: 3, flexGrow: 1 }}>
+                  <Box sx={{ 
+                    p: { xs: 1, sm: 2, md: 3 }, 
+                    flexGrow: 1,
+                    maxWidth: '100vw',
+                    overflow: 'hidden'
+                  }}>
                     <Routes>
                       <Route path="/" element={<HomePage />} />
                       <Route path="/teams" element={<AdminGuard><TeamList /></AdminGuard>} />

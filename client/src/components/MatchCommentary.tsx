@@ -3,8 +3,6 @@ import {
   Box,
   Paper,
   Typography,
-  Card,
-  CardContent,
   Chip,
   Stack,
   Divider,
@@ -31,68 +29,6 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({ match }) => {
 
   const handleChange = (panel: string) => (event: React.SyntheticEvent, isExpanded: boolean) => {
     setExpandedPanel(isExpanded ? panel : false);
-  };
-
-  const generateBallCommentary = (ball: BallOutcome, overNumber: number, ballIndex: number): string => {
-    const ballNumber = `${overNumber}.${ballIndex + 1}`;
-    let commentary = `${ballNumber}: `;
-    
-    if (ball.isWicket) {
-      commentary += `🏏 WICKET! ${ball.dismissalType?.toUpperCase()}`;
-      if (ball.fielder) {
-        commentary += ` (fielded by ${ball.fielder})`;
-      }
-      if (ball.runs > 0) {
-        commentary += ` + ${ball.runs} runs`;
-      }
-    } else if (ball.extras) {
-      const extraType = ball.extras.type.replace(/([A-Z])/g, ' $1').toLowerCase();
-      commentary += `${extraType.toUpperCase()} + ${ball.extras.runs} runs`;
-      if (ball.runs > ball.extras.runs) {
-        commentary += ` + ${ball.runs - ball.extras.runs} off the bat`;
-      }
-    } else {
-      if (ball.runs === 0) {
-        commentary += `Dot ball`;
-      } else if (ball.runs === 4) {
-        commentary += `🎯 FOUR! ${ball.runs} runs`;
-      } else if (ball.runs === 6) {
-        commentary += `💥 SIX! Maximum!`;
-      } else {
-        commentary += `${ball.runs} run${ball.runs > 1 ? 's' : ''}`;
-      }
-    }
-    
-    return commentary;
-  };
-
-  const getBallChipColor = (ball: BallOutcome): 'error' | 'warning' | 'success' | 'primary' | 'secondary' => {
-    if (ball.isWicket) return 'error';
-    if (ball.extras) return 'warning';
-    if (ball.runs >= 4) return 'success';
-    if (ball.runs > 0) return 'primary';
-    return 'secondary';
-  };
-
-  const getBallChipLabel = (ball: BallOutcome): string => {
-    if (ball.isWicket) return 'W';
-    if (ball.extras) {
-      const shortForm = {
-        'wide': 'Wd',
-        'no-ball': 'Nb',
-        'bye': 'B',
-        'leg-bye': 'Lb'
-      }[ball.extras.type] || ball.extras.type;
-      return `${shortForm}${ball.extras.runs}`;
-    }
-    return ball.runs.toString();
-  };
-
-  const getOverSummary = (balls: BallOutcome[]): string => {
-    const totalRuns = balls.reduce((sum, ball) => sum + ball.runs, 0);
-    const wickets = balls.filter(ball => ball.isWicket).length;
-    const summary = balls.map(ball => getBallChipLabel(ball)).join(' ');
-    return `${totalRuns} runs${wickets > 0 ? `, ${wickets} wicket${wickets > 1 ? 's' : ''}` : ''} (${summary})`;
   };
 
   if (!match || !match.innings || match.innings.length === 0) {
@@ -133,25 +69,16 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({ match }) => {
             ? innings.battingTeam.name 
             : `Team ${inningsNumber}`;
           
-          // Create ball outcomes from innings data if available
+          // Get ball outcomes from current over balls
           const allBalls: BallOutcome[] = [];
           
-          // If the innings has ball-by-ball data, use it
-          // Otherwise, create a representation from batting stats
-          if (innings.battingStats && innings.battingStats.length > 0) {
-            innings.battingStats.forEach(stat => {
-              for (let i = 0; i < (stat.balls || 0); i++) {
-                // Create approximate ball outcomes based on stats
-                // This is a simplified representation
-                allBalls.push({
-                  ballNumber: allBalls.length + 1,
-                  runs: i === (stat.balls || 0) - 1 ? Math.min(stat.runs || 0, 6) : Math.random() > 0.7 ? Math.floor(Math.random() * 7) : 0,
-                  isWicket: stat.isOut && i === (stat.balls || 0) - 1,
-                  dismissalType: stat.isOut ? (stat.dismissalType as any) : undefined
-                });
-              }
-            });
+          // Use current over balls for any innings that has them
+          if (innings.currentOverBalls && Array.isArray(innings.currentOverBalls) && innings.currentOverBalls.length > 0) {
+            allBalls.push(...innings.currentOverBalls);
           }
+          
+          // For active innings, also check if we should show all historical balls
+          // (This would require storing ball history properly, which we'll implement later)
           
           return (
             <Paper 
@@ -204,7 +131,7 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({ match }) => {
               {allBalls.length > 0 ? (
                 <BallCommentary
                   balls={allBalls.slice(-12)} // Show last 12 balls (2 overs)
-                  currentOver={Math.floor(allBalls.length / 6)}
+                  currentOver={1} // Not used anymore, calculated inside BallCommentary
                   bowlerName=""
                   strikerName=""
                   nonStrikerName=""

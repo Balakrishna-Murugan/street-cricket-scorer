@@ -27,32 +27,121 @@ const BallCommentary: React.FC<BallCommentaryProps> = ({
   nonStrikerName,
 }) => {
   const generateCommentary = (ball: BallOutcome, ballIndex: number): string => {
-    const ballNumber = `${currentOver}.${ballIndex + 1}`;
+    // Calculate proper over and ball number
+    // For extras like wide/no-ball, ball number doesn't advance
+    const legalBallsCount = balls.slice(0, ballIndex + 1).filter(b => 
+      !b.extras || (b.extras.type !== 'wide' && b.extras.type !== 'no-ball')
+    ).length;
+    
+    const overNumber = Math.floor((legalBallsCount - 1) / 6) + 1;
+    const ballInOver = ((legalBallsCount - 1) % 6) + 1;
+    const ballNumber = `${overNumber}.${ballInOver}`;
+    
     let commentary = `Ball ${ballNumber}: `;
     
     if (ball.isWicket) {
       commentary += `🏏 WICKET! ${ball.dismissalType?.toUpperCase()}`;
       if (ball.fielder) {
-        commentary += ` (fielded by ${ball.fielder})`;
+        const dismissalType = ball.dismissalType?.toLowerCase();
+        if (dismissalType === 'caught') {
+          commentary += ` - Great catch by ${ball.fielder}!`;
+        } else if (dismissalType === 'run out') {
+          commentary += ` - Sharp fielding by ${ball.fielder} breaks the stumps!`;
+        } else if (dismissalType === 'stumped') {
+          commentary += ` - Lightning fast stumping by ${ball.fielder}!`;
+        } else {
+          commentary += ` (fielded by ${ball.fielder})`;
+        }
       }
       if (ball.runs > 0) {
-        commentary += ` + ${ball.runs} runs`;
+        commentary += ` The batsman adds ${ball.runs} run${ball.runs > 1 ? 's' : ''} before departing.`;
       }
     } else if (ball.extras) {
-      const extraType = ball.extras.type.replace(/([A-Z])/g, ' $1').toLowerCase();
-      commentary += `${extraType.toUpperCase()} + ${ball.extras.runs} runs`;
-      if (ball.runs > ball.extras.runs) {
-        commentary += ` + ${ball.runs - ball.extras.runs} off the bat`;
+      const extraType = ball.extras.type;
+      let extraComment = '';
+      
+      switch (extraType) {
+        case 'wide':
+          extraComment = `📍 WIDE BALL! Bowler strays down the line. ${ball.extras.runs} extra run${ball.extras.runs > 1 ? 's' : ''} to the batting team.`;
+          if (ball.runs > ball.extras.runs) {
+            const batRuns = ball.runs - ball.extras.runs;
+            extraComment += ` Batsman also manages to score ${batRuns} run${batRuns > 1 ? 's' : ''} off the wide delivery.`;
+          }
+          break;
+        case 'no-ball':
+          extraComment = `🚫 NO BALL! Free hit coming up! ${ball.extras.runs} penalty run${ball.extras.runs > 1 ? 's' : ''}.`;
+          if (ball.runs > ball.extras.runs) {
+            const batRuns = ball.runs - ball.extras.runs;
+            if (batRuns === 4) {
+              extraComment += ` Plus a magnificent FOUR off the no-ball!`;
+            } else if (batRuns === 6) {
+              extraComment += ` Plus a massive SIX off the no-ball!`;
+            } else {
+              extraComment += ` Batsman adds ${batRuns} more run${batRuns > 1 ? 's' : ''}.`;
+            }
+          }
+          break;
+        case 'bye':
+          extraComment = `🏃 BYES! Ball beats everyone - keeper, batsman, and stumps. ${ball.extras.runs} run${ball.extras.runs > 1 ? 's' : ''} stolen by smart running.`;
+          break;
+        case 'leg-bye':
+          extraComment = `🦵 LEG BYES! Ball hits the pad and deflects away. ${ball.extras.runs} run${ball.extras.runs > 1 ? 's' : ''} added to the total.`;
+          break;
+        default:
+          extraComment = `${String(extraType).toUpperCase()} + ${ball.extras.runs} runs`;
+          break;
       }
+      commentary += extraComment;
     } else {
       if (ball.runs === 0) {
-        commentary += `Dot ball`;
+        const dotComments = [
+          'Dot ball - solid defensive stroke',
+          'Excellent line and length, batsman defends',
+          'No run taken, good bowling',
+          'Fielder cuts it off, no single possible',
+          'Watchful leave by the batsman'
+        ];
+        commentary += dotComments[Math.floor(Math.random() * dotComments.length)];
+      } else if (ball.runs === 1) {
+        const singleComments = [
+          'Quick single taken with smart running',
+          'Nudged for a single, strike rotated',
+          'Good running between the wickets',
+          'Single to keep the scoreboard ticking'
+        ];
+        commentary += singleComments[Math.floor(Math.random() * singleComments.length)];
+      } else if (ball.runs === 2) {
+        const doubleComments = [
+          'Excellent running! Two runs completed',
+          'Good placement, easy couple of runs',
+          'Hustled back for the second run',
+          'Smart cricket, converts one into two'
+        ];
+        commentary += doubleComments[Math.floor(Math.random() * doubleComments.length)];
+      } else if (ball.runs === 3) {
+        commentary += 'Superb running! Three runs taken with excellent placement and quick feet';
       } else if (ball.runs === 4) {
-        commentary += `🎯 FOUR! ${ball.runs} runs`;
+        const fourComments = [
+          '🎯 FOUR! Magnificent stroke through the covers!',
+          '🎯 FOUR! Cracking shot down the ground!',
+          '🎯 FOUR! Perfectly timed through the gaps!',
+          '🎯 FOUR! Delightful stroke to the boundary!',
+          '🎯 FOUR! Shot of the day! Textbook cricket!'
+        ];
+        commentary += fourComments[Math.floor(Math.random() * fourComments.length)];
       } else if (ball.runs === 6) {
-        commentary += `💥 SIX! Maximum!`;
+        const sixComments = [
+          '💥 SIX! MASSIVE! That ball has been absolutely demolished!',
+          '💥 SIX! What a strike! Into the stands it goes!',
+          '💥 SIX! Clean as a whistle! Perfect connection!',
+          '💥 SIX! That\'s out of the park! Incredible power!',
+          '💥 SIX! Maximum! The crowd is on its feet!'
+        ];
+        commentary += sixComments[Math.floor(Math.random() * sixComments.length)];
+      } else if (ball.runs === 5) {
+        commentary += `${ball.runs} runs! Excellent shot with an overthrow adding the extra run`;
       } else {
-        commentary += `${ball.runs} run${ball.runs > 1 ? 's' : ''}`;
+        commentary += `${ball.runs} runs taken - good cricket all around`;
       }
     }
     

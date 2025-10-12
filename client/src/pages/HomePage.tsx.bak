@@ -155,6 +155,40 @@ const HomePage: React.FC = () => {
                 </Typography>
               </Paper>
             </Box>
+              </>
+            )}
+
+            <Box width={{ xs: '100%', sm: isMobile ? '100%' : 'calc(50% - 12px)', md: 'calc(25% - 18px)' }}>
+              <Paper
+                onClick={() => navigate('/matches')}
+                sx={{
+                  p: 3,
+                  textAlign: 'center',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  borderRadius: '12px',
+                  background: 'linear-gradient(45deg, #fff3e0 30%, #ffcc02 90%)',
+                  border: '1px solid #FF9800',
+                  minHeight: isMobile ? '120px' : '140px',
+                  '&:hover': {
+                    transform: 'translateY(-4px)',
+                    boxShadow: '0 8px 16px rgba(255, 152, 0, 0.3)'
+                  }
+                }}
+              >
+                <SportsCricketIcon sx={{ fontSize: isMobile ? 40 : 50, mb: 2, color: '#e65100' }} />
+                <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#2c3e50' }}>
+                  {isAdmin ? 'Manage Matches' : 'View Matches'}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {isAdmin ? 'Create and manage matches' : 'View live matches'}
+                </Typography>
+              </Paper>
+            </Box>
           </Stack>
         </Paper>
       </Container>

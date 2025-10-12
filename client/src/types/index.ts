@@ -17,7 +17,8 @@ export interface Player {
   role: 'batsman' | 'bowler' | 'all-rounder';
   battingStyle?: 'right-handed' | 'left-handed';
   bowlingStyle?: string;
-  teams?: Array<string | TeamRef>;
+  team?: string | TeamRef; // Single team reference (singular)
+  teams?: Array<string | TeamRef>; // Multiple teams reference (plural) - for backwards compatibility
 }
 
 export interface Team {
@@ -98,6 +99,7 @@ export interface Innings {
   extras: Extras;
   runRate: number;
   requiredRunRate?: number;
+  currentOverBalls?: BallOutcome[]; // Store current over's ball-by-ball data
 }
 
 export interface Over {
