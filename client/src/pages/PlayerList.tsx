@@ -101,13 +101,18 @@ const PlayerList: React.FC = () => {
 
   const handleEdit = (player: Player) => {
     setEditingPlayer(player);
+    // Handle teams properly - extract IDs from populated objects or use existing IDs
+    const teamIds = player.teams ? player.teams.map(team => 
+      typeof team === 'object' ? team._id : team
+    ).filter(Boolean) : [];
+    
     setNewPlayer({
       name: player.name,
       age: player.age,
       role: player.role,
       battingStyle: player.battingStyle,
       bowlingStyle: player.bowlingStyle,
-      teams: player.teams || []
+      teams: teamIds
     });
     setOpen(true);
   };
@@ -136,7 +141,16 @@ const PlayerList: React.FC = () => {
     setError(null);
     try {
       if (editingPlayer?._id) {
-        await playerService.update(editingPlayer._id, { ...editingPlayer, ...newPlayer });
+        // Create clean update data with just the fields we want to update
+        const updateData = {
+          name: newPlayer.name,
+          age: newPlayer.age,
+          role: newPlayer.role,
+          battingStyle: newPlayer.battingStyle,
+          bowlingStyle: newPlayer.bowlingStyle,
+          teams: newPlayer.teams
+        };
+        await playerService.update(editingPlayer._id, updateData as Player);
       } else {
         await playerService.create(newPlayer);
       }
@@ -300,7 +314,7 @@ const PlayerList: React.FC = () => {
       >
         <DialogTitle>{editingPlayer ? 'Edit Player' : 'Create New Player'}</DialogTitle>
         <DialogContent>
-          <Stack spacing={2} sx={{ mt: 2, minWidth: 400 }}>
+          <Stack spacing={2} sx={{ mt: 2, minWidth: { xs: 'auto', sm: 400 } }}>
             <TextField
               label="Name"
               value={newPlayer.name}
@@ -308,6 +322,7 @@ const PlayerList: React.FC = () => {
               fullWidth
               required
               error={!newPlayer.name && error != null}
+              size={isMobile ? "small" : "medium"}
             />
             <TextField
               label="Age"
@@ -317,8 +332,9 @@ const PlayerList: React.FC = () => {
               fullWidth
               required
               error={newPlayer.age <= 0 && error != null}
+              size={isMobile ? "small" : "medium"}
             />
-            <FormControl fullWidth>
+            <FormControl fullWidth size={isMobile ? "small" : "medium"}>
               <InputLabel>Role</InputLabel>
               <Select
                 value={newPlayer.role}
@@ -330,7 +346,7 @@ const PlayerList: React.FC = () => {
                 <MenuItem value="all-rounder">All-Rounder</MenuItem>
               </Select>
             </FormControl>
-            <FormControl fullWidth>
+            <FormControl fullWidth size={isMobile ? "small" : "medium"}>
               <InputLabel>Batting Style</InputLabel>
               <Select
                 value={newPlayer.battingStyle}
@@ -346,8 +362,9 @@ const PlayerList: React.FC = () => {
               value={newPlayer.bowlingStyle}
               onChange={(e) => setNewPlayer({ ...newPlayer, bowlingStyle: e.target.value })}
               fullWidth
+              size={isMobile ? "small" : "medium"}
             />
-            <FormControl fullWidth>
+            <FormControl fullWidth size={isMobile ? "small" : "medium"}>
               <InputLabel>Team</InputLabel>
               <Select
                 value={newPlayer.teams?.[0] || ''}
@@ -367,13 +384,19 @@ const PlayerList: React.FC = () => {
             </FormControl>
           </Stack>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleClose}>Cancel</Button>
+        <DialogActions sx={{ p: { xs: 2, sm: 1 } }}>
+          <Button 
+            onClick={handleClose}
+            size={isMobile ? "small" : "medium"}
+          >
+            Cancel
+          </Button>
           <Button 
             onClick={handleSubmit} 
             variant="contained" 
             color="primary"
             disabled={loading || !newPlayer.name || newPlayer.age <= 0}
+            size={isMobile ? "small" : "medium"}
           >
             {loading ? <CircularProgress size={24} /> : (editingPlayer ? 'Save' : 'Create')}
           </Button>

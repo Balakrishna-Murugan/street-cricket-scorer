@@ -313,7 +313,7 @@ const TeamList: React.FC = () => {
       >
         <DialogTitle>{editingTeam ? 'Edit Team' : 'Create New Team'}</DialogTitle>
         <DialogContent>
-          <Stack spacing={2} sx={{ mt: 2, minWidth: 400 }}>
+          <Stack spacing={2} sx={{ mt: 2, minWidth: { xs: 'auto', sm: 400 } }}>
             <TextField
               label="Team Name"
               value={newTeam.name}
@@ -321,8 +321,9 @@ const TeamList: React.FC = () => {
               fullWidth
               required
               error={!newTeam.name && error != null}
+              size={isMobile ? "small" : "medium"}
             />
-            <FormControl fullWidth>
+            <FormControl fullWidth size={isMobile ? "small" : "medium"}>
               <Select
                 value={newTeam.captain === undefined || newTeam.captain === 'undefined' || newTeam.captain === null ? '' : newTeam.captain}
                 onChange={(e) => {
@@ -350,15 +351,48 @@ const TeamList: React.FC = () => {
                 ))}
               </Select>
             </FormControl>
+            
+            <FormControl fullWidth size={isMobile ? "small" : "medium"}>
+              <Select
+                multiple
+                value={newTeam.members || []}
+                onChange={(e) => {
+                  const value = e.target.value as string[];
+                  setNewTeam({ ...newTeam, members: value });
+                }}
+                displayEmpty
+                renderValue={(selected) => {
+                  if (!selected || selected.length === 0) {
+                    return <span style={{ color: '#999' }}>Select Team Members (Optional)</span>;
+                  }
+                  return `${selected.length} member(s) selected`;
+                }}
+              >
+                <MenuItem value="" disabled>
+                  <em>Select Team Members</em>
+                </MenuItem>
+                {players.map((player) => (
+                  <MenuItem key={player._id} value={player._id || ''}>
+                    {player.name} - {player.role}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </Stack>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleClose}>Cancel</Button>
+        <DialogActions sx={{ p: { xs: 2, sm: 1 } }}>
+          <Button 
+            onClick={handleClose}
+            size={isMobile ? "small" : "medium"}
+          >
+            Cancel
+          </Button>
           <Button 
             onClick={handleSubmit} 
             variant="contained" 
             color="primary"
             disabled={loading || !newTeam.name}
+            size={isMobile ? "small" : "medium"}
           >
             {loading ? <CircularProgress size={24} /> : editingTeam ? 'Save' : 'Create'}
           </Button>

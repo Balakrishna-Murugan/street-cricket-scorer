@@ -509,15 +509,22 @@ const MatchSummary: React.FC = () => {
             value={tabValue} 
             onChange={handleTabChange} 
             variant={isMobile ? "scrollable" : "standard"}
-            scrollButtons="auto"
+            scrollButtons={isMobile ? "auto" : false}
+            allowScrollButtonsMobile
             sx={{ 
               borderBottom: 1, 
               borderColor: 'divider',
               '& .MuiTab-root': {
                 fontWeight: 'bold',
                 fontSize: { xs: '0.875rem', sm: '1rem' },
-                minWidth: { xs: 'auto', sm: 160 }
-              }
+                minWidth: { xs: 80, sm: 160 },
+                padding: { xs: '6px 8px', sm: '12px 16px' }
+              },
+              '& .MuiTabs-scrollButtons': {
+                '&.Mui-disabled': {
+                  opacity: 0.3,
+                },
+              },
             }}
           >
             <Tab label="📊 Match Summary" />
