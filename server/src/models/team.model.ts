@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 export interface ITeam {
   name: string;
-  captain: mongoose.Types.ObjectId;
+  captain?: mongoose.Types.ObjectId;
   members: mongoose.Types.ObjectId[];
   logo?: string;
 }
@@ -17,7 +17,7 @@ const teamSchema = new mongoose.Schema<ITeam>({
   captain: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Player',
-    required: true
+    required: false
   },
   members: [{
     type: mongoose.Schema.Types.ObjectId,
