@@ -59,8 +59,8 @@ async function createMultipleSampleMatches() {
     let createdCount = 0;
     
     for (const matchData of sampleMatches) {
-      if (!matchData.team1 || !matchData.team2) {
-        console.log(`⚠️  Skipping match - teams not found`);
+      if (!matchData.team1 || !matchData.team2 || !matchData.tossWinner) {
+        console.log(`⚠️  Skipping match - teams or toss winner not found`);
         continue;
       }
       
