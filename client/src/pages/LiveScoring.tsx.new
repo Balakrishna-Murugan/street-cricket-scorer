@@ -1,0 +1,389 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { useParams } from 'react-router-dom';
+import { Match, Player, Over, BallOutcome } from '../types';
+import { matchService, playerService, overService } from '../services/api.service';
+import MatchDetails from '../components/MatchDetails';
+import {
+  Box,
+  Paper,
+  Button,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Typography,
+  Stack,
+  Grid,
+  SelectChangeEvent,
+} from '@mui/material';
+
+const LiveScoring: React.FC = () => {
+  const { matchId } = useParams<{ matchId: string }>();
+  const [match, setMatch] = useState<Match | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentInnings, setCurrentInnings] = useState<number>(0);
+  const [striker, setStriker] = useState<string>('');
+  const [nonStriker, setNonStriker] = useState<string>('');
+  const [bowler, setBowler] = useState<string>('');
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [isWicketDialogOpen, setIsWicketDialogOpen] = useState(false);
+  const [currentOver, setCurrentOver] = useState<Over | null>(null);
+  const [currentOverBalls, setCurrentOverBalls] = useState<BallOutcome[]>([]);
+  const [strikerStats, setStrikerStats] = useState<{ runs: number; balls: number }>({ runs: 0, balls: 0 });
+  const [nonStrikerStats, setNonStrikerStats] = useState<{ runs: number; balls: number }>({ runs: 0, balls: 0 });
+  const [bowlerStats, setBowlerStats] = useState<{ overs: number; runs: number; wickets: number }>({ overs: 0, runs: 0, wickets: 0 });
+
+  const fetchCurrentOver = async () => {
+    if (!matchId) return;
+    try {
+      const response = await overService.getCurrentOver(matchId);
+      setCurrentOver(response.data);
+      setCurrentOverBalls(response.data?.balls || []);
+    } catch (error) {
+      console.error('Error fetching current over:', error);
+    }
+  };
+
+  const updateBatsmanStats = (playerId: string, runs: number) => {
+    if (playerId === striker) {
+      setStrikerStats(prev => ({
+        runs: prev.runs + runs,
+        balls: prev.balls + 1
+      }));
+    } else if (playerId === nonStriker) {
+      setNonStrikerStats(prev => ({
+        runs: prev.runs + runs,
+        balls: prev.balls + 1
+      }));
+    }
+  };
+
+  const updateBowlerStats = (runs: number, isWicket: boolean = false, isExtra: boolean = false) => {
+    setBowlerStats(prev => {
+      const balls = !isExtra ? 1 : 0;
+      const totalBalls = Math.floor(prev.overs) * 6 + (prev.overs % 1) * 10 + balls;
+      return {
+        overs: Math.floor(totalBalls / 6) + (totalBalls % 6) / 10,
+        runs: prev.runs + runs,
+        wickets: isWicket ? prev.wickets + 1 : prev.wickets
+      };
+    });
+  };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [matchResponse, playersResponse] = await Promise.all([
+          matchService.getById(matchId!),
+          playerService.getAll()
+        ]);
+        setMatch(matchResponse.data);
+        setPlayers(playersResponse.data);
+        await fetchCurrentOver();
+      } catch (error) {
+        setError('Error fetching data');
+        console.error('Error:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [matchId]);
+
+  const handleBallOutcome = async (runs: number) => {
+    if (!match || currentInnings === undefined || !striker || !bowler) return;
+
+    try {
+      const newBall: BallOutcome = {
+        ballNumber: currentOverBalls.length + 1,
+        batsmanId: striker,
+        runs,
+        isWicket: false
+      };
+
+      setCurrentOverBalls(prev => [...prev, newBall]);
+      updateBatsmanStats(striker, runs);
+      updateBowlerStats(runs);
+
+      const updatedMatch = { ...match };
+      const currentInning = updatedMatch.innings![currentInnings];
+      currentInning.totalRuns += runs;
+      
+      // Update batting stats
+      const strikerStats = currentInning.battingStats.find(
+        (stat) => stat.playerId === striker
+      );
+      if (strikerStats) {
+        strikerStats.runsScored += runs;
+        strikerStats.ballsFaced += 1;
+        if (runs === 4) strikerStats.fours += 1;
+        if (runs === 6) strikerStats.sixes += 1;
+      }
+
+      // Update bowling stats
+      const bowlerStats = currentInning.bowlingStats.find(
+        (stat) => stat.playerId === bowler
+      );
+      if (bowlerStats) {
+        bowlerStats.runsGiven += runs;
+        bowlerStats.oversBowled = Math.floor(bowlerStats.oversBowled * 10 + 1) / 10;
+      }
+
+      if (currentOver) {
+        await overService.addBall(currentOver._id!, newBall);
+      } else {
+        const newOver: Omit<Over, '_id'> = {
+          matchId: matchId!,
+          inningNumber: currentInnings + 1,
+          overNumber: Math.floor(currentInning.overs) + 1,
+          bowlerId: bowler,
+          balls: [newBall],
+          overTotal: runs,
+          wickets: 0,
+          timestamp: new Date()
+        };
+        const response = await overService.create(newOver);
+        setCurrentOver(response.data);
+      }
+
+      const matchResponse = await matchService.update(matchId!, updatedMatch);
+      setMatch(matchResponse.data);
+
+      if ((runs % 2) === 1) {
+        // Swap striker and non-striker
+        const temp = striker;
+        setStriker(nonStriker);
+        setNonStriker(temp);
+      }
+
+      // Check if over is complete
+      if (currentOverBalls.length + 1 === 6) {
+        const temp = striker;
+        setStriker(nonStriker);
+        setNonStriker(temp);
+        setCurrentOver(null);
+        setCurrentOverBalls([]);
+      }
+    } catch (error) {
+      setError('Error updating match');
+      console.error('Error:', error);
+    }
+  };
+
+  const handleWicket = async (type: string) => {
+    if (!match || !matchId) return;
+
+    try {
+      const newBall: BallOutcome = {
+        ballNumber: currentOverBalls.length + 1,
+        batsmanId: striker,
+        runs: 0,
+        isWicket: true,
+        dismissalType: type,
+        dismissedPlayerId: striker
+      };
+
+      setCurrentOverBalls(prev => [...prev, newBall]);
+      updateBowlerStats(0, true);
+
+      const updatedMatch = { ...match };
+      const currentInning = updatedMatch.innings![currentInnings];
+
+      // Update batting stats
+      const strikerStats = currentInning.battingStats.find(
+        (stat) => stat.playerId === striker
+      );
+      if (strikerStats) {
+        strikerStats.isOut = true;
+        strikerStats.howOut = type;
+        strikerStats.ballsFaced += 1;
+      }
+
+      // Update bowling stats
+      const bowlerStats = currentInning.bowlingStats.find(
+        (stat) => stat.playerId === bowler
+      );
+      if (bowlerStats) {
+        bowlerStats.wicketsTaken += 1;
+        bowlerStats.oversBowled = Math.floor(bowlerStats.oversBowled * 10 + 1) / 10;
+      }
+
+      currentInning.wickets += 1;
+
+      if (currentOver) {
+        await overService.addBall(currentOver._id!, newBall);
+      }
+
+      const matchResponse = await matchService.update(matchId, updatedMatch);
+      setMatch(matchResponse.data);
+      setIsWicketDialogOpen(false);
+      setStriker('');
+    } catch (error) {
+      setError('Error recording wicket');
+      console.error('Error:', error);
+    }
+  };
+
+  const handleBatsmanChange = (event: SelectChangeEvent) => {
+    setStriker(event.target.value);
+  };
+
+  const handleNonStrikerChange = (event: SelectChangeEvent) => {
+    setNonStriker(event.target.value);
+  };
+
+  const handleBowlerChange = (event: SelectChangeEvent) => {
+    setBowler(event.target.value);
+  };
+
+  if (loading) return <Typography>Loading...</Typography>;
+  if (error) return <Typography color="error">{error}</Typography>;
+  if (!match) return <Typography>Match not found</Typography>;
+
+  const currentInning = match.innings![currentInnings];
+  const battingTeam = currentInning?.battingTeam;
+  const bowlingTeam = currentInning?.bowlingTeam;
+
+  return (
+    <Box p={3}>
+      <Typography variant="h4" gutterBottom>
+        Live Scoring - {match.team1} vs {match.team2}
+      </Typography>
+
+      <Paper sx={{ p: 2, mb: 3 }}>
+        <MatchDetails
+          totalRuns={currentInning?.totalRuns || 0}
+          wickets={currentInning?.wickets || 0}
+          overs={currentInning?.overs || 0}
+          currentOverBalls={currentOverBalls}
+          striker={striker}
+          nonStriker={nonStriker}
+          bowler={bowler}
+          players={players}
+          strikerStats={strikerStats}
+          nonStrikerStats={nonStrikerStats}
+          bowlerStats={bowlerStats}
+        />
+      </Paper>
+
+      <Grid container spacing={3} sx={{ mb: 3 }}>
+        <Grid item xs={12} md={4}>
+          <FormControl fullWidth>
+            <InputLabel>Striker</InputLabel>
+            <Select value={striker} onChange={handleBatsmanChange}>
+              {players
+                .filter(player => player.teams?.includes(battingTeam))
+                .map((player) => (
+                  <MenuItem key={player._id} value={player._id}>
+                    {player.name}
+                  </MenuItem>
+                ))}
+            </Select>
+          </FormControl>
+        </Grid>
+
+        <Grid item xs={12} md={4}>
+          <FormControl fullWidth>
+            <InputLabel>Non-Striker</InputLabel>
+            <Select value={nonStriker} onChange={handleNonStrikerChange}>
+              {players
+                .filter(player => player.teams?.includes(battingTeam))
+                .map((player) => (
+                  <MenuItem key={player._id} value={player._id}>
+                    {player.name}
+                  </MenuItem>
+                ))}
+            </Select>
+          </FormControl>
+        </Grid>
+
+        <Grid item xs={12} md={4}>
+          <FormControl fullWidth>
+            <InputLabel>Bowler</InputLabel>
+            <Select value={bowler} onChange={handleBowlerChange}>
+              {players
+                .filter(player => player.teams?.includes(bowlingTeam))
+                .map((player) => (
+                  <MenuItem key={player._id} value={player._id}>
+                    {player.name}
+                  </MenuItem>
+                ))}
+            </Select>
+          </FormControl>
+        </Grid>
+      </Grid>
+
+      <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap', gap: 2, mb: 3 }}>
+        {[0, 1, 2, 3, 4, 6].map((runs) => (
+          <Button
+            key={runs}
+            variant="contained"
+            onClick={() => handleBallOutcome(runs)}
+            disabled={!striker || !bowler}
+          >
+            {runs}
+          </Button>
+        ))}
+        <Button
+          variant="contained"
+          color="error"
+          onClick={() => setIsWicketDialogOpen(true)}
+          disabled={!striker || !bowler}
+        >
+          W
+        </Button>
+      </Stack>
+
+      <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap', gap: 2 }}>
+        <Button variant="outlined" onClick={() => handleBallOutcome(1)}>
+          Wide
+        </Button>
+        <Button variant="outlined" onClick={() => handleBallOutcome(1)}>
+          No Ball
+        </Button>
+        <Button variant="outlined" onClick={() => handleBallOutcome(1)}>
+          Bye
+        </Button>
+        <Button variant="outlined" onClick={() => handleBallOutcome(1)}>
+          Leg Bye
+        </Button>
+      </Stack>
+
+      <Dialog open={isWicketDialogOpen} onClose={() => setIsWicketDialogOpen(false)}>
+        <DialogTitle>How Out?</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2}>
+            {[
+              'bowled',
+              'caught',
+              'lbw',
+              'run out',
+              'stumped',
+              'hit wicket'
+            ].map((type) => (
+              <Button
+                key={type}
+                variant="outlined"
+                onClick={() => handleWicket(type)}
+                fullWidth
+              >
+                {type.toUpperCase()}
+              </Button>
+            ))}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setIsWicketDialogOpen(false)}>Cancel</Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+};
+
+export default LiveScoring;
