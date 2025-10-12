@@ -23,12 +23,13 @@ import {
   IconButton,
   Snackbar,
   Alert,
-  CircularProgress
+  CircularProgress,
+  Chip
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { Player } from '../types';
-import { playerService } from '../services/api.service';
+import { Player, Team } from '../types';
+import { playerService, teamService } from '../services/api.service';
 
 const defaultPlayer: Omit<Player, '_id'> = {
   name: '',
@@ -41,6 +42,7 @@ const defaultPlayer: Omit<Player, '_id'> = {
 
 const PlayerList: React.FC = () => {
   const [players, setPlayers] = useState<Player[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +51,17 @@ const PlayerList: React.FC = () => {
 
   useEffect(() => {
     fetchPlayers();
+    fetchTeams();
   }, []);
+
+  const fetchTeams = async () => {
+    try {
+      const response = await teamService.getAll();
+      setTeams(response.data);
+    } catch (error) {
+      console.error('Error fetching teams:', error);
+    }
+  };
 
   const fetchPlayers = async () => {
     setLoading(true);
@@ -76,6 +88,19 @@ const PlayerList: React.FC = () => {
     setNewPlayer(defaultPlayer);
     setEditingPlayer(null);
     setError(null);
+  };
+
+  const handleEdit = (player: Player) => {
+    setEditingPlayer(player);
+    setNewPlayer({
+      name: player.name,
+      age: player.age,
+      role: player.role,
+      battingStyle: player.battingStyle,
+      bowlingStyle: player.bowlingStyle,
+      teams: player.teams || []
+    });
+    setOpen(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -139,6 +164,7 @@ const PlayerList: React.FC = () => {
                 <TableCell>Role</TableCell>
                 <TableCell>Batting Style</TableCell>
                 <TableCell>Bowling Style</TableCell>
+                <TableCell>Team</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -151,8 +177,14 @@ const PlayerList: React.FC = () => {
                   <TableCell>{player.battingStyle}</TableCell>
                   <TableCell>{player.bowlingStyle}</TableCell>
                   <TableCell>
+                    {player.teams && player.teams.length > 0 ? (
+                      typeof player.teams[0] === 'object' ? player.teams[0].name : 
+                      teams.find(t => t._id === player.teams![0])?.name || 'Unknown'
+                    ) : 'No Team'}
+                  </TableCell>
+                  <TableCell>
                     <IconButton
-                      onClick={handleOpen}
+                      onClick={() => handleEdit(player)}
                       color="primary"
                       size="small"
                     >
@@ -227,6 +259,24 @@ const PlayerList: React.FC = () => {
               onChange={(e) => setNewPlayer({ ...newPlayer, bowlingStyle: e.target.value })}
               fullWidth
             />
+            <FormControl fullWidth>
+              <InputLabel>Team</InputLabel>
+              <Select
+                value={newPlayer.teams?.[0] || ''}
+                label="Team"
+                onChange={(e) => setNewPlayer({ 
+                  ...newPlayer, 
+                  teams: e.target.value ? [e.target.value as string] : [] 
+                })}
+              >
+                <MenuItem value="">No Team</MenuItem>
+                {teams.map((team) => (
+                  <MenuItem key={team._id} value={team._id}>
+                    {team.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </Stack>
         </DialogContent>
         <DialogActions>

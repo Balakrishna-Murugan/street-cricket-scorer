@@ -3,7 +3,6 @@ import {
   AppBar,
   Toolbar,
   Typography,
-  Button,
   IconButton,
   Menu,
   MenuItem,
@@ -19,6 +18,11 @@ const Header: React.FC = () => {
   const navigate = useNavigate();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [profileAnchorEl, setProfileAnchorEl] = useState<null | HTMLElement>(null);
+  
+  // Get user role and username from localStorage
+  const userRole = localStorage.getItem('userRole') || 'viewer';
+  const username = localStorage.getItem('username') || 'User';
+  const isAdmin = userRole === 'admin';
 
   const handleMenuClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -38,6 +42,8 @@ const Header: React.FC = () => {
 
   const handleLogout = () => {
     localStorage.removeItem('isAuthenticated');
+    localStorage.removeItem('userRole');
+    localStorage.removeItem('username');
     navigate('/login');
     handleProfileClose();
   };
@@ -61,12 +67,15 @@ const Header: React.FC = () => {
         </IconButton>
 
         <Typography variant="h6" component="div" sx={{ flexGrow: 1, ml: 1 }}>
-          Street Cricket
+          Street Cricket {!isAdmin && '(Viewer Mode)'}
         </Typography>
 
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
+          <Typography variant="body2" sx={{ mr: 1 }}>
+            {username} ({userRole})
+          </Typography>
           <IconButton color="inherit" onClick={handleProfileClick}>
-            <Avatar sx={{ width: 32, height: 32, bgcolor: 'secondary.main' }}>
+            <Avatar sx={{ width: 32, height: 32, bgcolor: isAdmin ? 'secondary.main' : 'warning.main' }}>
               <AccountCircleIcon />
             </Avatar>
           </IconButton>
@@ -78,18 +87,24 @@ const Header: React.FC = () => {
           open={Boolean(anchorEl)}
           onClose={handleMenuClose}
         >
-          <MenuItem onClick={() => { navigate('/teams'); handleMenuClose(); }}>
-            Teams
-          </MenuItem>
-          <MenuItem onClick={() => { navigate('/players'); handleMenuClose(); }}>
-            Players
-          </MenuItem>
-          <MenuItem onClick={() => { navigate('/matches'); handleMenuClose(); }}>
-            Matches
-          </MenuItem>
-          <MenuItem onClick={() => { navigate('/live-scoring'); handleMenuClose(); }}>
-            Live Scoring
-          </MenuItem>
+          {isAdmin && (
+            <>
+              <MenuItem onClick={() => { navigate('/teams'); handleMenuClose(); }}>
+                Teams
+              </MenuItem>
+              <MenuItem onClick={() => { navigate('/players'); handleMenuClose(); }}>
+                Players
+              </MenuItem>
+              <MenuItem onClick={() => { navigate('/matches'); handleMenuClose(); }}>
+                Matches
+              </MenuItem>
+            </>
+          )}
+          {!isAdmin && (
+            <MenuItem onClick={() => { navigate('/matches'); handleMenuClose(); }}>
+              View Matches
+            </MenuItem>
+          )}
         </Menu>
 
         {/* Profile Menu */}

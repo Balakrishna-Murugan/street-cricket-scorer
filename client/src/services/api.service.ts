@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Team, Player, Match, Over, BallOutcome } from '../types';
+import { Team, Player, Match, Over, BallOutcome, BallData, BowlerRotationResult } from '../types';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
@@ -21,8 +21,8 @@ export const playerService = {
 export const teamService = {
   getAll: () => api.get<Team[]>('/teams'),
   getById: (id: string) => api.get<Team>(`/teams/${id}`),
-  create: (data: Omit<Team, '_id'>) => api.post<Team>('/teams', data),
-  update: (id: string, data: Team) => api.put<Team>(`/teams/${id}`, data),
+  create: (data: Partial<Team>) => api.post<Team>('/teams', data),
+  update: (id: string, data: Partial<Team>) => api.put<Team>(`/teams/${id}`, data),
   delete: (id: string) => api.delete(`/teams/${id}`),
 };
 
@@ -41,4 +41,17 @@ export const matchService = {
   update: (id: string, data: Match) => api.put<Match>(`/matches/${id}`, data),
   updateScore: (matchId: string, data: Match) => api.put<Match>(`/matches/${matchId}/score`, data),
   delete: (id: string) => api.delete(`/matches/${id}`),
+  
+  // NEW ENHANCED BALL-BY-BALL TRACKING METHODS
+  processBall: (matchId: string, ballData: BallData) => 
+    api.post<Match>(`/matches/${matchId}/ball`, ballData),
+    
+  getBowlerRotation: (matchId: string) => 
+    api.get<BowlerRotationResult>(`/matches/${matchId}/bowler-rotation`),
+    
+  startNewOver: (matchId: string, bowlerId: string) => 
+    api.post<Match>(`/matches/${matchId}/new-over`, { bowlerId }),
+    
+  updateBatsmen: (matchId: string, onStrikeBatsman: string, offStrikeBatsman: string) => 
+    api.put<Match>(`/matches/${matchId}/batsmen`, { onStrikeBatsman, offStrikeBatsman }),
 };

@@ -19,30 +19,53 @@ import {
   IconButton,
   Snackbar,
   Alert,
-  CircularProgress
+  CircularProgress,
+  Select,
+  MenuItem,
+  FormControl
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { Team } from '../types';
-import { teamService } from '../services/api.service';
+import { Team, Player } from '../types';
+import { teamService, playerService } from '../services/api.service';
 
-const defaultTeam: Omit<Team, '_id'> = {
+interface TeamFormData {
+  name: string;
+  captain?: string;
+  members: string[];
+}
+
+const defaultTeam: TeamFormData = {
   name: '',
-  captain: '',
+  captain: '', // Explicitly set to empty string
   members: []
 };
 
 const TeamList: React.FC = () => {
+  const [players, setPlayers] = useState<Player[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
-  const [newTeam, setNewTeam] = useState<Omit<Team, '_id'>>(defaultTeam);
+  const [newTeam, setNewTeam] = useState<TeamFormData>(defaultTeam);
 
   useEffect(() => {
     fetchTeams();
+    fetchPlayers();
   }, []);
+
+  const fetchPlayers = async () => {
+    try {
+      const response = await playerService.getAll();
+      // Filter out players without _id to ensure type safety
+      const validPlayers = response.data.filter((player: Player) => player._id);
+      setPlayers(validPlayers);
+    } catch (error) {
+      console.error('Error fetching players:', error);
+      setError('Failed to fetch players');
+    }
+  };
 
   const fetchTeams = async () => {
     setLoading(true);
@@ -71,6 +94,27 @@ const TeamList: React.FC = () => {
     setError(null);
   };
 
+  const handleEdit = (team: Team) => {
+    setEditingTeam(team);
+    
+    // Handle captain value properly
+    let captainValue = '';
+    if (team.captain) {
+      if (typeof team.captain === 'object') {
+        captainValue = team.captain._id || '';
+      } else if (typeof team.captain === 'string') {
+        captainValue = team.captain;
+      }
+    }
+    
+    setNewTeam({
+      name: team.name,
+      captain: captainValue,
+      members: team.members.map(member => typeof member === 'object' ? member._id : member)
+    });
+    setOpen(true);
+  };
+
   const handleDelete = async (id: string) => {
     setLoading(true);
     setError(null);
@@ -86,24 +130,47 @@ const TeamList: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (!newTeam.name || !newTeam.captain) {
-      setError('Please fill in all required fields');
+    console.log('Form submission started with newTeam:', newTeam); // Debug log
+    
+    if (!newTeam.name) {
+      setError('Please fill in team name');
       return;
     }
 
     setLoading(true);
     setError(null);
     try {
-      if (editingTeam?._id) {
-        await teamService.update(editingTeam._id, { ...editingTeam, ...newTeam });
+      // Create a clean team data object
+      const teamData: Partial<Team> = {
+        name: newTeam.name.trim(),
+        members: newTeam.members || []
+      };
+      
+      // Only add captain if a valid one is selected
+      console.log('Captain value before processing:', `"${newTeam.captain}"`); // Debug log
+      if (newTeam.captain && 
+          newTeam.captain.trim() !== '' && 
+          newTeam.captain !== 'undefined' && 
+          newTeam.captain !== 'null') {
+        teamData.captain = newTeam.captain.trim();
+        console.log('Captain added to teamData:', teamData.captain); // Debug log
       } else {
-        await teamService.create(newTeam);
+        console.log('No captain selected, captain field omitted'); // Debug log
+      }
+      
+      console.log('Sending team data:', JSON.stringify(teamData, null, 2)); // Better debug log
+      
+      if (editingTeam?._id) {
+        await teamService.update(editingTeam._id, teamData);
+      } else {
+        await teamService.create(teamData);
       }
       handleClose();
       fetchTeams();
-    } catch (error) {
-      setError(editingTeam ? 'Failed to update team' : 'Failed to create team');
-      console.error('Error saving team:', error);
+    } catch (error: any) {
+      console.error('Error saving team:', error); // Debug log
+      const errorMessage = error.response?.data?.message || error.message || 'Unknown error occurred';
+      setError(editingTeam ? `Failed to update team: ${errorMessage}` : `Failed to create team: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -142,11 +209,11 @@ const TeamList: React.FC = () => {
               {teams.map((team) => (
                 <TableRow key={team._id}>
                   <TableCell>{team.name}</TableCell>
-                  <TableCell>{team.captain}</TableCell>
+                  <TableCell>{typeof team.captain === 'object' ? team.captain.name : team.captain}</TableCell>
                   <TableCell>{team.members.length}</TableCell>
                   <TableCell>
                     <IconButton 
-                      onClick={handleOpen}
+                      onClick={() => handleEdit(team)}
                       color="primary"
                       size="small"
                     >
@@ -183,14 +250,34 @@ const TeamList: React.FC = () => {
               required
               error={!newTeam.name && error != null}
             />
-            <TextField
-              label="Captain"
-              value={newTeam.captain}
-              onChange={(e) => setNewTeam({ ...newTeam, captain: e.target.value })}
-              fullWidth
-              required
-              error={!newTeam.captain && error != null}
-            />
+            <FormControl fullWidth>
+              <Select
+                value={newTeam.captain === undefined || newTeam.captain === 'undefined' || newTeam.captain === null ? '' : newTeam.captain}
+                onChange={(e) => {
+                  const value = e.target.value as string;
+                  console.log('Captain selection changed to:', value); // Debug log
+                  setNewTeam({ ...newTeam, captain: value });
+                }}
+                displayEmpty
+                sx={{ minWidth: 120 }}
+                renderValue={(selected) => {
+                  if (!selected || selected === '') {
+                    return <span style={{ color: '#999' }}>Select Captain (Optional)</span>;
+                  }
+                  const selectedPlayer = players.find(p => p._id === selected);
+                  return selectedPlayer ? selectedPlayer.name : selected;
+                }}
+              >
+                <MenuItem value="">
+                  <em>No Captain</em>
+                </MenuItem>
+                {players.map((player) => (
+                  <MenuItem key={player._id} value={player._id || ''}>
+                    {player.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </Stack>
         </DialogContent>
         <DialogActions>
@@ -199,7 +286,7 @@ const TeamList: React.FC = () => {
             onClick={handleSubmit} 
             variant="contained" 
             color="primary"
-            disabled={loading || !newTeam.name || !newTeam.captain}
+            disabled={loading || !newTeam.name}
           >
             {loading ? <CircularProgress size={24} /> : editingTeam ? 'Save' : 'Create'}
           </Button>

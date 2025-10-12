@@ -217,34 +217,131 @@ const sampleData = async () => {
     await Team.findByIdAndUpdate(team1._id, { captain: team1Players[0]._id });
     await Team.findByIdAndUpdate(team2._id, { captain: team2Players[0]._id });
 
-    // Create a sample match
-    const match = await Match.create({
-      team1: team1._id,
-      team2: team2._id,
-      date: new Date(),
-      venue: 'Local Ground, Chennai',
-      overs: 5,
-      status: 'in-progress',
-      tossWinner: team1._id,
-      tossDecision: 'bat',
-      innings: [
-        {
-          battingTeam: team1._id,
-          bowlingTeam: team2._id,
-          totalRuns: 0,
-          wickets: 0,
-          overs: 0,
-          battingStats: [],
-          bowlingStats: [],
-          extras: {
-            wides: 0,
-            noBalls: 0,
-            byes: 0,
-            legByes: 0
+    // Create multiple sample matches with different statuses
+    const matches = await Match.create([
+      {
+        team1: team1._id,
+        team2: team2._id,
+        date: new Date(),
+        venue: 'Local Ground, Chennai',
+        overs: 5,
+        status: 'in-progress',
+        tossWinner: team1._id,
+        tossDecision: 'bat',
+        innings: [
+          {
+            battingTeam: team1._id,
+            bowlingTeam: team2._id,
+            totalRuns: 0,
+            wickets: 0,
+            overs: 0,
+            battingStats: [],
+            bowlingStats: [],
+            extras: {
+              wides: 0,
+              noBalls: 0,
+              byes: 0,
+              legByes: 0
+            }
           }
-        }
-      ]
-    });
+        ]
+      },
+      {
+        team1: team2._id,
+        team2: team1._id,
+        date: new Date(Date.now() + 24 * 60 * 60 * 1000), // Tomorrow
+        venue: 'Sports Club, Mumbai',
+        overs: 10,
+        status: 'upcoming',
+        innings: [
+          {
+            battingTeam: team2._id,
+            bowlingTeam: team1._id,
+            totalRuns: 0,
+            wickets: 0,
+            overs: 0,
+            battingStats: [],
+            bowlingStats: [],
+            extras: {
+              wides: 0,
+              noBalls: 0,
+              byes: 0,
+              legByes: 0
+            }
+          }
+        ]
+      },
+      {
+        team1: team1._id,
+        team2: team2._id,
+        date: new Date(Date.now() - 24 * 60 * 60 * 1000), // Yesterday
+        venue: 'Stadium, Delhi',
+        overs: 20,
+        status: 'completed',
+        tossWinner: team2._id,
+        tossDecision: 'bowl',
+        result: 'Street Warriors won by 25 runs',
+        innings: [
+          {
+            battingTeam: team1._id,
+            bowlingTeam: team2._id,
+            totalRuns: 156,
+            wickets: 8,
+            overs: 20,
+            isCompleted: true,
+            battingStats: [],
+            bowlingStats: [],
+            extras: {
+              wides: 8,
+              noBalls: 2,
+              byes: 3,
+              legByes: 1
+            }
+          },
+          {
+            battingTeam: team2._id,
+            bowlingTeam: team1._id,
+            totalRuns: 131,
+            wickets: 10,
+            overs: 18.4,
+            isCompleted: true,
+            battingStats: [],
+            bowlingStats: [],
+            extras: {
+              wides: 5,
+              noBalls: 1,
+              byes: 2,
+              legByes: 0
+            }
+          }
+        ]
+      },
+      {
+        team1: team2._id,
+        team2: team1._id,
+        date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // Day after tomorrow
+        venue: 'Ground A, Bangalore',
+        overs: 15,
+        status: 'upcoming',
+        innings: [
+          {
+            battingTeam: team2._id,
+            bowlingTeam: team1._id,
+            totalRuns: 0,
+            wickets: 0,
+            overs: 0,
+            battingStats: [],
+            bowlingStats: [],
+            extras: {
+              wides: 0,
+              noBalls: 0,
+              byes: 0,
+              legByes: 0
+            }
+          }
+        ]
+      }
+    ]);
 
     console.log('Sample data inserted successfully');
     process.exit(0);

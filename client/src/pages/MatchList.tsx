@@ -33,20 +33,38 @@ const defaultMatch: Omit<Match, '_id'> = {
   overs: 20,
   status: 'upcoming',
   venue: '',
+  currentInnings: 0,
+  matchSettings: {
+    oversPerBowler: 4,
+    maxPlayersPerTeam: 11
+  },
+  bowlerRotation: {
+    bowlerOversCount: {},
+    availableBowlers: []
+  },
   innings: [{
     battingTeam: '',
     bowlingTeam: '',
     totalRuns: 0,
     wickets: 0,
     overs: 0,
+    balls: 0,
+    isCompleted: false,
     battingStats: [],
     bowlingStats: [],
+    currentState: {
+      currentOver: 0,
+      currentBall: 0,
+      lastBallRuns: 0
+    },
     extras: {
       wides: 0,
       noBalls: 0,
       byes: 0,
-      legByes: 0
-    }
+      legByes: 0,
+      total: 0
+    },
+    runRate: 0
   }]
 };
 
@@ -56,6 +74,10 @@ const MatchList: React.FC = () => {
   const [teams, setTeams] = useState<Team[]>([]);
   const [open, setOpen] = useState(false);
   const [newMatch, setNewMatch] = useState<Omit<Match, '_id'>>(defaultMatch);
+
+  // Get user role for permissions
+  const userRole = localStorage.getItem('userRole') || 'viewer';
+  const isAdmin = userRole === 'admin';
 
   useEffect(() => {
     fetchMatches();
@@ -85,7 +107,63 @@ const MatchList: React.FC = () => {
 
   const handleSubmit = async () => {
     try {
-      await matchService.create(newMatch);
+      // Create match with properly configured innings based on toss
+      const matchToCreate = { ...newMatch };
+      
+      if (matchToCreate.tossWinner && matchToCreate.tossDecision) {
+        // Determine batting and bowling teams based on toss
+        let battingTeam: string;
+        let bowlingTeam: string;
+        
+        const tossWinnerId = typeof matchToCreate.tossWinner === 'string' ? matchToCreate.tossWinner : matchToCreate.tossWinner._id;
+        const team1Id = typeof matchToCreate.team1 === 'string' ? matchToCreate.team1 : matchToCreate.team1._id;
+        const team2Id = typeof matchToCreate.team2 === 'string' ? matchToCreate.team2 : matchToCreate.team2._id;
+        
+        if (matchToCreate.tossDecision === 'bat') {
+          // Toss winner chose to bat
+          battingTeam = tossWinnerId;
+          bowlingTeam = tossWinnerId === team1Id ? team2Id : team1Id;
+        } else {
+          // Toss winner chose to bowl
+          bowlingTeam = tossWinnerId;
+          battingTeam = tossWinnerId === team1Id ? team2Id : team1Id;
+        }
+        
+        // Update first innings with correct team assignments
+        matchToCreate.innings[0] = {
+          ...matchToCreate.innings[0],
+          battingTeam,
+          bowlingTeam
+        };
+        
+        // Add second innings
+        matchToCreate.innings.push({
+          battingTeam: bowlingTeam, // Teams swap for second innings
+          bowlingTeam: battingTeam,
+          totalRuns: 0,
+          wickets: 0,
+          overs: 0,
+          balls: 0,
+          isCompleted: false,
+          battingStats: [],
+          bowlingStats: [],
+          currentState: {
+            currentOver: 0,
+            currentBall: 0,
+            lastBallRuns: 0
+          },
+          extras: {
+            wides: 0,
+            noBalls: 0,
+            byes: 0,
+            legByes: 0,
+            total: 0
+          },
+          runRate: 0
+        });
+      }
+      
+      await matchService.create(matchToCreate);
       handleClose();
       fetchMatches();
       setNewMatch(defaultMatch);
@@ -110,10 +188,14 @@ const MatchList: React.FC = () => {
   return (
     <div>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-        <Typography variant="h5">Matches</Typography>
-        <Button variant="contained" color="primary" onClick={handleOpen}>
-          Add Match
-        </Button>
+        <Typography variant="h5">
+          {isAdmin ? 'Matches' : 'View Matches'}
+        </Typography>
+        {isAdmin && (
+          <Button variant="contained" color="primary" onClick={handleOpen}>
+            Add Match
+          </Button>
+        )}
       </Box>
 
       <TableContainer component={Paper}>
@@ -170,7 +252,7 @@ const MatchList: React.FC = () => {
                     >
                       View Summary
                     </Button>
-                    {match.status === 'upcoming' && (
+                    {isAdmin && match.status === 'upcoming' && (
                       <Button 
                         color="success" 
                         size="small"
@@ -180,7 +262,7 @@ const MatchList: React.FC = () => {
                         Start Match
                       </Button>
                     )}
-                    {match.status === 'in-progress' && (
+                    {isAdmin && match.status === 'in-progress' && (
                       <Button 
                         color="secondary" 
                         size="small"
@@ -251,6 +333,36 @@ const MatchList: React.FC = () => {
             value={newMatch.venue}
             onChange={(e) => setNewMatch({ ...newMatch, venue: e.target.value })}
           />
+          
+          <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>
+            🏏 Toss Information
+          </Typography>
+          
+          <FormControl fullWidth margin="dense">
+            <InputLabel>Toss Winner</InputLabel>
+            <Select
+              value={newMatch.tossWinner || ''}
+              onChange={(e) => setNewMatch({ ...newMatch, tossWinner: e.target.value })}
+            >
+              {teams.map((team) => (
+                <MenuItem key={team._id} value={team._id}>
+                  {team.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          
+          <FormControl fullWidth margin="dense">
+            <InputLabel>Toss Decision</InputLabel>
+            <Select
+              value={newMatch.tossDecision || ''}
+              onChange={(e) => setNewMatch({ ...newMatch, tossDecision: e.target.value as 'bat' | 'bowl' })}
+              disabled={!newMatch.tossWinner}
+            >
+              <MenuItem value="bat">Chose to Bat First</MenuItem>
+              <MenuItem value="bowl">Chose to Bowl First</MenuItem>
+            </Select>
+          </FormControl>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleClose}>Cancel</Button>

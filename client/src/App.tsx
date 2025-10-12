@@ -10,6 +10,7 @@ import MatchSummary from './pages/MatchSummary';
 import Login from './pages/Login';
 import Header from './components/Header';
 import AuthGuard from './components/AuthGuard';
+import AdminGuard from './components/AdminGuard';
 
 const theme = createTheme({
   palette: {
@@ -38,10 +39,10 @@ function App() {
                   <Box sx={{ p: 3, flexGrow: 1 }}>
                     <Routes>
                       <Route path="/" element={<HomePage />} />
-                      <Route path="/teams" element={<TeamList />} />
-                      <Route path="/players" element={<PlayerList />} />
+                      <Route path="/teams" element={<AdminGuard><TeamList /></AdminGuard>} />
+                      <Route path="/players" element={<AdminGuard><PlayerList /></AdminGuard>} />
                       <Route path="/matches" element={<MatchList />} />
-                      <Route path="/matches/:matchId/live" element={<LiveScoring />} />
+                      <Route path="/matches/:matchId/live" element={<AdminGuard><LiveScoring /></AdminGuard>} />
                       <Route path="/matches/:matchId/summary" element={<MatchSummary />} />
                     </Routes>
                   </Box>

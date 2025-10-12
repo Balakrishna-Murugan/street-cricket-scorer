@@ -19,6 +19,13 @@ const Login: React.FC = () => {
   const handleLogin = () => {
     if (username === 'admin' && password === 'admin') {
       localStorage.setItem('isAuthenticated', 'true');
+      localStorage.setItem('userRole', 'admin');
+      localStorage.setItem('username', 'admin');
+      navigate('/');
+    } else if (username === 'viewer' && password === 'viewer') {
+      localStorage.setItem('isAuthenticated', 'true');
+      localStorage.setItem('userRole', 'viewer');
+      localStorage.setItem('username', 'viewer');
       navigate('/');
     } else {
       setError('Invalid username or password');
@@ -73,7 +80,8 @@ const Login: React.FC = () => {
           </Button>
 
           <Typography variant="body2" sx={{ mt: 2 }} color="text.secondary" textAlign="center">
-            Use username: admin, password: admin
+            Admin: username: admin, password: admin<br />
+            Viewer: username: viewer, password: viewer
           </Typography>
         </Paper>
       </Box>

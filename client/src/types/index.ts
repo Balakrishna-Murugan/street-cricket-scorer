@@ -23,8 +23,8 @@ export interface Player {
 export interface Team {
   _id?: string;
   name: string;
-  captain: string;
-  members: string[];
+  captain?: string | { _id: string; name: string };
+  members: Array<string | { _id: string; name: string; role: string }>;
   logo?: string;
 }
 
@@ -48,15 +48,32 @@ export interface BattingStats {
   sixes: number;
   isOut: boolean;
   dismissalType?: string;
+  howOut?: string;
+  dismissedBy?: string | PlayerRef;
+  strikeRate: number;
+  isOnStrike: boolean;
 }
 
 export interface BowlingStats {
   player: string | PlayerRef;
   overs: number;
+  balls: number;
   runs: number;
   wickets: number;
-  economy?: number;
-  maidens?: number;
+  wides: number;
+  noBalls: number;
+  economy: number;
+  lastBowledOver?: number;
+}
+
+export interface CurrentState {
+  currentOver: number;
+  currentBall: number;
+  onStrikeBatsman?: string | PlayerRef;
+  offStrikeBatsman?: string | PlayerRef;
+  currentBowler?: string | PlayerRef;
+  lastBallRuns: number;
+  lastBallExtras?: string;
 }
 
 export interface Extras {
@@ -64,6 +81,7 @@ export interface Extras {
   noBalls: number;
   byes: number;
   legByes: number;
+  total: number;
 }
 
 export interface Innings {
@@ -72,9 +90,14 @@ export interface Innings {
   totalRuns: number;
   wickets: number;
   overs: number;
+  balls: number;
+  isCompleted: boolean;
   battingStats: BattingStats[];
   bowlingStats: BowlingStats[];
+  currentState: CurrentState;
   extras: Extras;
+  runRate: number;
+  requiredRunRate?: number;
 }
 
 export interface Over {
@@ -96,9 +119,43 @@ export interface Match {
   date: string;
   venue?: string;
   overs: number;
-  status: 'upcoming' | 'in-progress' | 'completed';
-  tossWinner?: string;
+  status: 'upcoming' | 'in-progress' | 'completed' | 'abandoned';
+  tossWinner?: string | TeamRef;
   tossDecision?: 'bat' | 'bowl';
   result?: string;
   innings: Innings[];
+  currentInnings: number;
+  matchSettings: {
+    oversPerBowler: number;
+    powerplayOvers?: number;
+    maxPlayersPerTeam: number;
+  };
+  bowlerRotation: {
+    lastBowler?: string | PlayerRef;
+    bowlerOversCount: Record<string, number>;
+    availableBowlers: Array<string | PlayerRef>;
+  };
+}
+
+// Ball processing interface for API calls
+export interface BallData {
+  runs: number;
+  batsmanId: string;
+  bowlerId: string;
+  extras?: {
+    type: 'wide' | 'no-ball' | 'bye' | 'leg-bye';
+    runs: number;
+  };
+  isWicket: boolean;
+  dismissalType?: string;
+  dismissedPlayerId?: string;
+  fielderId?: string;
+}
+
+// Bowler rotation result from API
+export interface BowlerRotationResult {
+  availableBowlers: string[];
+  recommendedBowler?: string;
+  canBowl: boolean;
+  reason?: string;
 }
