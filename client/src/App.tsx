@@ -113,7 +113,7 @@ function App() {
                 <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
                   <Header />
                   <Box sx={{ 
-                    p: { xs: 1, sm: 2, md: 3 }, 
+                    p: { xs: 1, sm: 1.5, md: 2 }, 
                     flexGrow: 1,
                     maxWidth: '100vw',
                     overflow: 'hidden'

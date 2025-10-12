@@ -17,9 +17,9 @@ const HomePage: React.FC = () => {
   return (
     <Box
       sx={{
-        minHeight: '100vh',
+        minHeight: 'calc(100vh - 120px)', // Adjusted for header height
         background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
-        padding: 3,
+        padding: { xs: 1, sm: 2 },
       }}
     >
       <Container maxWidth="lg">

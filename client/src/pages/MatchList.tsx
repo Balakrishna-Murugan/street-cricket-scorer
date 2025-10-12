@@ -419,14 +419,24 @@ const MatchList: React.FC = () => {
                         View Summary
                       </Button>
                       {isAdmin && match.status === 'upcoming' && (
-                        <Button 
-                          color="success" 
-                          size="small"
-                          variant="contained"
-                          onClick={() => navigate(`/matches/${match._id}/live`)}
-                        >
-                          Start Match
-                        </Button>
+                        <>
+                          <Button 
+                            color="info" 
+                            size="small"
+                            variant="outlined"
+                            onClick={() => handleEditOpen(match)}
+                          >
+                            Edit
+                          </Button>
+                          <Button 
+                            color="success" 
+                            size="small"
+                            variant="contained"
+                            onClick={() => navigate(`/matches/${match._id}/live`)}
+                          >
+                            Start Match
+                          </Button>
+                        </>
                       )}
                       {isAdmin && match.status === 'in-progress' && (
                         <Button 
