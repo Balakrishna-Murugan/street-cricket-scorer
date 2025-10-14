@@ -78,63 +78,6 @@ const LiveScoring: React.FC<Props> = () => {
   const [pendingBowlerChange, setPendingBowlerChange] = useState('');
   const [isFirstInningsComplete, setIsFirstInningsComplete] = useState(false);
   const [isMatchCompleted, setIsMatchCompleted] = useState(false);
-  
-  // New state for player selection dialog
-  const [isPlayerSelectionDialogOpen, setIsPlayerSelectionDialogOpen] = useState(false);
-
-  // Helper function to check if all required players are selected
-  const arePlayersSelected = useCallback(() => {
-    return striker && nonStriker && bowler && striker !== nonStriker;
-  }, [striker, nonStriker, bowler]);
-
-  // Helper function to get dialog context
-  const getDialogContext = useCallback(() => {
-    if (isOverCompleted) {
-      return {
-        title: '🎯 Over Completed - Select New Bowler',
-        message: 'The over is completed. Please select a new bowler to continue:',
-        showOnlyBowler: true,
-        gradientColor: 'linear-gradient(45deg, #FF9800 30%, #FFB74D 90%)'
-      };
-    } else if (isWaitingForNewBatsman) {
-      return {
-        title: '🏏 Wicket! Select New Batsman',
-        message: 'A wicket has been taken. Please select a new striker to continue:',
-        showOnlyStriker: true,
-        gradientColor: 'linear-gradient(45deg, #f44336 30%, #e57373 90%)'
-      };
-    } else {
-      return {
-        title: '🏏 Select Players to Start Match',
-        message: `Please select the striker, non-striker, and bowler to ${match && match.innings.length > 1 && currentInnings === 1 ? 'continue with the match' : 'start the match'}:`,
-        showOnlyBowler: false,
-        showOnlyStriker: false,
-        gradientColor: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)'
-      };
-    }
-  }, [isOverCompleted, isWaitingForNewBatsman, match, currentInnings]);
-
-  // Helper function to check if required selections are made based on context
-  const areRequiredSelectionsComplete = useCallback(() => {
-    const context = getDialogContext();
-    if (context.showOnlyBowler) {
-      return !!bowler;
-    } else if (context.showOnlyStriker) {
-      return !!striker && striker !== nonStriker;
-    } else {
-      return arePlayersSelected();
-    }
-  }, [getDialogContext, bowler, striker, nonStriker, arePlayersSelected]);
-
-  // Function to handle starting/continuing match with player selection
-  const handleStartOrContinueMatch = () => {
-    if (!arePlayersSelected()) {
-      setIsPlayerSelectionDialogOpen(true);
-    } else {
-      // All players selected, can start scoring immediately
-      setIsOverInProgress(true);
-    }
-  };
 
   // Function to check if match should end
   const checkMatchEnd = useCallback((updatedMatch: any) => {
@@ -479,42 +422,6 @@ const LiveScoring: React.FC<Props> = () => {
       }
     }
   }, [match, striker, nonStriker, bowler, currentInnings]);
-
-  // Auto-open player selection dialog when match loads if no players selected
-  useEffect(() => {
-    if (match && isAdmin && !arePlayersSelected() && !isPlayerSelectionDialogOpen && !loading) {
-      // Small delay to ensure UI has rendered
-      const timer = setTimeout(() => {
-        setIsPlayerSelectionDialogOpen(true);
-      }, 500);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [match, isAdmin, arePlayersSelected, isPlayerSelectionDialogOpen, loading]);
-
-  // Auto-open player selection dialog when over is completed and needs new bowler
-  useEffect(() => {
-    if (isOverCompleted && isAdmin && !isPlayerSelectionDialogOpen) {
-      // Delay to allow UI to update the over completion alert first
-      const timer = setTimeout(() => {
-        setIsPlayerSelectionDialogOpen(true);
-      }, 1000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [isOverCompleted, isAdmin, isPlayerSelectionDialogOpen]);
-
-  // Auto-open player selection dialog when waiting for new batsman after wicket
-  useEffect(() => {
-    if (isWaitingForNewBatsman && isAdmin && !isPlayerSelectionDialogOpen) {
-      // Delay to allow wicket recording to complete
-      const timer = setTimeout(() => {
-        setIsPlayerSelectionDialogOpen(true);
-      }, 1000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [isWaitingForNewBatsman, isAdmin, isPlayerSelectionDialogOpen]);
 
   const handleBallOutcome = async (runs: number, isExtra: boolean = false) => {
     if (!match || !matchId) return;
@@ -1622,16 +1529,13 @@ const LiveScoring: React.FC<Props> = () => {
       setIsFirstInningsComplete(false);
       setOverCompletionMessage('');
       
-      // Reset player selections for second innings
+      // Allow player selection for second innings
       setStriker('');
       setNonStriker('');
       setBowler('');
       setCurrentOverBalls([]);
       setIsOverInProgress(false);
       setIsOverCompleted(false);
-      
-      // Open player selection dialog for second innings
-      setIsPlayerSelectionDialogOpen(true);
       
     } catch (error) {
       console.error('Error starting second innings:', error);
@@ -1845,33 +1749,6 @@ const LiveScoring: React.FC<Props> = () => {
         </Alert>
       )}
 
-      {/* Start/Continue Match Button - Show when players not selected or match needs to start */}
-      {isAdmin && !arePlayersSelected() && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
-          <Button
-            variant="contained"
-            size="large"
-            onClick={handleStartOrContinueMatch}
-            sx={{
-              px: 4,
-              py: 1.5,
-              fontSize: '1.1rem',
-              fontWeight: 'bold',
-              borderRadius: 3,
-              background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
-              boxShadow: '0 4px 12px rgba(33, 150, 243, 0.4)',
-              '&:hover': {
-                background: 'linear-gradient(45deg, #1976D2 30%, #2196F3 90%)',
-                transform: 'translateY(-2px)',
-                boxShadow: '0 6px 16px rgba(33, 150, 243, 0.5)',
-              },
-            }}
-          >
-            🏏 {match.innings.length > 1 && currentInnings === 1 ? 'Continue Match' : 'Start Match'}
-          </Button>
-        </Box>
-      )}
-
       {/* Score Summary */}
       <Paper sx={{ p: 2, mb: 3 }} component="div">
         {/* Comprehensive Innings Display */}
@@ -1960,8 +1837,7 @@ const LiveScoring: React.FC<Props> = () => {
         />
       </Paper>
 
-      {/* Player Selection - Hidden from main UI, only shown in dialog when needed */}
-      {false && (
+      {/* Player Selection */}
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 3, mb: 3 }}>
         <FormControl 
           fullWidth
@@ -2120,7 +1996,6 @@ const LiveScoring: React.FC<Props> = () => {
           </Alert>
         )}
       </Box>
-      )}
 
       {/* Scoring Buttons */}
       <Box sx={{ mb: 3 }}>
@@ -3140,196 +3015,6 @@ const LiveScoring: React.FC<Props> = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCancelBowlerChange}>Cancel</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Player Selection Dialog */}
-      <Dialog 
-        open={isPlayerSelectionDialogOpen} 
-        onClose={() => setIsPlayerSelectionDialogOpen(false)}
-        maxWidth="md"
-        fullWidth
-        sx={{
-          '& .MuiDialog-paper': {
-            borderRadius: '16px',
-            background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
-          }
-        }}
-      >
-        <DialogTitle sx={{ 
-          background: getDialogContext().gradientColor,
-          color: '#fff',
-          fontWeight: 'bold',
-          textShadow: '2px 2px 4px rgba(0,0,0,0.3)',
-          borderRadius: '16px 16px 0 0'
-        }}>
-          {getDialogContext().title}
-        </DialogTitle>
-        <DialogContent sx={{ p: 3 }}>
-          <Typography variant="body2" sx={{ mb: 3, color: 'text.primary', fontWeight: 500 }}>
-            {getDialogContext().message}
-          </Typography>
-          
-          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 3 }}>
-            {/* Striker Selection - Show unless it's only bowler selection */}
-            {!getDialogContext().showOnlyBowler && (
-            <FormControl fullWidth>
-              <InputLabel>Striker</InputLabel>
-              <Select 
-                value={striker} 
-                onChange={(e) => setStriker(e.target.value)}
-              >
-                {players
-                  .filter(player => {
-                    if (!player.team || !match?.innings?.[currentInnings]?.battingTeam) return false;
-                    
-                    const battingTeam = match.innings[currentInnings].battingTeam;
-                    const battingTeamId = typeof battingTeam === 'object' 
-                      ? (battingTeam as any)._id 
-                      : battingTeam;
-                    
-                    const playerTeamId = typeof player.team === 'string' ? player.team : player.team._id;
-                    const hasTeam = playerTeamId === String(battingTeamId);
-                    
-                    // Check if player is out
-                    const currentInning = match.innings[currentInnings];
-                    const isPlayerOut = currentInning?.battingStats?.some(stat => {
-                      const playerId = typeof stat.player === 'string' ? stat.player : stat.player._id;
-                      return playerId === player._id && stat.isOut;
-                    });
-                    
-                    // Don't allow same player as non-striker
-                    const isSameAsNonStriker = player._id === nonStriker;
-                    
-                    return hasTeam && !isPlayerOut && !isSameAsNonStriker;
-                  })
-                  .map((player) => (
-                    <MenuItem key={player._id} value={player._id}>
-                      {player.name}
-                    </MenuItem>
-                  ))}
-              </Select>
-            </FormControl>
-            )}
-
-            {/* Non-Striker Selection - Show unless it's only bowler or only striker selection */}
-            {!getDialogContext().showOnlyBowler && !getDialogContext().showOnlyStriker && (
-            <FormControl fullWidth>
-              <InputLabel>Non-Striker</InputLabel>
-              <Select 
-                value={nonStriker} 
-                onChange={(e) => setNonStriker(e.target.value)}
-              >
-                {players
-                  .filter(player => {
-                    if (!player.team || !match?.innings?.[currentInnings]?.battingTeam) return false;
-                    
-                    const battingTeam = match.innings[currentInnings].battingTeam;
-                    const battingTeamId = typeof battingTeam === 'object' 
-                      ? (battingTeam as any)._id 
-                      : battingTeam;
-                    
-                    const playerTeamId = typeof player.team === 'string' ? player.team : player.team._id;
-                    const hasTeam = playerTeamId === String(battingTeamId);
-                    
-                    // Check if player is out
-                    const currentInning = match.innings[currentInnings];
-                    const isPlayerOut = currentInning?.battingStats?.some(stat => {
-                      const playerId = typeof stat.player === 'string' ? stat.player : stat.player._id;
-                      return playerId === player._id && stat.isOut;
-                    });
-                    
-                    // Don't allow same player as striker
-                    const isSameAsStriker = player._id === striker;
-                    
-                    return hasTeam && !isPlayerOut && !isSameAsStriker;
-                  })
-                  .map((player) => (
-                    <MenuItem key={player._id} value={player._id}>
-                      {player.name}
-                    </MenuItem>
-                  ))}
-              </Select>
-            </FormControl>
-            )}
-
-            {/* Bowler Selection - Show unless it's only striker selection */}
-            {!getDialogContext().showOnlyStriker && (
-            <FormControl fullWidth>
-              <InputLabel>Bowler</InputLabel>
-              <Select 
-                value={bowler} 
-                onChange={(e) => setBowler(e.target.value)}
-              >
-                {players
-                  .filter(player => {
-                    if (!player.team || !match?.innings?.[currentInnings]?.bowlingTeam) return false;
-                    
-                    const bowlingTeam = match.innings[currentInnings].bowlingTeam;
-                    const bowlingTeamId = typeof bowlingTeam === 'object' 
-                      ? (bowlingTeam as any)._id 
-                      : bowlingTeam;
-                    
-                    const playerTeamId = typeof player.team === 'string' ? player.team : player.team._id;
-                    const hasTeam = playerTeamId === String(bowlingTeamId);
-                    
-                    return hasTeam;
-                  })
-                  .map((player) => (
-                    <MenuItem key={player._id} value={player._id}>
-                      {player.name}
-                    </MenuItem>
-                  ))}
-              </Select>
-            </FormControl>
-            )}
-          </Box>
-        </DialogContent>
-        <DialogActions sx={{ p: 3 }}>
-          <Button 
-            onClick={() => setIsPlayerSelectionDialogOpen(false)}
-            sx={{ mr: 2 }}
-          >
-            Cancel
-          </Button>
-          <Button 
-            variant="contained" 
-            onClick={() => {
-              if (areRequiredSelectionsComplete()) {
-                setIsPlayerSelectionDialogOpen(false);
-                
-                // Handle different contexts
-                if (isOverCompleted) {
-                  // Over completion - just reset the over completion state
-                  setIsOverCompleted(false);
-                  setOverCompletionMessage('');
-                  setIsOverInProgress(true);
-                } else if (isWaitingForNewBatsman) {
-                  // Wicket - reset the waiting state and continue
-                  setIsWaitingForNewBatsman(false);
-                } else {
-                  // Match start/continue - start the match
-                  setIsOverInProgress(true);
-                  setIsOverCompleted(false);
-                  setOverCompletionMessage('');
-                }
-              }
-            }}
-            disabled={!areRequiredSelectionsComplete()}
-            sx={{
-              background: areRequiredSelectionsComplete() 
-                ? 'linear-gradient(45deg, #4CAF50 30%, #66BB6A 90%)' 
-                : undefined,
-              '&:hover': areRequiredSelectionsComplete() ? {
-                background: 'linear-gradient(45deg, #388E3C 30%, #4CAF50 90%)',
-              } : undefined
-            }}
-          >
-            {isOverCompleted ? '🎯 Continue with New Bowler' : 
-             isWaitingForNewBatsman ? '🏏 Continue with New Batsman' : 
-             '🚀 Start Match'}
-          </Button>
         </DialogActions>
       </Dialog>
       </Paper>

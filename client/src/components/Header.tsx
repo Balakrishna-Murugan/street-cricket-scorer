@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   AppBar,
   Toolbar,
@@ -16,6 +16,7 @@ import {
   Divider,
 } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { matchService } from '../services/api.service';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import MenuIcon from '@mui/icons-material/Menu';
 import HomeIcon from '@mui/icons-material/Home';
@@ -33,11 +34,35 @@ const Header: React.FC = () => {
   
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [profileAnchorEl, setProfileAnchorEl] = useState<null | HTMLElement>(null);
+  const [matchInfo, setMatchInfo] = useState<{ [key: string]: string }>({});
   
   // Get user role and username from localStorage
   const userRole = localStorage.getItem('userRole') || 'viewer';
   const username = localStorage.getItem('username') || 'User';
   const isAdmin = userRole === 'admin';
+
+  // Fetch match info when on a match page
+  useEffect(() => {
+    const pathSegments = location.pathname.split('/');
+    if (pathSegments[1] === 'matches' && pathSegments[2] && pathSegments[2].length > 10) {
+      const matchId = pathSegments[2];
+      if (!matchInfo[matchId]) {
+        matchService.getById(matchId)
+          .then(response => {
+            const match = response.data;
+            const team1Name = typeof match.team1 === 'object' ? match.team1.name : match.team1;
+            const team2Name = typeof match.team2 === 'object' ? match.team2.name : match.team2;
+            setMatchInfo(prev => ({
+              ...prev,
+              [matchId]: `${team1Name} vs ${team2Name}`
+            }));
+          })
+          .catch(() => {
+            // If fetch fails, keep default "Match Details"
+          });
+      }
+    }
+  }, [location.pathname, matchInfo]);
 
   // Generate breadcrumbs based on current path
   const generateBreadcrumbs = () => {
@@ -59,7 +84,13 @@ const Header: React.FC = () => {
     
     pathnames.forEach((pathname, index) => {
       const path = `/${pathnames.slice(0, index + 1).join('/')}`;
-      const label = breadcrumbNameMap[`/${pathname}`] || pathname;
+      let label = breadcrumbNameMap[`/${pathname}`] || pathname;
+      
+      // Special handling for match IDs - show team names if available, otherwise "Match Details"
+      if (pathnames[index - 1] === 'matches' && pathname.length > 10) {
+        label = matchInfo[pathname] || 'Match Details';
+      }
+      
       breadcrumbs.push({ label, path });
     });
 
