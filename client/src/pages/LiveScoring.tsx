@@ -675,7 +675,7 @@ const LiveScoring: React.FC<Props> = () => {
 
       // Add ball to current over balls for commentary
       const ballOutcome: BallOutcome = {
-        ballNumber: remainingInningsBalls === 0 ? 6 : remainingInningsBalls,
+        ballNumber: currentOverBalls.length + 1, // Ball number within current over (1-6)
         runs,
         isWicket: false,
         extras: isExtra ? { type: 'wide', runs } : undefined
@@ -1072,7 +1072,7 @@ const LiveScoring: React.FC<Props> = () => {
     
     // Add extra ball to current over balls for commentary
     const extraBall: BallOutcome = {
-      ballNumber: type === 'wide' || type === 'noBall' ? 0 : (currentInning.currentState?.currentBall || 0), // Extras don't count as ball numbers
+      ballNumber: type === 'wide' || type === 'noBall' ? 0 : (currentOverBalls.length + 1), // Wides/no-balls = 0, byes/leg-byes = current ball position
       runs,
       isWicket: false,
       extras: {
@@ -1275,7 +1275,7 @@ const LiveScoring: React.FC<Props> = () => {
 
     // Add wicket ball to current over balls for commentary
     const wicketBall: BallOutcome = {
-      ballNumber: remainingInningsBalls === 0 ? 6 : remainingInningsBalls,
+      ballNumber: currentOverBalls.length + 1, // Ball number within current over (1-6)
       runs: 0,
       isWicket: true,
       dismissalType: type as any,
@@ -1466,15 +1466,34 @@ const LiveScoring: React.FC<Props> = () => {
               setNonStriker('');
               setBowler('');
               setIsOverCompleted(true);
+              
+              // CRITICAL FIX: Clear current over balls for innings completion after wicket
+              setCurrentOverBalls([]);
+              if (match && match.innings && match.innings[currentInnings]) {
+                match.innings[currentInnings].currentOverBalls = [];
+              }
             } else {
               // Second innings completed, match finished
               setOverCompletionMessage(`Match completed! Second innings finished after ${completeInningsOvers} overs.`);
               setIsOverCompleted(true);
+              
+              // CRITICAL FIX: Clear current over balls for match completion after wicket
+              setCurrentOverBalls([]);
+              if (match && match.innings && match.innings[currentInnings]) {
+                match.innings[currentInnings].currentOverBalls = [];
+              }
             }
           } else {
             // Just over completed, continue with same innings
             setIsOverCompleted(true);
             setOverCompletionMessage(`Over ${completeInningsOvers} completed! Please select a new bowler and start the next over.`);
+            
+            // CRITICAL FIX: Clear current over balls when over completes after wicket
+            // This prevents old over information from persisting into the new over
+            setCurrentOverBalls([]);
+            if (match && match.innings && match.innings[currentInnings]) {
+              match.innings[currentInnings].currentOverBalls = [];
+            }
           }
         }
         
@@ -3301,10 +3320,18 @@ const LiveScoring: React.FC<Props> = () => {
                 
                 // Handle different contexts
                 if (isOverCompleted) {
-                  // Over completion - just reset the over completion state
+                  // Over completion - reset the over completion state and clear current over
                   setIsOverCompleted(false);
                   setOverCompletionMessage('');
                   setIsOverInProgress(true);
+                  
+                  // CRITICAL FIX: Clear current over balls for fresh start
+                  setCurrentOverBalls([]);
+                  
+                  // Also clear the match data current over balls
+                  if (match && match.innings && match.innings[currentInnings]) {
+                    match.innings[currentInnings].currentOverBalls = [];
+                  }
                 } else if (isWaitingForNewBatsman) {
                   // Wicket - reset the waiting state and continue
                   setIsWaitingForNewBatsman(false);
