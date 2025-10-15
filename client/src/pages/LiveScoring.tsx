@@ -2133,19 +2133,25 @@ const LiveScoring: React.FC<Props> = () => {
   console.log('Available players:', players);
 
   return (
-    <Container maxWidth="lg">
+    <Container 
+      maxWidth="lg" 
+      sx={{ 
+        px: isMobile ? 0 : 3, // Remove padding on mobile for full screen usage
+        py: isMobile ? 0 : 2
+      }}
+    >
       <Box 
         sx={{ 
           minHeight: '100vh',
           background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
-          p: isMobile ? 2 : 3,
-          mx: isMobile ? -2 : 0
+          p: isMobile ? 1 : 3, // Reduced padding for mobile
+          mx: isMobile ? 0 : 0 // Removed negative margin
         }}
       >
       <Paper 
         elevation={8}
         sx={{ 
-          p: 4, 
+          p: isMobile ? 2 : 4, // Reduced padding for mobile
           borderRadius: 3,
           background: '#ffffff',
           border: '1px solid rgba(0,0,0,0.1)',
@@ -2659,7 +2665,7 @@ const LiveScoring: React.FC<Props> = () => {
               minHeight: isMobile ? '45px' : '50px',
               borderRadius: '10px',
               fontWeight: 'bold',
-              color: '#fff',
+              color: '#FF9800', // Changed to more visible orange color
               borderColor: '#FFB74D',
               background: 'rgba(255, 183, 77, 0.1)',
               backdropFilter: 'blur(10px)',
@@ -2667,8 +2673,13 @@ const LiveScoring: React.FC<Props> = () => {
               '&:hover': {
                 background: 'linear-gradient(45deg, #FFB74D 30%, #FFA726 90%)',
                 borderColor: '#FFA726',
+                color: '#fff', // White text on hover
                 transform: 'translateY(-1px)',
                 boxShadow: '0 4px 8px rgba(255, 183, 77, 0.3)',
+              },
+              '&:disabled': {
+                color: 'rgba(255, 152, 0, 0.5)', // Visible disabled state
+                borderColor: 'rgba(255, 183, 77, 0.3)',
               }
             }}
           >
@@ -2686,7 +2697,7 @@ const LiveScoring: React.FC<Props> = () => {
               minHeight: isMobile ? '45px' : '50px',
               borderRadius: '10px',
               fontWeight: 'bold',
-              color: '#fff',
+              color: '#FF5722', // Changed to more visible red-orange color
               borderColor: '#FF8A65',
               background: 'rgba(255, 138, 101, 0.1)',
               backdropFilter: 'blur(10px)',
@@ -2694,8 +2705,13 @@ const LiveScoring: React.FC<Props> = () => {
               '&:hover': {
                 background: 'linear-gradient(45deg, #FF8A65 30%, #FF7043 90%)',
                 borderColor: '#FF7043',
+                color: '#fff', // White text on hover
                 transform: 'translateY(-1px)',
                 boxShadow: '0 4px 8px rgba(255, 138, 101, 0.3)',
+              },
+              '&:disabled': {
+                color: 'rgba(255, 87, 34, 0.5)', // Visible disabled state
+                borderColor: 'rgba(255, 138, 101, 0.3)',
               }
             }}
           >
@@ -2713,7 +2729,7 @@ const LiveScoring: React.FC<Props> = () => {
               minHeight: isMobile ? '45px' : '50px',
               borderRadius: '10px',
               fontWeight: 'bold',
-              color: '#fff',
+              color: '#4CAF50', // Changed to more visible green color
               borderColor: '#81C784',
               background: 'rgba(129, 199, 132, 0.1)',
               backdropFilter: 'blur(10px)',
@@ -2721,8 +2737,13 @@ const LiveScoring: React.FC<Props> = () => {
               '&:hover': {
                 background: 'linear-gradient(45deg, #81C784 30%, #66BB6A 90%)',
                 borderColor: '#66BB6A',
+                color: '#fff', // White text on hover
                 transform: 'translateY(-1px)',
                 boxShadow: '0 4px 8px rgba(129, 199, 132, 0.3)',
+              },
+              '&:disabled': {
+                color: 'rgba(76, 175, 80, 0.5)', // Visible disabled state
+                borderColor: 'rgba(129, 199, 132, 0.3)',
               }
             }}
           >
@@ -2740,7 +2761,7 @@ const LiveScoring: React.FC<Props> = () => {
               minHeight: isMobile ? '45px' : '50px',
               borderRadius: '10px',
               fontWeight: 'bold',
-              color: '#fff',
+              color: '#9C27B0', // Changed to more visible purple color
               borderColor: '#9575CD',
               background: 'rgba(149, 117, 205, 0.1)',
               backdropFilter: 'blur(10px)',
@@ -2748,8 +2769,13 @@ const LiveScoring: React.FC<Props> = () => {
               '&:hover': {
                 background: 'linear-gradient(45deg, #9575CD 30%, #7E57C2 90%)',
                 borderColor: '#7E57C2',
+                color: '#fff', // White text on hover
                 transform: 'translateY(-1px)',
                 boxShadow: '0 4px 8px rgba(149, 117, 205, 0.3)',
+              },
+              '&:disabled': {
+                color: 'rgba(156, 39, 176, 0.5)', // Visible disabled state
+                borderColor: 'rgba(149, 117, 205, 0.3)',
               }
             }}
           >
