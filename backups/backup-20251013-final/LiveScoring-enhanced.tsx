@@ -28,7 +28,6 @@ import {
   AlertTitle,
   TextField,
   Container,
-  Autocomplete,
   useTheme,
   useMediaQuery,
 } from '@mui/material';
@@ -88,43 +87,6 @@ const LiveScoring: React.FC<Props> = () => {
     return striker && nonStriker && bowler && striker !== nonStriker;
   }, [striker, nonStriker, bowler]);
 
-  // Helper function to count available batsmen for the batting team
-  const getAvailableBatsmen = useCallback(() => {
-    if (!match || !players || players.length === 0) return [];
-    
-    const currentInning = match.innings[currentInnings];
-    if (!currentInning) return [];
-    
-    const battingTeamId = typeof currentInning?.battingTeam === 'string' 
-      ? currentInning.battingTeam 
-      : currentInning?.battingTeam?._id;
-    
-    if (!battingTeamId) return [];
-    
-    return players.filter(player => {
-      // Check if player has teams and battingTeamId exists
-      if (!player.teams || !Array.isArray(player.teams)) return false;
-      
-      // Check if player belongs to batting team
-      const hasTeam = player.teams.some(team => {
-        const teamId = typeof team === 'string' ? team : team._id;
-        return teamId === String(battingTeamId);
-      });
-      
-      if (!hasTeam) return false;
-      
-      // Check if player is out
-      const isPlayerOut = currentInning.battingStats && Array.isArray(currentInning.battingStats) 
-        ? currentInning.battingStats.some(stat => {
-            const playerId = typeof stat.player === 'string' ? stat.player : stat.player._id;
-            return playerId === player._id && stat.isOut;
-          })
-        : false;
-      
-      return !isPlayerOut;
-    });
-  }, [match, players, currentInnings]);
-
   // Helper function to get dialog context
   const getDialogContext = useCallback(() => {
     if (isOverCompleted) {
@@ -165,163 +127,7 @@ const LiveScoring: React.FC<Props> = () => {
   }, [getDialogContext, bowler, striker, nonStriker, arePlayersSelected]);
 
   // Function to handle starting/continuing match with player selection
-  const handleStartOrContinueMatch = async () => {
-    // Check if there are enough batsmen to start/continue the match
-    const availableBatsmen = getAvailableBatsmen();
-    console.log('Available batsmen for match start:', availableBatsmen.length, availableBatsmen.map(p => p.name));
-    
-    if (availableBatsmen.length < 2) {
-      // Not enough batsmen to start/continue match - auto complete innings
-      if (!match || !matchId) return;
-      
-      const currentInning = match.innings[currentInnings];
-      if (!currentInning) return;
-      
-      if (currentInnings === 0) {
-        // First innings can't start - move to second innings
-        try {
-          const updatedMatch = { ...match };
-          
-          // Mark first innings as completed due to insufficient batsmen
-          updatedMatch.innings[0].isCompleted = true;
-          
-          // Prepare clean match data for saving
-          const cleanMatchData = (match: Match): Match => {
-            return {
-              ...match,
-              team1: typeof match.team1 === 'object' ? match.team1._id : match.team1,
-              team2: typeof match.team2 === 'object' ? match.team2._id : match.team2,
-              currentInnings: match.currentInnings || 0,
-              innings: match.innings.map(inning => ({
-                battingTeam: typeof inning.battingTeam === 'object' ? inning.battingTeam._id : inning.battingTeam,
-                bowlingTeam: typeof inning.bowlingTeam === 'object' ? inning.bowlingTeam._id : inning.bowlingTeam,
-                totalRuns: inning.totalRuns,
-                wickets: inning.wickets,
-                overs: inning.overs,
-                balls: inning.balls || 0,
-                isCompleted: inning.isCompleted || false,
-                battingStats: inning.battingStats || [],
-                bowlingStats: inning.bowlingStats || [],
-                currentState: inning.currentState || {
-                  currentOver: 0,
-                  currentBall: 0,
-                  lastBallRuns: 0
-                },
-                extras: inning.extras || {
-                  wides: 0,
-                  noBalls: 0,
-                  byes: 0,
-                  legByes: 0,
-                  total: 0
-                },
-                runRate: inning.runRate || 0,
-                requiredRunRate: inning.requiredRunRate,
-                currentOverBalls: inning.currentOverBalls || []
-              }))
-            };
-          };
-
-          // Save the updated match with first innings completed
-          const cleanedMatch = cleanMatchData(updatedMatch);
-          await matchService.updateScore(matchId, cleanedMatch);
-          
-          // Update local state
-          setMatch(updatedMatch);
-          setIsFirstInningsComplete(true);
-          setOverCompletionMessage(`First innings skipped - not enough batsmen (${availableBatsmen.length} available). Click "Start Second Innings" to continue.`);
-          setIsOverCompleted(true);
-          
-          setError(''); // Clear any existing errors
-          
-        } catch (error: any) {
-          setError('Error completing first innings due to insufficient batsmen');
-          console.error('Error:', error);
-        }
-        return;
-      } else {
-        // Second innings can't continue - end match
-        try {
-          const updatedMatch = { ...match };
-          updatedMatch.status = 'completed';
-          updatedMatch.innings[1].isCompleted = true;
-          
-          // Determine winner based on first innings score
-          const firstInnings = updatedMatch.innings[0];
-          const secondInnings = updatedMatch.innings[1];
-          const firstInningsScore = firstInnings.totalRuns || 0;
-          const secondInningsScore = secondInnings.totalRuns || 0;
-          
-          if (firstInningsScore > secondInningsScore) {
-            const firstInningsBattingTeam = typeof firstInnings.battingTeam === 'object' && firstInnings.battingTeam
-              ? firstInnings.battingTeam.name 
-              : 'Team 1';
-            const runsDifference = firstInningsScore - secondInningsScore;
-            updatedMatch.result = `${firstInningsBattingTeam} won by ${runsDifference} runs`;
-          } else if (secondInningsScore > firstInningsScore) {
-            const secondInningsBattingTeam = typeof secondInnings.battingTeam === 'object' && secondInnings.battingTeam
-              ? secondInnings.battingTeam.name 
-              : 'Team 2';
-            const runsDifference = secondInningsScore - firstInningsScore;
-            updatedMatch.result = `${secondInningsBattingTeam} won by ${runsDifference} runs`;
-          } else {
-            updatedMatch.result = 'Match ended in a tie';
-          }
-          
-          // Save the completed match
-          const cleanMatchData = (match: Match): Match => {
-            return {
-              ...match,
-              team1: typeof match.team1 === 'object' ? match.team1._id : match.team1,
-              team2: typeof match.team2 === 'object' ? match.team2._id : match.team2,
-              currentInnings: match.currentInnings || 0,
-              innings: match.innings.map(inning => ({
-                battingTeam: typeof inning.battingTeam === 'object' ? inning.battingTeam._id : inning.battingTeam,
-                bowlingTeam: typeof inning.bowlingTeam === 'object' ? inning.bowlingTeam._id : inning.bowlingTeam,
-                totalRuns: inning.totalRuns,
-                wickets: inning.wickets,
-                overs: inning.overs,
-                balls: inning.balls || 0,
-                isCompleted: inning.isCompleted || false,
-                battingStats: inning.battingStats || [],
-                bowlingStats: inning.bowlingStats || [],
-                currentState: inning.currentState || {
-                  currentOver: 0,
-                  currentBall: 0,
-                  lastBallRuns: 0
-                },
-                extras: inning.extras || {
-                  wides: 0,
-                  noBalls: 0,
-                  byes: 0,
-                  legByes: 0,
-                  total: 0
-                },
-                runRate: inning.runRate || 0,
-                requiredRunRate: inning.requiredRunRate,
-                currentOverBalls: inning.currentOverBalls || []
-              }))
-            };
-          };
-
-          const cleanedMatch = cleanMatchData(updatedMatch);
-          await matchService.updateScore(matchId, cleanedMatch);
-          
-          // Update local state
-          setMatch(updatedMatch);
-          setIsMatchCompleted(true);
-          setOverCompletionMessage(`Match completed - not enough batsmen to continue second innings (${availableBatsmen.length} available). ${updatedMatch.result}`);
-          setIsOverCompleted(true);
-          
-          setError(''); // Clear any existing errors
-          
-        } catch (error: any) {
-          setError('Error ending match due to insufficient batsmen');
-          console.error('Error:', error);
-        }
-        return;
-      }
-    }
-    
+  const handleStartOrContinueMatch = () => {
     if (!arePlayersSelected()) {
       setIsPlayerSelectionDialogOpen(true);
     } else {
@@ -352,7 +158,7 @@ const LiveScoring: React.FC<Props> = () => {
     if (currentScore >= target) {
       const wicketsRemaining = 10 - wicketsLost;
       updatedMatch.status = 'completed';
-      updatedMatch.result = `${typeof secondInnings.battingTeam === 'object' && secondInnings.battingTeam ? secondInnings.battingTeam.name : 'Team 2'} won by ${wicketsRemaining} wickets`;
+      updatedMatch.result = `${typeof secondInnings.battingTeam === 'object' ? secondInnings.battingTeam.name : 'Team 2'} won by ${wicketsRemaining} wickets`;
       
       // Complete the match
       secondInnings.isCompleted = true;
@@ -364,7 +170,7 @@ const LiveScoring: React.FC<Props> = () => {
     if (wicketsLost >= 10) {
       const runsDifference = (firstInnings.totalRuns || 0) - currentScore;
       updatedMatch.status = 'completed';
-      updatedMatch.result = `${typeof firstInnings.battingTeam === 'object' && firstInnings.battingTeam ? firstInnings.battingTeam.name : 'Team 1'} won by ${runsDifference} runs`;
+      updatedMatch.result = `${typeof firstInnings.battingTeam === 'object' ? firstInnings.battingTeam.name : 'Team 1'} won by ${runsDifference} runs`;
       
       // Complete the match
       secondInnings.isCompleted = true;
@@ -525,7 +331,7 @@ const LiveScoring: React.FC<Props> = () => {
         }
         
         // Always initialize striker from match data
-        if (currentInning.battingStats && Array.isArray(currentInning.battingStats) && currentInning.battingStats.length > 0) {
+        if (currentInning.battingStats.length > 0) {
           // Find the player who is currently on strike
           const onStrikeBatter = currentInning.battingStats.find(stat => stat.isOnStrike && !stat.isOut);
           if (onStrikeBatter) {
@@ -546,7 +352,7 @@ const LiveScoring: React.FC<Props> = () => {
         }
         
         // Always initialize non-striker from match data
-        if (currentInning.battingStats && Array.isArray(currentInning.battingStats) && currentInning.battingStats.length > 1) {
+        if (currentInning.battingStats.length > 1) {
           // Find the non-striker (not on strike and not out)
           const nonStrikeBatter = currentInning.battingStats.find(stat => !stat.isOnStrike && !stat.isOut);
           if (nonStrikeBatter) {
@@ -554,10 +360,10 @@ const LiveScoring: React.FC<Props> = () => {
               ? nonStrikeBatter.player
               : nonStrikeBatter.player._id || '';
             setNonStriker(nonStrikerId);
-          } else if (currentInning.battingStats && Array.isArray(currentInning.battingStats) && currentInning.battingStats.length > 1) {
+          } else if (currentInning.battingStats.length > 1) {
             // Fallback to second batsman if available
             const secondBatter = currentInning.battingStats[1];
-            if (secondBatter && !secondBatter.isOut) {
+            if (!secondBatter.isOut) {
               const nonStrikerId = typeof secondBatter.player === 'string'
                 ? secondBatter.player
                 : secondBatter.player._id || '';
@@ -754,11 +560,6 @@ const LiveScoring: React.FC<Props> = () => {
     }
 
     if (!isExtra) {
-      // Ensure battingStats array exists
-      if (!currentInning.battingStats) {
-        currentInning.battingStats = [];
-      }
-      
       // Update striker's stats
       let strikerBattingStats = currentInning.battingStats.find(
         (stat) => typeof stat.player === 'string' ? stat.player === striker : stat.player._id === striker
@@ -874,7 +675,7 @@ const LiveScoring: React.FC<Props> = () => {
 
       // Add ball to current over balls for commentary
       const ballOutcome: BallOutcome = {
-        ballNumber: currentOverBalls.length + 1, // Ball number within current over (1-6)
+        ballNumber: remainingInningsBalls === 0 ? 6 : remainingInningsBalls,
         runs,
         isWicket: false,
         extras: isExtra ? { type: 'wide', runs } : undefined
@@ -1020,25 +821,23 @@ const LiveScoring: React.FC<Props> = () => {
         setNonStriker(temp);
         
         // Update strike status in batting stats
-        if (currentInning.battingStats && Array.isArray(currentInning.battingStats)) {
-          currentInning.battingStats.forEach(stat => {
-            if (typeof stat.player === 'string') {
-              stat.isOnStrike = stat.player === nonStriker;
-            } else {
-              stat.isOnStrike = stat.player._id === nonStriker;
-            }
-          });
-        }
+        currentInning.battingStats.forEach(stat => {
+          if (typeof stat.player === 'string') {
+            stat.isOnStrike = stat.player === nonStriker;
+          } else {
+            stat.isOnStrike = stat.player._id === nonStriker;
+          }
+        });
         
         // Update local stats to reflect the new striker (who was non-striker before)
         // The runs were already added to the original striker's stats above
         // Now we need to sync the local state with the actual batting stats
-        const newStrikerStats = currentInning.battingStats && Array.isArray(currentInning.battingStats)
-          ? currentInning.battingStats.find((stat) => typeof stat.player === 'string' ? stat.player === nonStriker : stat.player._id === nonStriker)
-          : null;
-        const newNonStrikerStats = currentInning.battingStats && Array.isArray(currentInning.battingStats)
-          ? currentInning.battingStats.find((stat) => typeof stat.player === 'string' ? stat.player === temp : stat.player._id === temp)
-          : null;
+        const newStrikerStats = currentInning.battingStats.find(
+          (stat) => typeof stat.player === 'string' ? stat.player === nonStriker : stat.player._id === nonStriker
+        );
+        const newNonStrikerStats = currentInning.battingStats.find(
+          (stat) => typeof stat.player === 'string' ? stat.player === temp : stat.player._id === temp
+        );
         
         setStrikerStats({
           runs: newStrikerStats?.runs || 0,
@@ -1050,20 +849,18 @@ const LiveScoring: React.FC<Props> = () => {
         });
       } else {
         // Update strike status for current striker
-        if (currentInning.battingStats && Array.isArray(currentInning.battingStats)) {
-          currentInning.battingStats.forEach(stat => {
-            if (typeof stat.player === 'string') {
-              stat.isOnStrike = stat.player === striker;
-            } else {
-              stat.isOnStrike = stat.player._id === striker;
-            }
-          });
-        }
+        currentInning.battingStats.forEach(stat => {
+          if (typeof stat.player === 'string') {
+            stat.isOnStrike = stat.player === striker;
+          } else {
+            stat.isOnStrike = stat.player._id === striker;
+          }
+        });
         
         // Update local striker stats to match the batting stats
-        const currentStrikerStats = currentInning.battingStats && Array.isArray(currentInning.battingStats)
-          ? currentInning.battingStats.find((stat) => typeof stat.player === 'string' ? stat.player === striker : stat.player._id === striker)
-          : null;
+        const currentStrikerStats = currentInning.battingStats.find(
+          (stat) => typeof stat.player === 'string' ? stat.player === striker : stat.player._id === striker
+        );
         if (currentStrikerStats) {
           setStrikerStats({
             runs: currentStrikerStats.runs,
@@ -1275,7 +1072,7 @@ const LiveScoring: React.FC<Props> = () => {
     
     // Add extra ball to current over balls for commentary
     const extraBall: BallOutcome = {
-      ballNumber: type === 'wide' || type === 'noBall' ? 0 : (currentOverBalls.length + 1), // Wides/no-balls = 0, byes/leg-byes = current ball position
+      ballNumber: type === 'wide' || type === 'noBall' ? 0 : (currentInning.currentState?.currentBall || 0), // Extras don't count as ball numbers
       runs,
       isWicket: false,
       extras: {
@@ -1309,15 +1106,13 @@ const LiveScoring: React.FC<Props> = () => {
       setNonStriker(temp);
       
       // Update strike status in batting stats
-      if (currentInning.battingStats && Array.isArray(currentInning.battingStats)) {
-        currentInning.battingStats.forEach(stat => {
-          if (typeof stat.player === 'string') {
-            stat.isOnStrike = stat.player === nonStriker;
-          } else {
-            stat.isOnStrike = stat.player._id === nonStriker;
-          }
-        });
-      }
+      currentInning.battingStats.forEach(stat => {
+        if (typeof stat.player === 'string') {
+          stat.isOnStrike = stat.player === nonStriker;
+        } else {
+          stat.isOnStrike = stat.player._id === nonStriker;
+        }
+      });
     }
 
     try {
@@ -1414,9 +1209,9 @@ const LiveScoring: React.FC<Props> = () => {
     }
 
     // Update batting stats - mark striker as out
-    const strikerBattingStats = currentInning.battingStats && Array.isArray(currentInning.battingStats)
-      ? currentInning.battingStats.find((stat) => (typeof stat.player === 'string' ? stat.player : stat.player._id) === striker)
-      : null;
+    const strikerBattingStats = currentInning.battingStats.find(
+      (stat) => (typeof stat.player === 'string' ? stat.player : stat.player._id) === striker
+    );
     
     if (strikerBattingStats) {
       strikerBattingStats.isOut = true;
@@ -1480,7 +1275,7 @@ const LiveScoring: React.FC<Props> = () => {
 
     // Add wicket ball to current over balls for commentary
     const wicketBall: BallOutcome = {
-      ballNumber: currentOverBalls.length + 1, // Ball number within current over (1-6)
+      ballNumber: remainingInningsBalls === 0 ? 6 : remainingInningsBalls,
       runs: 0,
       isWicket: true,
       dismissalType: type as any,
@@ -1492,119 +1287,6 @@ const LiveScoring: React.FC<Props> = () => {
     
     // FIXED: Store current over balls in match data for persistence
     currentInning.currentOverBalls = newCurrentOverBalls;
-
-    // Check if no more batsmen are available (for teams with less than 10 players)
-    const availableBatsmen = getAvailableBatsmen();
-    // Need at least 2 batsmen to continue (striker + non-striker)
-    // Current striker is now out, so we need at least 2 remaining players
-    const availableBatsmenCount = availableBatsmen.length;
-    console.log('Available batsmen after wicket:', availableBatsmenCount, availableBatsmen.map(p => p.name));
-    
-    if (availableBatsmenCount < 2) {
-      // Not enough batsmen to continue - innings ends
-      currentInning.isCompleted = true;
-      
-      if (currentInnings === 0) {
-        // First innings completed due to no more batsmen
-        setIsFirstInningsComplete(true);
-        setOverCompletionMessage(`First innings completed! All out for ${currentInning.totalRuns} runs in ${currentInning.overs.toFixed(1)} overs. (${currentInning.wickets} wickets, not enough batsmen to continue)`);
-        setIsOverCompleted(true);
-        setIsOverInProgress(false);
-        setIsWaitingForNewBatsman(false);
-        setIsWicketDialogOpen(false);
-        
-        // Save the match state and return - user will start second innings manually
-        try {
-          const cleanedMatch = cleanMatchData(updatedMatch);
-          await matchService.updateScore(matchId, cleanedMatch);
-          setMatch(updatedMatch);
-        } catch (error: any) {
-          setError('Error saving innings completion');
-          console.error('Error:', error);
-        }
-        return;
-      } else {
-        // Second innings completed due to no more batsmen - match ends
-        updatedMatch.status = 'completed';
-        const firstInnings = updatedMatch.innings[0];
-        const runsDifference = (firstInnings.totalRuns || 0) - currentInning.totalRuns;
-        const firstInningsBattingTeam = typeof firstInnings.battingTeam === 'object' && firstInnings.battingTeam
-          ? firstInnings.battingTeam.name 
-          : 'Team 1';
-        updatedMatch.result = `${firstInningsBattingTeam} won by ${runsDifference} runs`;
-        
-        setIsMatchCompleted(true);
-        setOverCompletionMessage(`Match completed! ${firstInningsBattingTeam} won by ${runsDifference} runs. All out for ${currentInning.totalRuns} runs. (${currentInning.wickets} wickets, not enough batsmen to continue)`);
-        setIsOverCompleted(true);
-        setIsOverInProgress(false);
-        setIsWaitingForNewBatsman(false);
-        setIsWicketDialogOpen(false);
-        
-        // Save the completed match and return
-        try {
-          const cleanedMatch = cleanMatchData(updatedMatch);
-          await matchService.updateScore(matchId, cleanedMatch);
-          setMatch(updatedMatch);
-        } catch (error: any) {
-          setError('Error saving match completion');
-          console.error('Error:', error);
-        }
-        return;
-      }
-    }
-
-    // Check if all batsmen are out (10 wickets) - innings should end
-    if (currentInning.wickets >= 10) {
-      currentInning.isCompleted = true;
-      
-      if (currentInnings === 0) {
-        // First innings completed due to all out
-        setIsFirstInningsComplete(true);
-        setOverCompletionMessage(`First innings completed! All out for ${currentInning.totalRuns} runs in ${currentInning.overs.toFixed(1)} overs.`);
-        setIsOverCompleted(true);
-        setIsOverInProgress(false);
-        setIsWaitingForNewBatsman(false);
-        setIsWicketDialogOpen(false);
-        
-        // Save the match state and return - user will start second innings manually
-        try {
-          const cleanedMatch = cleanMatchData(updatedMatch);
-          await matchService.updateScore(matchId, cleanedMatch);
-          setMatch(updatedMatch);
-        } catch (error: any) {
-          setError('Error saving innings completion');
-          console.error('Error:', error);
-        }
-        return;
-      } else {
-        // Second innings completed due to all out - match ends
-        updatedMatch.status = 'completed';
-        const firstInnings = updatedMatch.innings[0];
-        const runsDifference = (firstInnings.totalRuns || 0) - currentInning.totalRuns;
-        const firstInningsBattingTeam = typeof firstInnings.battingTeam === 'object' && firstInnings.battingTeam
-          ? firstInnings.battingTeam.name 
-          : 'Team 1';
-        updatedMatch.result = `${firstInningsBattingTeam} won by ${runsDifference} runs`;
-        
-        setIsMatchCompleted(true);
-        setOverCompletionMessage(`Match completed! ${firstInningsBattingTeam} won by ${runsDifference} runs. All out for ${currentInning.totalRuns} runs.`);
-        setIsOverCompleted(true);
-        setIsOverInProgress(false);
-        setIsWaitingForNewBatsman(false);
-        setIsWicketDialogOpen(false);
-        
-        // Save the completed match and return
-        try {
-          const cleanedMatch = cleanMatchData(updatedMatch);
-          await matchService.updateScore(matchId, cleanedMatch);
-          setMatch(updatedMatch);
-        } catch (error: any) {
-          setError('Error saving match completion');
-          console.error('Error:', error);
-        }
-        return;
-      }
-    }
 
     // Check if over is complete - but don't set over completion state if waiting for new batsman
     // This will be handled after new batsman is selected
@@ -1784,41 +1466,22 @@ const LiveScoring: React.FC<Props> = () => {
               setNonStriker('');
               setBowler('');
               setIsOverCompleted(true);
-              
-              // CRITICAL FIX: Clear current over balls for innings completion after wicket
-              setCurrentOverBalls([]);
-              if (match && match.innings && match.innings[currentInnings]) {
-                match.innings[currentInnings].currentOverBalls = [];
-              }
             } else {
               // Second innings completed, match finished
               setOverCompletionMessage(`Match completed! Second innings finished after ${completeInningsOvers} overs.`);
               setIsOverCompleted(true);
-              
-              // CRITICAL FIX: Clear current over balls for match completion after wicket
-              setCurrentOverBalls([]);
-              if (match && match.innings && match.innings[currentInnings]) {
-                match.innings[currentInnings].currentOverBalls = [];
-              }
             }
           } else {
             // Just over completed, continue with same innings
             setIsOverCompleted(true);
             setOverCompletionMessage(`Over ${completeInningsOvers} completed! Please select a new bowler and start the next over.`);
-            
-            // CRITICAL FIX: Clear current over balls when over completes after wicket
-            // This prevents old over information from persisting into the new over
-            setCurrentOverBalls([]);
-            if (match && match.innings && match.innings[currentInnings]) {
-              match.innings[currentInnings].currentOverBalls = [];
-            }
           }
         }
         
         // Sync with actual match data if the player already has stats
-        const newStrikerStats = currentInning.battingStats && Array.isArray(currentInning.battingStats)
-          ? currentInning.battingStats.find((stat) => typeof stat.player === 'string' ? stat.player === newStriker : stat.player._id === newStriker)
-          : null;
+        const newStrikerStats = currentInning.battingStats.find(
+          (stat) => typeof stat.player === 'string' ? stat.player === newStriker : stat.player._id === newStriker
+        );
         
         if (newStrikerStats) {
           setStrikerStats({
@@ -1911,81 +1574,10 @@ const LiveScoring: React.FC<Props> = () => {
   const handleStartSecondInnings = async () => {
     if (!match || !matchId) return;
     
-    // For second innings, the batting team is the bowling team from first innings
-    const firstInnings = match.innings[0];
-    if (!firstInnings) return;
-    
-    // Get the second innings batting team ID (which was the bowling team in first innings)
-    let secondInningsBattingTeamId: string | undefined;
-    
-    if (typeof firstInnings.bowlingTeam === 'string') {
-      secondInningsBattingTeamId = firstInnings.bowlingTeam;
-    } else if (firstInnings.bowlingTeam && firstInnings.bowlingTeam._id) {
-      secondInningsBattingTeamId = firstInnings.bowlingTeam._id;
-    } else {
-      return;
-    }
-    
-    // Count all players from that team
-    const teamPlayers = players.filter(player => {
-      if (!player.teams || !Array.isArray(player.teams)) return false;
-      
-      return player.teams.some(team => {
-        const teamId = typeof team === 'string' ? team : team._id;
-        return teamId === secondInningsBattingTeamId;
-      });
-    });
-    
-    if (teamPlayers.length < 2) {
-      setError(`Second innings cannot start - only ${teamPlayers.length} available batsmen. Match will end.`);
-      setIsMatchCompleted(true);
-      setOverCompletionMessage(`Match completed - not enough batsmen for second innings (${teamPlayers.length} available).`);
-      setIsOverCompleted(true);
-      return;
-    }
-    
-    // Continue with second innings start
-    startSecondInningsFlow();
-  };
-  
-  const startSecondInningsFlow = async () => {
-    if (!match || !matchId) return;
-    
     try {
       // Switch to second innings
       const updatedMatch = { ...match };
       updatedMatch.currentInnings = 1;
-      
-      // Ensure second innings exists - if not, create it
-      if (!updatedMatch.innings[1]) {
-        const firstInnings = updatedMatch.innings[0];
-        const newInnings: any = {
-          battingTeam: firstInnings.bowlingTeam,
-          bowlingTeam: firstInnings.battingTeam,
-          totalRuns: 0,
-          wickets: 0,
-          overs: 0,
-          balls: 0,
-          isCompleted: false,
-          battingStats: [],
-          bowlingStats: [],
-          currentState: {
-            currentOver: 0,
-            currentBall: 0,
-            lastBallRuns: 0
-          },
-          extras: {
-            wides: 0,
-            noBalls: 0,
-            byes: 0,
-            legByes: 0,
-            total: 0
-          },
-          runRate: 0,
-          currentOverBalls: []
-        };
-        updatedMatch.innings.push(newInnings);
-      }
       
       // Save the innings transition to server
       const cleanMatchData = (match: Match): Match => {
@@ -1993,7 +1585,7 @@ const LiveScoring: React.FC<Props> = () => {
           ...match,
           team1: typeof match.team1 === 'object' ? match.team1._id : match.team1,
           team2: typeof match.team2 === 'object' ? match.team2._id : match.team2,
-          currentInnings: updatedMatch.currentInnings, // Use the updated currentInnings
+          currentInnings: match.currentInnings || 0,
           innings: match.innings.map(inning => ({
             battingTeam: typeof inning.battingTeam === 'object' ? inning.battingTeam._id : inning.battingTeam,
             bowlingTeam: typeof inning.bowlingTeam === 'object' ? inning.bowlingTeam._id : inning.bowlingTeam,
@@ -2053,10 +1645,10 @@ const LiveScoring: React.FC<Props> = () => {
   // Show innings transition screen when first innings is complete
   if (isFirstInningsComplete && currentInnings === 0) {
     const firstInning = match.innings[0];
-    const firstInningBattingTeam = typeof firstInning?.battingTeam === 'object' && firstInning.battingTeam
+    const firstInningBattingTeam = typeof firstInning?.battingTeam === 'object' 
       ? firstInning.battingTeam.name 
       : 'Team 1';
-    const firstInningBowlingTeam = typeof firstInning?.bowlingTeam === 'object' && firstInning.bowlingTeam
+    const firstInningBowlingTeam = typeof firstInning?.bowlingTeam === 'object' 
       ? firstInning.bowlingTeam.name 
       : 'Team 2';
 
@@ -2110,16 +1702,6 @@ const LiveScoring: React.FC<Props> = () => {
   }
 
   const currentInning = match.innings[currentInnings];
-  
-  // If currentInning is undefined (during innings transition), show loading or return early
-  if (!currentInning) {
-    return (
-      <Container>
-        <Typography>Loading innings data...</Typography>
-      </Container>
-    );
-  }
-  
   const battingTeamId = typeof currentInning?.battingTeam === 'string' 
     ? currentInning.battingTeam 
     : currentInning?.battingTeam?._id;
@@ -2163,7 +1745,7 @@ const LiveScoring: React.FC<Props> = () => {
             textShadow: '2px 2px 4px rgba(0,0,0,0.1)'
           }}
         >
-          🏏 {`${typeof match.team1 === 'object' && match.team1 ? match.team1.name : match.team1} vs ${typeof match.team2 === 'object' && match.team2 ? match.team2.name : match.team2}`}
+          🏏 {`${typeof match.team1 === 'object' ? match.team1.name : match.team1} vs ${typeof match.team2 === 'object' ? match.team2.name : match.team2}`}
         </Typography>
 
         {/* Innings Indicator */}
@@ -2190,7 +1772,7 @@ const LiveScoring: React.FC<Props> = () => {
               }}
             >
               <AlertTitle sx={{ fontWeight: 'bold' }}>🔄 Second Innings Started!</AlertTitle>
-              Teams have been swapped. {typeof currentInning?.battingTeam === 'object' && currentInning.battingTeam ? currentInning.battingTeam.name : currentInning?.battingTeam} is now batting.
+              Teams have been swapped. {typeof currentInning?.battingTeam === 'object' ? currentInning.battingTeam.name : currentInning?.battingTeam} is now batting.
             </Alert>
           )}
         </Box>
@@ -2355,175 +1937,172 @@ const LiveScoring: React.FC<Props> = () => {
             wickets: bowlerStats.wickets,
             balls: bowlerStats.balls || 0
           }}
+          isAdmin={isAdmin}
+          isOverInProgress={isOverInProgress}
+          isOverCompleted={isOverCompleted}
+          isMatchCompleted={isMatchCompleted}
+          overCompletionMessage={overCompletionMessage}
+          onStartNewOver={() => {
+            setIsOverInProgress(true);
+            setIsOverCompleted(false);
+            setOverCompletionMessage('');
+            setCurrentOverBalls([]);
+            
+            // FIXED: Clear current over balls from match data when starting new over
+            if (match && match.innings && match.innings[currentInnings]) {
+              match.innings[currentInnings].currentOverBalls = [];
+            }
+            
+            // FIXED: Reset bowlers used tracking for new over
+            setBowlersUsedInCurrentOver([]);
+          }}
+          onEndOver={() => setIsOverInProgress(false)}
         />
       </Paper>
 
       {/* Player Selection - Hidden from main UI, only shown in dialog when needed */}
       {false && (
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 3, mb: 3 }}>
-        <Autocomplete
+        <FormControl 
           fullWidth
-          options={players
-            .filter(player => {
-              // Check if player has teams and battingTeamId exists
-              if (!player.teams || !Array.isArray(player.teams) || !battingTeamId) return false;
-              
-              // Check if player belongs to batting team (using teams array)
-              const hasTeam = player.teams.some(team => {
-                const teamId = typeof team === 'string' ? team : team._id;
-                return teamId === String(battingTeamId);
-              });
-              
-              // Check if player is out
-              const isPlayerOut = currentInning.battingStats && Array.isArray(currentInning.battingStats)
-                ? currentInning.battingStats.some(stat => {
-                    const playerId = typeof stat.player === 'string' ? stat.player : stat.player._id;
-                    return playerId === player._id && stat.isOut;
-                  })
-                : false;
-              
-              // Don't allow same player as non-striker
-              const isSameAsNonStriker = player._id === nonStriker;
-              
-              return hasTeam && !isPlayerOut && !isSameAsNonStriker;
-            })}
-          getOptionLabel={(option) => option.name}
-          value={players.find(p => p._id === striker) || null}
-          onChange={(event, newValue) => {
-            if (newValue && newValue._id) {
-              handleBatsmanChange({ target: { value: newValue._id } } as SelectChangeEvent);
-            }
+          sx={{ 
+            '& .MuiOutlinedInput-root': isWaitingForNewBatsman ? {
+              backgroundColor: 'warning.light',
+              '&:hover': { backgroundColor: 'warning.light' }
+            } : {}
           }}
-          disabled={!isAdmin || (isOverCompleted && !isWaitingForNewBatsman)}
-          renderInput={(params) => (
-            <TextField 
-              {...params} 
-              label={`Striker ${isWaitingForNewBatsman ? '(SELECT NEW BATSMAN!)' : ''}`}
-              sx={{
-                '& .MuiOutlinedInput-root': isWaitingForNewBatsman ? {
-                  backgroundColor: 'warning.light',
-                  '&:hover': { backgroundColor: 'warning.light' }
-                } : {}
-              }}
-            />
-          )}
-          renderOption={(props, option) => (
-            <Box component="li" {...props}>
-              <Typography>{option.name}</Typography>
-            </Box>
-          )}
-        />
-
-        <Autocomplete
-          fullWidth
-          options={players
-            .filter(player => {
-              // Check if player has teams and battingTeamId exists
-              if (!player.teams || !Array.isArray(player.teams) || !battingTeamId) return false;
-              
-              // Check if player belongs to batting team (using teams array)
-              const hasTeam = player.teams.some(team => {
-                const teamId = typeof team === 'string' ? team : team._id;
-                return teamId === String(battingTeamId);
-              });
-              
-              // Check if player is out
-              const isPlayerOut = currentInning.battingStats && Array.isArray(currentInning.battingStats)
-                ? currentInning.battingStats.some(stat => {
-                    const playerId = typeof stat.player === 'string' ? stat.player : stat.player._id;
-                    return playerId === player._id && stat.isOut;
-                  })
-                : false;
-              
-              // Don't allow same player as striker
-              const isSameAsStriker = player._id === striker;
-              
-              return hasTeam && !isPlayerOut && !isSameAsStriker;
-            })}
-          getOptionLabel={(option) => option.name}
-          value={players.find(p => p._id === nonStriker) || null}
-          onChange={(event, newValue) => {
-            if (newValue && newValue._id) {
-              handleNonStrikerChange({ target: { value: newValue._id } } as SelectChangeEvent);
-            }
-          }}
-          disabled={!isAdmin || isOverCompleted || isWaitingForNewBatsman}
-          renderInput={(params) => (
-            <TextField 
-              {...params} 
-              label="Non-Striker"
-            />
-          )}
-          renderOption={(props, option) => (
-            <Box component="li" {...props}>
-              <Typography>{option.name}</Typography>
-            </Box>
-          )}
-        />
-
-        <Autocomplete
-          fullWidth
-          options={players
-            .filter(player => {
-              // Check if player has teams and bowlingTeamId exists
-              if (!player.teams || !Array.isArray(player.teams) || !bowlingTeamId) return false;
-              
-              // Check if player belongs to bowling team (using teams array)
-              const hasTeam = player.teams.some(team => {
-                const teamId = typeof team === 'string' ? team : team._id;
-                return teamId === String(bowlingTeamId);
-              });
-              return hasTeam;
-            })
-            .sort((a, b) => {
-              // FIXED: Smart sorting for bowler rotation when over completed
-              if (isOverCompleted && bowlersUsedInCurrentOver.length > 0) {
-                const aUsedInCurrentOver = bowlersUsedInCurrentOver.includes(a._id || '');
-                const bUsedInCurrentOver = bowlersUsedInCurrentOver.includes(b._id || '');
+        >
+          <InputLabel>Striker {isWaitingForNewBatsman ? '(SELECT NEW BATSMAN!)' : ''}</InputLabel>
+          <Select 
+            value={striker} 
+            onChange={handleBatsmanChange}
+            disabled={!isAdmin || (isOverCompleted && !isWaitingForNewBatsman)}
+          >
+            {players
+              .filter(player => {
+                console.log('Checking player for striker:', player.name);
+                console.log('Player team:', player.team);
+                console.log('battingTeamId:', battingTeamId);
+                if (!player.team || !battingTeamId) return false;
                 
-                // Prioritize bowlers who haven't bowled in current over
-                if (!aUsedInCurrentOver && bUsedInCurrentOver) return -1;
-                if (aUsedInCurrentOver && !bUsedInCurrentOver) return 1;
-              }
-              
-              // Default alphabetical sort
-              return (a.name || '').localeCompare(b.name || '');
-            })}
-          getOptionLabel={(option) => {
-            const usedInCurrentOver = isOverCompleted && bowlersUsedInCurrentOver.includes(option._id || '');
-            return `${option.name}${usedInCurrentOver ? ' ⚠️ (Used in last over)' : ''}`;
+                // Check if player belongs to batting team (using singular 'team' property)
+                const playerTeamId = typeof player.team === 'string' ? player.team : player.team._id;
+                const hasTeam = playerTeamId === String(battingTeamId);
+                console.log('Has team:', hasTeam);
+                
+                // Check if player is out
+                const isPlayerOut = currentInning.battingStats.some(stat => {
+                  const playerId = typeof stat.player === 'string' ? stat.player : stat.player._id;
+                  return playerId === player._id && stat.isOut;
+                });
+                
+                // Don't allow same player as non-striker
+                const isSameAsNonStriker = player._id === nonStriker;
+                
+                return hasTeam && !isPlayerOut && !isSameAsNonStriker;
+              })
+              .map((player) => (
+                <MenuItem key={player._id} value={player._id}>
+                  {player.name}
+                </MenuItem>
+              ))}
+          </Select>
+        </FormControl>
+
+        <FormControl fullWidth>
+          <InputLabel>Non-Striker</InputLabel>
+          <Select 
+            value={nonStriker} 
+            onChange={handleNonStrikerChange}
+            disabled={!isAdmin || isOverCompleted || isWaitingForNewBatsman}
+          >
+            {players
+              .filter(player => {
+                console.log('Checking player for non-striker:', player.name);
+                console.log('Player team:', player.team);
+                console.log('battingTeamId:', battingTeamId);
+                if (!player.team || !battingTeamId) return false;
+                
+                // Check if player belongs to batting team (using singular 'team' property)
+                const playerTeamId = typeof player.team === 'string' ? player.team : player.team._id;
+                const hasTeam = playerTeamId === String(battingTeamId);
+                console.log('Has team:', hasTeam);
+                
+                // Check if player is out
+                const isPlayerOut = currentInning.battingStats.some(stat => {
+                  const playerId = typeof stat.player === 'string' ? stat.player : stat.player._id;
+                  return playerId === player._id && stat.isOut;
+                });
+                
+                // Don't allow same player as striker
+                const isSameAsStriker = player._id === striker;
+                
+                return hasTeam && !isPlayerOut && !isSameAsStriker;
+              })
+              .map((player) => (
+                <MenuItem key={player._id} value={player._id}>
+                  {player.name}
+                </MenuItem>
+              ))}
+          </Select>
+        </FormControl>
+
+        <FormControl 
+          fullWidth
+          sx={{ 
+            '& .MuiOutlinedInput-root': isOverCompleted ? {
+              backgroundColor: 'warning.light',
+              '&:hover': { backgroundColor: 'warning.light' }
+            } : {}
           }}
-          value={players.find(p => p._id === bowler) || null}
-          onChange={(event, newValue) => {
-            if (newValue && newValue._id) {
-              handleBowlerChange({ target: { value: newValue._id } } as SelectChangeEvent);
-            }
-          }}
-          disabled={!isAdmin || isWaitingForNewBatsman}
-          renderInput={(params) => (
-            <TextField 
-              {...params} 
-              label={`Bowler ${isOverCompleted ? '(SELECT NEW BOWLER!)' : ''}${allowBowlerChange && bowlerChangeReason ? ` - ${bowlerChangeReason}` : ''}`}
-              sx={{
-                '& .MuiOutlinedInput-root': isOverCompleted ? {
-                  backgroundColor: 'warning.light',
-                  '&:hover': { backgroundColor: 'warning.light' }
-                } : {}
-              }}
-            />
-          )}
-          renderOption={(props, option) => {
-            const usedInCurrentOver = isOverCompleted && bowlersUsedInCurrentOver.includes(option._id || '');
-            return (
-              <Box component="li" {...props}>
-                <Typography>
-                  {option.name}
-                  {usedInCurrentOver && ' ⚠️ (Used in last over)'}
-                </Typography>
-              </Box>
-            );
-          }}
-        />
+        >
+          <InputLabel>
+            Bowler {isOverCompleted ? '(SELECT NEW BOWLER!)' : ''}
+            {allowBowlerChange && bowlerChangeReason && ` - ${bowlerChangeReason}`}
+          </InputLabel>
+          <Select 
+            value={bowler} 
+            onChange={handleBowlerChange}
+            disabled={!isAdmin || isWaitingForNewBatsman}
+          >
+            {players
+              .filter(player => {
+                console.log('Checking player for bowler:', player.name);
+                console.log('Player team:', player.team);
+                console.log('bowlingTeamId:', bowlingTeamId);
+                if (!player.team || !bowlingTeamId) return false;
+                
+                // Check if player belongs to bowling team (using singular 'team' property)
+                const playerTeamId = typeof player.team === 'string' ? player.team : player.team._id;
+                const hasTeam = playerTeamId === String(bowlingTeamId);
+                console.log('Has team:', hasTeam);
+                return hasTeam;
+              })
+              .sort((a, b) => {
+                // FIXED: Smart sorting for bowler rotation when over completed
+                if (isOverCompleted && bowlersUsedInCurrentOver.length > 0) {
+                  const aUsedInCurrentOver = bowlersUsedInCurrentOver.includes(a._id || '');
+                  const bUsedInCurrentOver = bowlersUsedInCurrentOver.includes(b._id || '');
+                  
+                  // Prioritize bowlers who haven't bowled in current over
+                  if (!aUsedInCurrentOver && bUsedInCurrentOver) return -1;
+                  if (aUsedInCurrentOver && !bUsedInCurrentOver) return 1;
+                }
+                
+                // Default alphabetical sort
+                return a.name.localeCompare(b.name);
+              })
+              .map((player) => {
+                const usedInCurrentOver = isOverCompleted && bowlersUsedInCurrentOver.includes(player._id || '');
+                return (
+                  <MenuItem key={player._id} value={player._id}>
+                    {player.name}
+                    {usedInCurrentOver && ' ⚠️ (Used in last over)'}
+                  </MenuItem>
+                );
+              })}
+          </Select>
+        </FormControl>
 
         {allowBowlerChange && (
           <Alert severity="warning" sx={{ mt: 1 }}>
@@ -2798,12 +2377,11 @@ const LiveScoring: React.FC<Props> = () => {
               </TableRow>
             </TableHead>
           <TableBody>
-            {currentInning.battingStats && Array.isArray(currentInning.battingStats) 
-              ? currentInning.battingStats.map((stat) => {
+            {currentInning.battingStats.map((stat) => {
               const playerId = typeof stat.player === 'string' ? stat.player : stat.player._id || '';
               const playerName = typeof stat.player === 'string' 
                 ? players.find(p => p._id === stat.player)?.name 
-                : stat.player?.name;
+                : stat.player.name;
               const strikeRate =
                 stat.balls > 0
                   ? ((stat.runs / stat.balls) * 100).toFixed(2)
@@ -2858,8 +2436,7 @@ const LiveScoring: React.FC<Props> = () => {
                   </TableCell>
                 </TableRow>
               );
-            })
-            : []}
+            })}
           </TableBody>
         </Table>
       </TableContainer>
@@ -2911,7 +2488,7 @@ const LiveScoring: React.FC<Props> = () => {
               const playerId = typeof stat.player === 'string' ? stat.player : stat.player._id || '';
               const playerName = typeof stat.player === 'string'
                 ? players.find(p => p._id === stat.player)?.name
-                : stat.player?.name;
+                : stat.player.name;
               
               const totalBalls = stat.balls || 0;
               const completeOvers = Math.floor(totalBalls / 6);
@@ -3230,11 +2807,9 @@ const LiveScoring: React.FC<Props> = () => {
                   >
                     {players
                       .filter(player => {
-                        if (!player.teams || !Array.isArray(player.teams) || !bowlingTeamId) return false;
-                        return player.teams.some(team => {
-                          const teamId = typeof team === 'string' ? team : team._id;
-                          return teamId === String(bowlingTeamId);
-                        });
+                        if (!player.team || !bowlingTeamId) return false;
+                        const playerTeamId = typeof player.team === 'string' ? player.team : player.team._id;
+                        return playerTeamId === String(bowlingTeamId);
                       })
                       .map((player) => (
                         <MenuItem key={player._id} value={player._id}>
@@ -3274,11 +2849,9 @@ const LiveScoring: React.FC<Props> = () => {
                   >
                     {players
                       .filter(player => {
-                        if (!player.teams || !Array.isArray(player.teams) || !bowlingTeamId) return false;
-                        return player.teams.some(team => {
-                          const teamId = typeof team === 'string' ? team : team._id;
-                          return teamId === String(bowlingTeamId);
-                        });
+                        if (!player.team || !bowlingTeamId) return false;
+                        const playerTeamId = typeof player.team === 'string' ? player.team : player.team._id;
+                        return playerTeamId === String(bowlingTeamId);
                       })
                       .map((player) => (
                         <MenuItem key={player._id} value={player._id}>
@@ -3318,11 +2891,9 @@ const LiveScoring: React.FC<Props> = () => {
                   >
                     {players
                       .filter(player => {
-                        if (!player.teams || !Array.isArray(player.teams) || !bowlingTeamId) return false;
-                        return player.teams.some(team => {
-                          const teamId = typeof team === 'string' ? team : team._id;
-                          return teamId === String(bowlingTeamId);
-                        });
+                        if (!player.team || !bowlingTeamId) return false;
+                        const playerTeamId = typeof player.team === 'string' ? player.team : player.team._id;
+                        return playerTeamId === String(bowlingTeamId);
                       })
                       .map((player) => (
                         <MenuItem key={player._id} value={player._id}>
@@ -3600,158 +3171,118 @@ const LiveScoring: React.FC<Props> = () => {
             {getDialogContext().message}
           </Typography>
           
-          {/* Warning for insufficient batsmen */}
-          {(() => {
-            const availableBatsmen = getAvailableBatsmen();
-            if (availableBatsmen.length < 2) {
-              return (
-                <Alert 
-                  severity="warning" 
-                  sx={{ mb: 3, borderRadius: 2 }}
-                >
-                  <AlertTitle sx={{ fontWeight: 'bold' }}>⚠️ Insufficient Batsmen</AlertTitle>
-                  Only {availableBatsmen.length} available batsmen found. Need at least 2 to continue the match.
-                  {availableBatsmen.length === 0 && ' This innings will be skipped.'}
-                  {availableBatsmen.length === 1 && ' The match may end after the next wicket.'}
-                </Alert>
-              );
-            }
-            return null;
-          })()}
-          
           <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 3 }}>
             {/* Striker Selection - Show unless it's only bowler selection */}
             {!getDialogContext().showOnlyBowler && (
-            <Autocomplete
-              fullWidth
-              options={players
-                .filter(player => {
-                  if (!player.teams || !Array.isArray(player.teams) || !match?.innings?.[currentInnings]?.battingTeam) return false;
-                  
-                  const battingTeam = match.innings[currentInnings].battingTeam;
-                  const battingTeamId = typeof battingTeam === 'object' 
-                    ? (battingTeam as any)._id 
-                    : battingTeam;
-                  
-                  const hasTeam = player.teams.some(team => {
-                    const teamId = typeof team === 'string' ? team : team._id;
-                    return teamId === String(battingTeamId);
-                  });
-                  
-                  // Check if player is out
-                  const currentInning = match.innings[currentInnings];
-                  const isPlayerOut = currentInning?.battingStats?.some(stat => {
-                    const playerId = typeof stat.player === 'string' ? stat.player : stat.player._id;
-                    return playerId === player._id && stat.isOut;
-                  });
-                  
-                  // Don't allow same player as non-striker
-                  const isSameAsNonStriker = player._id === nonStriker;
-                  
-                  return hasTeam && !isPlayerOut && !isSameAsNonStriker;
-                })}
-              getOptionLabel={(option) => option.name}
-              value={players.find(p => p._id === striker) || null}
-              onChange={(event, newValue) => {
-                if (newValue && newValue._id) {
-                  setStriker(newValue._id);
-                }
-              }}
-              renderInput={(params) => (
-                <TextField {...params} label="Striker" />
-              )}
-              renderOption={(props, option) => (
-                <Box component="li" {...props}>
-                  <Typography>{option.name}</Typography>
-                </Box>
-              )}
-            />
+            <FormControl fullWidth>
+              <InputLabel>Striker</InputLabel>
+              <Select 
+                value={striker} 
+                onChange={(e) => setStriker(e.target.value)}
+              >
+                {players
+                  .filter(player => {
+                    if (!player.team || !match?.innings?.[currentInnings]?.battingTeam) return false;
+                    
+                    const battingTeam = match.innings[currentInnings].battingTeam;
+                    const battingTeamId = typeof battingTeam === 'object' 
+                      ? (battingTeam as any)._id 
+                      : battingTeam;
+                    
+                    const playerTeamId = typeof player.team === 'string' ? player.team : player.team._id;
+                    const hasTeam = playerTeamId === String(battingTeamId);
+                    
+                    // Check if player is out
+                    const currentInning = match.innings[currentInnings];
+                    const isPlayerOut = currentInning?.battingStats?.some(stat => {
+                      const playerId = typeof stat.player === 'string' ? stat.player : stat.player._id;
+                      return playerId === player._id && stat.isOut;
+                    });
+                    
+                    // Don't allow same player as non-striker
+                    const isSameAsNonStriker = player._id === nonStriker;
+                    
+                    return hasTeam && !isPlayerOut && !isSameAsNonStriker;
+                  })
+                  .map((player) => (
+                    <MenuItem key={player._id} value={player._id}>
+                      {player.name}
+                    </MenuItem>
+                  ))}
+              </Select>
+            </FormControl>
             )}
 
             {/* Non-Striker Selection - Show unless it's only bowler or only striker selection */}
             {!getDialogContext().showOnlyBowler && !getDialogContext().showOnlyStriker && (
-            <Autocomplete
-              fullWidth
-              options={players
-                .filter(player => {
-                  if (!player.teams || !Array.isArray(player.teams) || !match?.innings?.[currentInnings]?.battingTeam) return false;
-                  
-                  const battingTeam = match.innings[currentInnings].battingTeam;
-                  const battingTeamId = typeof battingTeam === 'object' 
-                    ? (battingTeam as any)._id 
-                    : battingTeam;
-                  
-                  const hasTeam = player.teams.some(team => {
-                    const teamId = typeof team === 'string' ? team : team._id;
-                    return teamId === String(battingTeamId);
-                  });
-                  
-                  // Check if player is out
-                  const currentInning = match.innings[currentInnings];
-                  const isPlayerOut = currentInning?.battingStats?.some(stat => {
-                    const playerId = typeof stat.player === 'string' ? stat.player : stat.player._id;
-                    return playerId === player._id && stat.isOut;
-                  });
-                  
-                  // Don't allow same player as striker
-                  const isSameAsStriker = player._id === striker;
-                  
-                  return hasTeam && !isPlayerOut && !isSameAsStriker;
-                })}
-              getOptionLabel={(option) => option.name}
-              value={players.find(p => p._id === nonStriker) || null}
-              onChange={(event, newValue) => {
-                if (newValue && newValue._id) {
-                  setNonStriker(newValue._id);
-                }
-              }}
-              renderInput={(params) => (
-                <TextField {...params} label="Non-Striker" />
-              )}
-              renderOption={(props, option) => (
-                <Box component="li" {...props}>
-                  <Typography>{option.name}</Typography>
-                </Box>
-              )}
-            />
+            <FormControl fullWidth>
+              <InputLabel>Non-Striker</InputLabel>
+              <Select 
+                value={nonStriker} 
+                onChange={(e) => setNonStriker(e.target.value)}
+              >
+                {players
+                  .filter(player => {
+                    if (!player.team || !match?.innings?.[currentInnings]?.battingTeam) return false;
+                    
+                    const battingTeam = match.innings[currentInnings].battingTeam;
+                    const battingTeamId = typeof battingTeam === 'object' 
+                      ? (battingTeam as any)._id 
+                      : battingTeam;
+                    
+                    const playerTeamId = typeof player.team === 'string' ? player.team : player.team._id;
+                    const hasTeam = playerTeamId === String(battingTeamId);
+                    
+                    // Check if player is out
+                    const currentInning = match.innings[currentInnings];
+                    const isPlayerOut = currentInning?.battingStats?.some(stat => {
+                      const playerId = typeof stat.player === 'string' ? stat.player : stat.player._id;
+                      return playerId === player._id && stat.isOut;
+                    });
+                    
+                    // Don't allow same player as striker
+                    const isSameAsStriker = player._id === striker;
+                    
+                    return hasTeam && !isPlayerOut && !isSameAsStriker;
+                  })
+                  .map((player) => (
+                    <MenuItem key={player._id} value={player._id}>
+                      {player.name}
+                    </MenuItem>
+                  ))}
+              </Select>
+            </FormControl>
             )}
 
             {/* Bowler Selection - Show unless it's only striker selection */}
             {!getDialogContext().showOnlyStriker && (
-            <Autocomplete
-              fullWidth
-              options={players
-                .filter(player => {
-                  if (!player.teams || !Array.isArray(player.teams) || !match?.innings?.[currentInnings]?.bowlingTeam) return false;
-                  
-                  const bowlingTeam = match.innings[currentInnings].bowlingTeam;
-                  const bowlingTeamId = typeof bowlingTeam === 'object' 
-                    ? (bowlingTeam as any)._id 
-                    : bowlingTeam;
-                  
-                  const hasTeam = player.teams.some(team => {
-                    const teamId = typeof team === 'string' ? team : team._id;
-                    return teamId === String(bowlingTeamId);
-                  });
-                  
-                  return hasTeam;
-                })}
-              getOptionLabel={(option) => option.name}
-              value={players.find(p => p._id === bowler) || null}
-              onChange={(event, newValue) => {
-                if (newValue && newValue._id) {
-                  setBowler(newValue._id);
-                }
-              }}
-              renderInput={(params) => (
-                <TextField {...params} label="Bowler" />
-              )}
-              renderOption={(props, option) => (
-                <Box component="li" {...props}>
-                  <Typography>{option.name}</Typography>
-                </Box>
-              )}
-            />
+            <FormControl fullWidth>
+              <InputLabel>Bowler</InputLabel>
+              <Select 
+                value={bowler} 
+                onChange={(e) => setBowler(e.target.value)}
+              >
+                {players
+                  .filter(player => {
+                    if (!player.team || !match?.innings?.[currentInnings]?.bowlingTeam) return false;
+                    
+                    const bowlingTeam = match.innings[currentInnings].bowlingTeam;
+                    const bowlingTeamId = typeof bowlingTeam === 'object' 
+                      ? (bowlingTeam as any)._id 
+                      : bowlingTeam;
+                    
+                    const playerTeamId = typeof player.team === 'string' ? player.team : player.team._id;
+                    const hasTeam = playerTeamId === String(bowlingTeamId);
+                    
+                    return hasTeam;
+                  })
+                  .map((player) => (
+                    <MenuItem key={player._id} value={player._id}>
+                      {player.name}
+                    </MenuItem>
+                  ))}
+              </Select>
+            </FormControl>
             )}
           </Box>
         </DialogContent>
@@ -3770,18 +3301,10 @@ const LiveScoring: React.FC<Props> = () => {
                 
                 // Handle different contexts
                 if (isOverCompleted) {
-                  // Over completion - reset the over completion state and clear current over
+                  // Over completion - just reset the over completion state
                   setIsOverCompleted(false);
                   setOverCompletionMessage('');
                   setIsOverInProgress(true);
-                  
-                  // CRITICAL FIX: Clear current over balls for fresh start
-                  setCurrentOverBalls([]);
-                  
-                  // Also clear the match data current over balls
-                  if (match && match.innings && match.innings[currentInnings]) {
-                    match.innings[currentInnings].currentOverBalls = [];
-                  }
                 } else if (isWaitingForNewBatsman) {
                   // Wicket - reset the waiting state and continue
                   setIsWaitingForNewBatsman(false);

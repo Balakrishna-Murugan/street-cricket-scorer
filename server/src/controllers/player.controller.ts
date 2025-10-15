@@ -15,7 +15,7 @@ export const playerController = {
   // Get all players
   getAll: async (_req: Request, res: Response) => {
     try {
-      const players = await Player.find();
+      const players = await Player.find().populate('teams', 'name');
       console.log('Fetched players:', players);
       res.json(players);
     } catch (error: any) {

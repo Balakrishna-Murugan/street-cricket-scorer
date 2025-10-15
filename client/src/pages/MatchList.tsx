@@ -14,10 +14,6 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
   Box,
   Chip,
   Stack,
@@ -26,7 +22,8 @@ import {
   CardActions,
   Container,
   useTheme,
-  useMediaQuery
+  useMediaQuery,
+  Autocomplete
 } from '@mui/material';
 import { Match, Team } from '../types';
 import { matchService, teamService } from '../services/api.service';
@@ -466,32 +463,48 @@ const MatchList: React.FC = () => {
       >
         <DialogTitle>Add New Match</DialogTitle>
         <DialogContent sx={{ pb: 1 }}>
-          <FormControl fullWidth margin="dense">
-            <InputLabel>Team 1</InputLabel>
-            <Select
-              value={newMatch.team1}
-              onChange={(e) => setNewMatch({ ...newMatch, team1: e.target.value })}
-            >
-              {teams.map((team) => (
-                <MenuItem key={team._id} value={team._id}>
-                  {team.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl fullWidth margin="dense">
-            <InputLabel>Team 2</InputLabel>
-            <Select
-              value={newMatch.team2}
-              onChange={(e) => setNewMatch({ ...newMatch, team2: e.target.value })}
-            >
-              {teams.map((team) => (
-                <MenuItem key={team._id} value={team._id}>
-                  {team.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <Autocomplete
+            fullWidth
+            options={teams}
+            getOptionLabel={(option) => option.name}
+            value={teams.find(team => team._id === newMatch.team1) || null}
+            onChange={(event, newValue) => {
+              setNewMatch({ ...newMatch, team1: newValue?._id || '' });
+            }}
+            renderInput={(params) => (
+              <TextField 
+                {...params} 
+                label="Team 1"
+                margin="dense"
+              />
+            )}
+            renderOption={(props, option) => (
+              <Box component="li" {...props}>
+                <Typography>{option.name}</Typography>
+              </Box>
+            )}
+          />
+          <Autocomplete
+            fullWidth
+            options={teams}
+            getOptionLabel={(option) => option.name}
+            value={teams.find(team => team._id === newMatch.team2) || null}
+            onChange={(event, newValue) => {
+              setNewMatch({ ...newMatch, team2: newValue?._id || '' });
+            }}
+            renderInput={(params) => (
+              <TextField 
+                {...params} 
+                label="Team 2"
+                margin="dense"
+              />
+            )}
+            renderOption={(props, option) => (
+              <Box component="li" {...props}>
+                <Typography>{option.name}</Typography>
+              </Box>
+            )}
+          />
           <TextField
             margin="dense"
             label="Number of Overs"
@@ -521,35 +534,56 @@ const MatchList: React.FC = () => {
             🏏 Toss Information
           </Typography>
           
-          <FormControl fullWidth margin="dense">
-            <InputLabel>Toss Winner</InputLabel>
-            <Select
-              value={newMatch.tossWinner || ''}
-              onChange={(e) => setNewMatch({ ...newMatch, tossWinner: e.target.value })}
-              disabled={!newMatch.team1 || !newMatch.team2}
-            >
-              {/* Only show Team 1 and Team 2 in toss dropdown */}
-              {teams.filter(team => 
-                team._id === newMatch.team1 || team._id === newMatch.team2
-              ).map((team) => (
-                <MenuItem key={team._id} value={team._id}>
-                  {team.name} {team._id === newMatch.team1 ? '(Team 1)' : '(Team 2)'}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <Autocomplete
+            fullWidth
+            options={teams.filter(team => 
+              team._id === newMatch.team1 || team._id === newMatch.team2
+            )}
+            getOptionLabel={(option) => `${option.name} ${option._id === newMatch.team1 ? '(Team 1)' : '(Team 2)'}`}
+            value={teams.find(team => team._id === newMatch.tossWinner) || null}
+            onChange={(event, newValue) => {
+              setNewMatch({ ...newMatch, tossWinner: newValue?._id || '' });
+            }}
+            disabled={!newMatch.team1 || !newMatch.team2}
+            renderInput={(params) => (
+              <TextField 
+                {...params} 
+                label="Toss Winner"
+                margin="dense"
+              />
+            )}
+            renderOption={(props, option) => (
+              <Box component="li" {...props}>
+                <Typography>{option.name} {option._id === newMatch.team1 ? '(Team 1)' : '(Team 2)'}</Typography>
+              </Box>
+            )}
+          />
           
-          <FormControl fullWidth margin="dense">
-            <InputLabel>Toss Decision</InputLabel>
-            <Select
-              value={newMatch.tossDecision || ''}
-              onChange={(e) => setNewMatch({ ...newMatch, tossDecision: e.target.value as 'bat' | 'bowl' })}
-              disabled={!newMatch.tossWinner}
-            >
-              <MenuItem value="bat">Chose to Bat First</MenuItem>
-              <MenuItem value="bowl">Chose to Bowl First</MenuItem>
-            </Select>
-          </FormControl>
+          <Autocomplete
+            fullWidth
+            options={[
+              { value: 'bat', label: 'Chose to Bat First' },
+              { value: 'bowl', label: 'Chose to Bowl First' }
+            ]}
+            getOptionLabel={(option) => option.label}
+            value={newMatch.tossDecision ? { value: newMatch.tossDecision, label: newMatch.tossDecision === 'bat' ? 'Chose to Bat First' : 'Chose to Bowl First' } : null}
+            onChange={(event, newValue) => {
+              setNewMatch({ ...newMatch, tossDecision: (newValue?.value as 'bat' | 'bowl') || '' });
+            }}
+            disabled={!newMatch.tossWinner}
+            renderInput={(params) => (
+              <TextField 
+                {...params} 
+                label="Toss Decision"
+                margin="dense"
+              />
+            )}
+            renderOption={(props, option) => (
+              <Box component="li" {...props}>
+                <Typography>{option.label}</Typography>
+              </Box>
+            )}
+          />
         </DialogContent>
         <DialogActions>
           <Button onClick={handleClose}>Cancel</Button>
@@ -571,32 +605,48 @@ const MatchList: React.FC = () => {
         <DialogContent sx={{ pb: 1 }}>
           {editMatch && (
             <>
-              <FormControl fullWidth margin="dense">
-                <InputLabel>Team 1</InputLabel>
-                <Select
-                  value={typeof editMatch.team1 === 'string' ? editMatch.team1 : editMatch.team1._id}
-                  onChange={(e) => setEditMatch({ ...editMatch, team1: e.target.value })}
-                >
-                  {teams.map((team) => (
-                    <MenuItem key={team._id} value={team._id}>
-                      {team.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <FormControl fullWidth margin="dense">
-                <InputLabel>Team 2</InputLabel>
-                <Select
-                  value={typeof editMatch.team2 === 'string' ? editMatch.team2 : editMatch.team2._id}
-                  onChange={(e) => setEditMatch({ ...editMatch, team2: e.target.value })}
-                >
-                  {teams.map((team) => (
-                    <MenuItem key={team._id} value={team._id}>
-                      {team.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <Autocomplete
+                fullWidth
+                options={teams}
+                getOptionLabel={(option) => option.name}
+                value={teams.find(team => team._id === (typeof editMatch.team1 === 'string' ? editMatch.team1 : editMatch.team1._id)) || null}
+                onChange={(event, newValue) => {
+                  setEditMatch({ ...editMatch, team1: newValue?._id || '' });
+                }}
+                renderInput={(params) => (
+                  <TextField 
+                    {...params} 
+                    label="Team 1"
+                    margin="dense"
+                  />
+                )}
+                renderOption={(props, option) => (
+                  <Box component="li" {...props}>
+                    <Typography>{option.name}</Typography>
+                  </Box>
+                )}
+              />
+              <Autocomplete
+                fullWidth
+                options={teams}
+                getOptionLabel={(option) => option.name}
+                value={teams.find(team => team._id === (typeof editMatch.team2 === 'string' ? editMatch.team2 : editMatch.team2._id)) || null}
+                onChange={(event, newValue) => {
+                  setEditMatch({ ...editMatch, team2: newValue?._id || '' });
+                }}
+                renderInput={(params) => (
+                  <TextField 
+                    {...params} 
+                    label="Team 2"
+                    margin="dense"
+                  />
+                )}
+                renderOption={(props, option) => (
+                  <Box component="li" {...props}>
+                    <Typography>{option.name}</Typography>
+                  </Box>
+                )}
+              />
               <TextField
                 margin="dense"
                 label="Number of Overs"
@@ -626,39 +676,63 @@ const MatchList: React.FC = () => {
                 🏏 Toss Information
               </Typography>
               
-              <FormControl fullWidth margin="dense">
-                <InputLabel>Toss Winner</InputLabel>
-                <Select
-                  value={editMatch.tossWinner || ''}
-                  onChange={(e) => setEditMatch({ ...editMatch, tossWinner: e.target.value })}
-                >
-                  {/* Only show Team 1 and Team 2 in toss dropdown */}
-                  {teams.filter(team => {
-                    const team1Id = typeof editMatch.team1 === 'string' ? editMatch.team1 : editMatch.team1._id;
-                    const team2Id = typeof editMatch.team2 === 'string' ? editMatch.team2 : editMatch.team2._id;
-                    return team._id === team1Id || team._id === team2Id;
-                  }).map((team) => {
-                    const team1Id = typeof editMatch.team1 === 'string' ? editMatch.team1 : editMatch.team1._id;
-                    return (
-                      <MenuItem key={team._id} value={team._id}>
-                        {team.name} {team._id === team1Id ? '(Team 1)' : '(Team 2)'}
-                      </MenuItem>
-                    );
-                  })}
-                </Select>
-              </FormControl>
+              <Autocomplete
+                fullWidth
+                options={teams.filter(team => {
+                  const team1Id = typeof editMatch.team1 === 'string' ? editMatch.team1 : editMatch.team1._id;
+                  const team2Id = typeof editMatch.team2 === 'string' ? editMatch.team2 : editMatch.team2._id;
+                  return team._id === team1Id || team._id === team2Id;
+                })}
+                getOptionLabel={(option) => {
+                  const team1Id = typeof editMatch.team1 === 'string' ? editMatch.team1 : editMatch.team1._id;
+                  return `${option.name} ${option._id === team1Id ? '(Team 1)' : '(Team 2)'}`;
+                }}
+                value={teams.find(team => team._id === editMatch.tossWinner) || null}
+                onChange={(event, newValue) => {
+                  setEditMatch({ ...editMatch, tossWinner: newValue?._id || '' });
+                }}
+                renderInput={(params) => (
+                  <TextField 
+                    {...params} 
+                    label="Toss Winner"
+                    margin="dense"
+                  />
+                )}
+                renderOption={(props, option) => {
+                  const team1Id = typeof editMatch.team1 === 'string' ? editMatch.team1 : editMatch.team1._id;
+                  return (
+                    <Box component="li" {...props}>
+                      <Typography>{option.name} {option._id === team1Id ? '(Team 1)' : '(Team 2)'}</Typography>
+                    </Box>
+                  );
+                }}
+              />
               
-              <FormControl fullWidth margin="dense">
-                <InputLabel>Toss Decision</InputLabel>
-                <Select
-                  value={editMatch.tossDecision || ''}
-                  onChange={(e) => setEditMatch({ ...editMatch, tossDecision: e.target.value as 'bat' | 'bowl' })}
-                  disabled={!editMatch.tossWinner}
-                >
-                  <MenuItem value="bat">Chose to Bat First</MenuItem>
-                  <MenuItem value="bowl">Chose to Bowl First</MenuItem>
-                </Select>
-              </FormControl>
+              <Autocomplete
+                fullWidth
+                options={[
+                  { value: 'bat', label: 'Chose to Bat First' },
+                  { value: 'bowl', label: 'Chose to Bowl First' }
+                ]}
+                getOptionLabel={(option) => option.label}
+                value={editMatch.tossDecision ? { value: editMatch.tossDecision, label: editMatch.tossDecision === 'bat' ? 'Chose to Bat First' : 'Chose to Bowl First' } : null}
+                onChange={(event, newValue) => {
+                  setEditMatch({ ...editMatch, tossDecision: (newValue?.value as 'bat' | 'bowl') || '' });
+                }}
+                disabled={!editMatch.tossWinner}
+                renderInput={(params) => (
+                  <TextField 
+                    {...params} 
+                    label="Toss Decision"
+                    margin="dense"
+                  />
+                )}
+                renderOption={(props, option) => (
+                  <Box component="li" {...props}>
+                    <Typography>{option.label}</Typography>
+                  </Box>
+                )}
+              />
             </>
           )}
         </DialogContent>

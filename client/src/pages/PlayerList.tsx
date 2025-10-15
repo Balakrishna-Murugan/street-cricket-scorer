@@ -14,10 +14,6 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
   Box,
   Stack,
   IconButton,
@@ -30,7 +26,8 @@ import {
   Container,
   useTheme,
   useMediaQuery,
-  Chip
+  Chip,
+  Autocomplete
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -334,29 +331,59 @@ const PlayerList: React.FC = () => {
               error={newPlayer.age <= 0 && error != null}
               size={isMobile ? "small" : "medium"}
             />
-            <FormControl fullWidth size={isMobile ? "small" : "medium"}>
-              <InputLabel>Role</InputLabel>
-              <Select
-                value={newPlayer.role}
-                label="Role"
-                onChange={(e) => setNewPlayer({ ...newPlayer, role: e.target.value as Player['role'] })}
-              >
-                <MenuItem value="batsman">Batsman</MenuItem>
-                <MenuItem value="bowler">Bowler</MenuItem>
-                <MenuItem value="all-rounder">All-Rounder</MenuItem>
-              </Select>
-            </FormControl>
-            <FormControl fullWidth size={isMobile ? "small" : "medium"}>
-              <InputLabel>Batting Style</InputLabel>
-              <Select
-                value={newPlayer.battingStyle}
-                label="Batting Style"
-                onChange={(e) => setNewPlayer({ ...newPlayer, battingStyle: e.target.value as 'right-handed' | 'left-handed' })}
-              >
-                <MenuItem value="right-handed">Right Handed</MenuItem>
-                <MenuItem value="left-handed">Left Handed</MenuItem>
-              </Select>
-            </FormControl>
+            <Autocomplete
+              fullWidth
+              options={[
+                { value: 'batsman', label: 'Batsman' },
+                { value: 'bowler', label: 'Bowler' },
+                { value: 'all-rounder', label: 'All-Rounder' }
+              ]}
+              getOptionLabel={(option) => option.label}
+              value={{ value: newPlayer.role, label: newPlayer.role === 'batsman' ? 'Batsman' : newPlayer.role === 'bowler' ? 'Bowler' : 'All-Rounder' }}
+              onChange={(event, newValue) => {
+                if (newValue) {
+                  setNewPlayer({ ...newPlayer, role: newValue.value as Player['role'] });
+                }
+              }}
+              renderInput={(params) => (
+                <TextField 
+                  {...params} 
+                  label="Role"
+                  size={isMobile ? "small" : "medium"}
+                />
+              )}
+              renderOption={(props, option) => (
+                <Box component="li" {...props}>
+                  <Typography>{option.label}</Typography>
+                </Box>
+              )}
+            />
+            <Autocomplete
+              fullWidth
+              options={[
+                { value: 'right-handed', label: 'Right Handed' },
+                { value: 'left-handed', label: 'Left Handed' }
+              ]}
+              getOptionLabel={(option) => option.label}
+              value={{ value: newPlayer.battingStyle, label: newPlayer.battingStyle === 'right-handed' ? 'Right Handed' : 'Left Handed' }}
+              onChange={(event, newValue) => {
+                if (newValue) {
+                  setNewPlayer({ ...newPlayer, battingStyle: newValue.value as 'right-handed' | 'left-handed' });
+                }
+              }}
+              renderInput={(params) => (
+                <TextField 
+                  {...params} 
+                  label="Batting Style"
+                  size={isMobile ? "small" : "medium"}
+                />
+              )}
+              renderOption={(props, option) => (
+                <Box component="li" {...props}>
+                  <Typography>{option.label}</Typography>
+                </Box>
+              )}
+            />
             <TextField
               label="Bowling Style"
               value={newPlayer.bowlingStyle}
@@ -364,24 +391,32 @@ const PlayerList: React.FC = () => {
               fullWidth
               size={isMobile ? "small" : "medium"}
             />
-            <FormControl fullWidth size={isMobile ? "small" : "medium"}>
-              <InputLabel>Team</InputLabel>
-              <Select
-                value={newPlayer.teams?.[0] || ''}
-                label="Team"
-                onChange={(e) => setNewPlayer({ 
-                  ...newPlayer, 
-                  teams: e.target.value ? [e.target.value as string] : [] 
-                })}
-              >
-                <MenuItem value="">No Team</MenuItem>
-                {teams.map((team) => (
-                  <MenuItem key={team._id} value={team._id}>
-                    {team.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <Autocomplete
+              fullWidth
+              options={[{ _id: '', name: 'No Team' }, ...teams]}
+              getOptionLabel={(option) => option.name}
+              value={teams.find(team => team._id === (newPlayer.teams?.[0] || '')) || { _id: '', name: 'No Team' }}
+              onChange={(event, newValue) => {
+                if (newValue) {
+                  setNewPlayer({ 
+                    ...newPlayer, 
+                    teams: newValue._id ? [newValue._id] : [] 
+                  });
+                }
+              }}
+              renderInput={(params) => (
+                <TextField 
+                  {...params} 
+                  label="Team"
+                  size={isMobile ? "small" : "medium"}
+                />
+              )}
+              renderOption={(props, option) => (
+                <Box component="li" {...props}>
+                  <Typography>{option.name}</Typography>
+                </Box>
+              )}
+            />
           </Stack>
         </DialogContent>
         <DialogActions sx={{ p: { xs: 2, sm: 1 } }}>

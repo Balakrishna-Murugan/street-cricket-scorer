@@ -20,16 +20,14 @@ import {
   Snackbar,
   Alert,
   CircularProgress,
-  Select,
-  MenuItem,
-  FormControl,
   Card,
   CardContent,
   CardActions,
   Container,
   useTheme,
   useMediaQuery,
-  Chip
+  Chip,
+  Autocomplete
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -323,61 +321,65 @@ const TeamList: React.FC = () => {
               error={!newTeam.name && error != null}
               size={isMobile ? "small" : "medium"}
             />
-            <FormControl fullWidth size={isMobile ? "small" : "medium"}>
-              <Select
-                value={newTeam.captain === undefined || newTeam.captain === 'undefined' || newTeam.captain === null ? '' : newTeam.captain}
-                onChange={(e) => {
-                  const value = e.target.value as string;
-                  console.log('Captain selection changed to:', value); // Debug log
-                  setNewTeam({ ...newTeam, captain: value });
-                }}
-                displayEmpty
-                sx={{ minWidth: 120 }}
-                renderValue={(selected) => {
-                  if (!selected || selected === '') {
-                    return <span style={{ color: '#999' }}>Select Captain (Optional)</span>;
-                  }
-                  const selectedPlayer = players.find(p => p._id === selected);
-                  return selectedPlayer ? selectedPlayer.name : selected;
-                }}
-              >
-                <MenuItem value="">
-                  <em>No Captain</em>
-                </MenuItem>
-                {players.map((player) => (
-                  <MenuItem key={player._id} value={player._id || ''}>
-                    {player.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <Autocomplete
+              fullWidth
+              options={[{ _id: '', name: 'No Captain' }, ...players]}
+              getOptionLabel={(option) => option.name}
+              value={players.find(p => p._id === newTeam.captain) || { _id: '', name: 'No Captain' }}
+              onChange={(event, newValue) => {
+                const value = newValue?._id || '';
+                console.log('Captain selection changed to:', value); // Debug log
+                setNewTeam({ ...newTeam, captain: value });
+              }}
+              renderInput={(params) => (
+                <TextField 
+                  {...params} 
+                  label="Captain (Optional)"
+                  size={isMobile ? "small" : "medium"}
+                />
+              )}
+              renderOption={(props, option) => (
+                <Box component="li" {...props}>
+                  <Typography>{option.name}</Typography>
+                </Box>
+              )}
+            />
             
-            <FormControl fullWidth size={isMobile ? "small" : "medium"}>
-              <Select
-                multiple
-                value={newTeam.members || []}
-                onChange={(e) => {
-                  const value = e.target.value as string[];
-                  setNewTeam({ ...newTeam, members: value });
-                }}
-                displayEmpty
-                renderValue={(selected) => {
-                  if (!selected || selected.length === 0) {
-                    return <span style={{ color: '#999' }}>Select Team Members (Optional)</span>;
-                  }
-                  return `${selected.length} member(s) selected`;
-                }}
-              >
-                <MenuItem value="" disabled>
-                  <em>Select Team Members</em>
-                </MenuItem>
-                {players.map((player) => (
-                  <MenuItem key={player._id} value={player._id || ''}>
-                    {player.name} - {player.role}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <Autocomplete
+              multiple
+              fullWidth
+              options={players}
+              getOptionLabel={(option) => `${option.name} - ${option.role}`}
+              value={players.filter(player => newTeam.members.includes(player._id || ''))}
+              onChange={(event, newValue) => {
+                const memberIds = newValue.map(player => player._id || '').filter(id => id);
+                setNewTeam({ ...newTeam, members: memberIds });
+              }}
+              renderInput={(params) => (
+                <TextField 
+                  {...params} 
+                  label="Team Members (Optional)"
+                  placeholder={newTeam.members.length === 0 ? "Select Team Members" : ""}
+                  size={isMobile ? "small" : "medium"}
+                />
+              )}
+              renderOption={(props, option) => (
+                <Box component="li" {...props}>
+                  <Typography>{option.name} - {option.role}</Typography>
+                </Box>
+              )}
+              renderTags={(value, getTagProps) =>
+                value.map((option, index) => (
+                  <Chip
+                    variant="outlined"
+                    label={option.name}
+                    size="small"
+                    {...getTagProps({ index })}
+                    key={option._id}
+                  />
+                ))
+              }
+            />
           </Stack>
         </DialogContent>
         <DialogActions sx={{ p: { xs: 2, sm: 1 } }}>

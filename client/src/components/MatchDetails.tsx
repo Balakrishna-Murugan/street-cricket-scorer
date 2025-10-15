@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Typography, Button, Stack, Chip, useTheme, useMediaQuery } from '@mui/material';
+import { Box, Typography, Stack, Chip, useTheme, useMediaQuery } from '@mui/material';
 import { Player, BallOutcome } from '../types';
 
 interface MatchDetailsProps {
@@ -15,14 +15,6 @@ interface MatchDetailsProps {
   strikerStats: { runs: number; balls: number };
   nonStrikerStats: { runs: number; balls: number };
   bowlerStats: { overs: number; runs: number; wickets: number; balls: number };
-  // Over management props
-  isAdmin?: boolean;
-  isOverInProgress?: boolean;
-  isOverCompleted?: boolean;
-  isMatchCompleted?: boolean;
-  overCompletionMessage?: string;
-  onStartNewOver?: () => void;
-  onEndOver?: () => void;
 }
 
 const MatchDetails: React.FC<MatchDetailsProps> = ({
@@ -38,13 +30,6 @@ const MatchDetails: React.FC<MatchDetailsProps> = ({
   strikerStats,
   nonStrikerStats,
   bowlerStats,
-  isAdmin = false,
-  isOverInProgress = false,
-  isOverCompleted = false,
-  isMatchCompleted = false,
-  overCompletionMessage = '',
-  onStartNewOver,
-  onEndOver,
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -110,78 +95,6 @@ const MatchDetails: React.FC<MatchDetailsProps> = ({
             Overs: {totalBalls !== undefined ? formatOvers(totalBalls) : formatOversFromDecimal(overs)}
           </Typography>
         </Box>
-
-        {/* Over Management Section */}
-        {isAdmin && !isMatchCompleted && (
-          <Box sx={{ 
-            p: 2,
-            background: '#f8f9fa',
-            borderRadius: '8px',
-            border: '1px solid #e9ecef',
-            width: isMobile ? '100%' : '250px',
-            maxWidth: isMobile ? '400px' : '250px'
-          }}>
-            <Typography 
-              variant="subtitle2" 
-              gutterBottom
-              sx={{ 
-                color: '#2c3e50',
-                fontWeight: 'bold',
-                mb: 1,
-                textAlign: isMobile ? 'center' : 'left'
-              }}
-            >
-              🏏 Over Control
-            </Typography>
-            <Stack direction="column" spacing={1}>
-              <Button
-                variant="contained"
-                size={isMobile ? "medium" : "small"}
-                onClick={onStartNewOver}
-                disabled={isOverInProgress || isOverCompleted}
-                fullWidth
-                sx={{
-                  fontSize: isMobile ? '0.875rem' : '0.75rem',
-                  py: isMobile ? 1 : 0.5,
-                  background: 'linear-gradient(45deg, #4CAF50 30%, #8BC34A 90%)',
-                  '&:disabled': {
-                    background: '#ccc',
-                  }
-                }}
-              >
-                Start New Over
-              </Button>
-              <Button
-                variant="outlined"
-                size={isMobile ? "medium" : "small"}
-                onClick={onEndOver}
-                disabled={!isOverInProgress || isOverCompleted}
-                fullWidth
-                sx={{
-                  fontSize: isMobile ? '0.875rem' : '0.75rem',
-                  py: isMobile ? 1 : 0.5,
-                  color: '#FF8A65',
-                  borderColor: '#FF8A65',
-                }}
-              >
-                End Over
-              </Button>
-              <Typography 
-                variant="caption" 
-                sx={{ 
-                  color: isMatchCompleted ? '#d32f2f' : isOverCompleted ? '#f57c00' : isOverInProgress ? '#4caf50' : '#666',
-                  fontWeight: 'bold',
-                  textAlign: 'center'
-                }}
-              >
-                {isMatchCompleted ? '🏆 Match Completed!' :
-                 isOverCompleted ? '✅ Over Complete' :
-                 isOverInProgress ? '🏏 In Progress' : 
-                 '⏸️ Not Started'}
-              </Typography>
-            </Stack>
-          </Box>
-        )}
       </Box>
 
       <Box sx={{ mb: 2 }}>
