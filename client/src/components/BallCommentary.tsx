@@ -8,6 +8,8 @@ import {
   Chip,
   Stack,
   Divider,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import { BallOutcome } from '../types';
 
@@ -26,6 +28,8 @@ const BallCommentary: React.FC<BallCommentaryProps> = ({
   strikerName,
   nonStrikerName,
 }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const generateCommentary = (ball: BallOutcome, ballIndex: number): string => {
     // Calculate proper over and ball number
     // For extras like wide/no-ball, ball number doesn't advance
@@ -228,9 +232,11 @@ const BallCommentary: React.FC<BallCommentaryProps> = ({
 
       {balls.length > 0 && (
         <Box sx={{ mt: 2, p: 2, bgcolor: 'rgba(25, 118, 210, 0.1)', borderRadius: 2 }}>
-          <Typography variant="body2" color="primary" sx={{ fontWeight: 'bold', mb: 1 }}>
-            📊 This Over:
-          </Typography>
+          {!isMobile && (
+            <Typography variant="body2" color="primary" sx={{ fontWeight: 'bold', mb: 1 }}>
+              📊 This Over:
+            </Typography>
+          )}
           <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
             {balls.map((ball, index) => (
               <Chip

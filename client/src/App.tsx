@@ -5,8 +5,11 @@ import HomePage from './pages/HomePage';
 import TeamList from './pages/TeamList';
 import PlayerList from './pages/PlayerList';
 import MatchList from './pages/MatchList';
+import MatchListSummary from './pages/MatchListSummary';
+import MatchOverview from './pages/MatchOverview';
 import LiveScoring from './pages/LiveScoring';
 import MatchSummary from './pages/MatchSummary';
+import MatchCommentaryPage from './pages/MatchCommentaryPage';
 import Login from './pages/Login';
 import Header from './components/Header';
 import AuthGuard from './components/AuthGuard';
@@ -113,7 +116,7 @@ function App() {
                 <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
                   <Header />
                   <Box sx={{ 
-                    p: { xs: 1, sm: 1.5, md: 2 }, 
+                    p: { xs: 0, sm: 1.5, md: 2 }, // Remove padding on mobile
                     flexGrow: 1,
                     maxWidth: '100vw',
                     overflow: 'hidden'
@@ -123,8 +126,12 @@ function App() {
                       <Route path="/teams" element={<AdminGuard><TeamList /></AdminGuard>} />
                       <Route path="/players" element={<AdminGuard><PlayerList /></AdminGuard>} />
                       <Route path="/matches" element={<MatchList />} />
+                      <Route path="/match-summary" element={<MatchListSummary />} />
+                      <Route path="/matches/:matchId" element={<MatchOverview />} />
+                      <Route path="/matches/:matchId/overview" element={<MatchOverview />} />
                       <Route path="/matches/:matchId/live" element={<AdminGuard><LiveScoring /></AdminGuard>} />
                       <Route path="/matches/:matchId/summary" element={<MatchSummary />} />
+                      <Route path="/matches/:matchId/commentary" element={<MatchCommentaryPage />} />
                     </Routes>
                   </Box>
                 </Box>

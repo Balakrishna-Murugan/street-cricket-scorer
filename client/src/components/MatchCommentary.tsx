@@ -15,6 +15,8 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { Match, BallOutcome } from '../types';
@@ -25,6 +27,8 @@ interface MatchCommentaryProps {
 }
 
 const MatchCommentary: React.FC<MatchCommentaryProps> = ({ match }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [expandedPanel, setExpandedPanel] = useState<string | false>(false);
 
   const handleChange = (panel: string) => (event: React.SyntheticEvent, isExpanded: boolean) => {
@@ -241,9 +245,9 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({ match }) => {
                       <Table size="small">
                         <TableHead>
                           <TableRow>
-                            <TableCell>Batsman</TableCell>
-                            <TableCell align="right">Runs</TableCell>
-                            <TableCell align="right">Balls</TableCell>
+                            <TableCell>{isMobile ? 'Player' : 'Batsman'}</TableCell>
+                            <TableCell align="right">{isMobile ? 'R' : 'Runs'}</TableCell>
+                            <TableCell align="right">{isMobile ? 'B' : 'Balls'}</TableCell>
                             <TableCell align="right">4s</TableCell>
                             <TableCell align="right">6s</TableCell>
                             <TableCell align="right">SR</TableCell>
@@ -280,10 +284,10 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({ match }) => {
                       <Table size="small">
                         <TableHead>
                           <TableRow>
-                            <TableCell>Bowler</TableCell>
-                            <TableCell align="right">Overs</TableCell>
-                            <TableCell align="right">Runs</TableCell>
-                            <TableCell align="right">Wickets</TableCell>
+                            <TableCell>{isMobile ? 'Player' : 'Bowler'}</TableCell>
+                            <TableCell align="right">{isMobile ? 'O' : 'Overs'}</TableCell>
+                            <TableCell align="right">{isMobile ? 'R' : 'Runs'}</TableCell>
+                            <TableCell align="right">{isMobile ? 'W' : 'Wickets'}</TableCell>
                             <TableCell align="right">Economy</TableCell>
                           </TableRow>
                         </TableHead>

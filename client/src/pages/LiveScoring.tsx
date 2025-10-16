@@ -31,7 +31,11 @@ import {
   Autocomplete,
   useTheme,
   useMediaQuery,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import ChangeCircleIcon from '@mui/icons-material/ChangeCircle';
 
 interface Props {}
 
@@ -82,6 +86,11 @@ const LiveScoring: React.FC<Props> = () => {
   
   // New state for player selection dialog
   const [isPlayerSelectionDialogOpen, setIsPlayerSelectionDialogOpen] = useState(false);
+  
+  // State for player change functionality
+  const [isPlayerChangeDialogOpen, setIsPlayerChangeDialogOpen] = useState(false);
+  const [changePlayerType, setChangePlayerType] = useState<'striker' | 'nonStriker' | 'bowler' | null>(null);
+  const [changePlayerReason, setChangePlayerReason] = useState('');
 
   // Helper function to check if all required players are selected
   const arePlayersSelected = useCallback(() => {
@@ -127,6 +136,32 @@ const LiveScoring: React.FC<Props> = () => {
 
   // Helper function to get dialog context
   const getDialogContext = useCallback(() => {
+    if (changePlayerType) {
+      // Player change context
+      if (changePlayerType === 'bowler') {
+        return {
+          title: `🔄 Change Bowler (${changePlayerReason})`,
+          message: 'Please select a new bowler:',
+          showOnlyBowler: true,
+          gradientColor: 'linear-gradient(45deg, #9C27B0 30%, #BA68C8 90%)'
+        };
+      } else if (changePlayerType === 'striker') {
+        return {
+          title: `🔄 Change Striker (${changePlayerReason})`,
+          message: 'Please select a new striker:',
+          showOnlyStriker: true,
+          gradientColor: 'linear-gradient(45deg, #FF5722 30%, #FF8A65 90%)'
+        };
+      } else if (changePlayerType === 'nonStriker') {
+        return {
+          title: `🔄 Change Non-Striker (${changePlayerReason})`,
+          message: 'Please select a new non-striker:',
+          showOnlyNonStriker: true,
+          gradientColor: 'linear-gradient(45deg, #607D8B 30%, #90A4AE 90%)'
+        };
+      }
+    }
+    
     if (isOverCompleted) {
       return {
         title: '🎯 Over Completed - Select New Bowler',
@@ -150,7 +185,7 @@ const LiveScoring: React.FC<Props> = () => {
         gradientColor: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)'
       };
     }
-  }, [isOverCompleted, isWaitingForNewBatsman, match, currentInnings]);
+  }, [isOverCompleted, isWaitingForNewBatsman, match, currentInnings, changePlayerType, changePlayerReason]);
 
   // Helper function to check if required selections are made based on context
   const areRequiredSelectionsComplete = useCallback(() => {
@@ -159,6 +194,8 @@ const LiveScoring: React.FC<Props> = () => {
       return !!bowler;
     } else if (context.showOnlyStriker) {
       return !!striker && striker !== nonStriker;
+    } else if ((context as any).showOnlyNonStriker) {
+      return !!nonStriker && striker !== nonStriker;
     } else {
       return arePlayersSelected();
     }
@@ -494,28 +531,63 @@ const LiveScoring: React.FC<Props> = () => {
           setIsOverCompleted(false);
           
           // FIXED: Restore current over's ball-by-ball history when resuming match
-          if (currentInning.currentOverBalls && currentInning.currentOverBalls.length > 0) {
-            console.log('Restoring current over balls from stored data:', currentInning.currentOverBalls);
-            setCurrentOverBalls(currentInning.currentOverBalls);
-          } else {
-            // If no stored balls, create placeholder balls for current over since we don't have detailed over data
+          console.log('Checking currentInning.currentOverBalls:', currentInning.currentOverBalls);
+          console.log('currentInning data:', {
+            totalRuns: currentInning.totalRuns,
+            balls: currentInning.balls,
+            wickets: currentInning.wickets,
+            currentOverBalls: currentInning.currentOverBalls
+          });
+          
+          // WORKAROUND: Check localStorage for current over data as backup
+          const matchStorageKey = `currentOverBalls_${matchId}_${currentInnings}`;
+          const storedOverBalls = localStorage.getItem(matchStorageKey);
+          
+          // Helper function for fallback reconstruction
+          const fallbackReconstruction = () => {
+            console.log('No currentOverBalls found in stored data. Total balls:', totalBalls, 'Current ball:', currentBall);
+            
             const ballsInCurrentOver = currentBall || (currentState?.currentBall || 0);
             
             if (ballsInCurrentOver > 0) {
-              // Create placeholder balls only if we can't find the actual data
-              const placeholderBalls: BallOutcome[] = [];
+              console.log('Attempting to reconstruct current over data for', ballsInCurrentOver, 'balls');
+              
+              const reconstructedBalls: BallOutcome[] = [];
               for (let i = 0; i < ballsInCurrentOver; i++) {
-                placeholderBalls.push({
+                reconstructedBalls.push({
                   ballNumber: i + 1,
-                  runs: 0, // We don't have the exact data, so show placeholder
+                  runs: 0,
                   isWicket: false
                 });
               }
-              console.log('Creating placeholder balls for current over:', placeholderBalls);
-              setCurrentOverBalls(placeholderBalls);
+              
+              console.log('Note: Current over ball data will be properly saved after server restart with updated schema');
+              setCurrentOverBalls(reconstructedBalls);
+              currentInning.currentOverBalls = reconstructedBalls;
             } else {
+              console.log('No balls in current over, setting empty array');
               setCurrentOverBalls([]);
             }
+          };
+          
+          if (currentInning.currentOverBalls && currentInning.currentOverBalls.length > 0) {
+            console.log('Restoring current over balls from stored data:', currentInning.currentOverBalls);
+            setCurrentOverBalls(currentInning.currentOverBalls);
+          } else if (storedOverBalls) {
+            console.log('Database currentOverBalls is undefined, trying localStorage backup...');
+            try {
+              const parsedBalls = JSON.parse(storedOverBalls);
+              console.log('Found localStorage backup data:', parsedBalls);
+              setCurrentOverBalls(parsedBalls);
+              // Also update the innings data
+              currentInning.currentOverBalls = parsedBalls;
+            } catch (error) {
+              console.error('Error parsing localStorage currentOverBalls:', error);
+              // Fall back to reconstruction logic
+              fallbackReconstruction();
+            }
+          } else {
+            fallbackReconstruction();
           }
         } else if (totalBalls > 0 && currentBall === 0) {
           // If total balls is multiple of 6, over might be completed
@@ -595,7 +667,7 @@ const LiveScoring: React.FC<Props> = () => {
     } finally {
       setLoading(false);
     }
-  }, [matchId]);
+  }, [matchId, currentInnings]);
 
   useEffect(() => {
     fetchMatch();
@@ -673,6 +745,36 @@ const LiveScoring: React.FC<Props> = () => {
       }
     }
   }, [match, striker, nonStriker, bowler, currentInnings]);
+
+  // Handlers for player changes during match
+  const handlePlayerChange = (playerType: 'striker' | 'nonStriker' | 'bowler') => {
+    setChangePlayerType(playerType);
+    setIsPlayerChangeDialogOpen(true);
+  };
+
+  const handlePlayerChangeSubmit = () => {
+    // Close the change dialog and open the player selection dialog
+    setIsPlayerChangeDialogOpen(false);
+    setIsPlayerSelectionDialogOpen(true);
+    
+    // Set the context for player selection dialog based on change type
+    if (changePlayerType === 'bowler') {
+      // For bowler change, set only bowler selection
+      setIsOverCompleted(false);
+      setIsWaitingForNewBatsman(false);
+    } else if (changePlayerType === 'striker') {
+      // For striker change, set only striker selection
+      setIsOverCompleted(false);
+      setIsWaitingForNewBatsman(true);
+    }
+    // Note: For non-striker changes, we'll handle in the selection dialog context
+  };
+
+  const handlePlayerChangeCancel = () => {
+    setIsPlayerChangeDialogOpen(false);
+    setChangePlayerType(null);
+    setChangePlayerReason('');
+  };
 
   // Auto-open player selection dialog when match loads if no players selected
   useEffect(() => {
@@ -885,6 +987,22 @@ const LiveScoring: React.FC<Props> = () => {
       
       // FIXED: Store current over balls in match data for persistence
       currentInning.currentOverBalls = newCurrentOverBalls;
+      console.log('Saving currentOverBalls to innings:', newCurrentOverBalls);
+      console.log('Current innings after update:', {
+        totalRuns: currentInning.totalRuns,
+        balls: currentInning.balls,
+        wickets: currentInning.wickets,
+        currentOverBalls: currentInning.currentOverBalls
+      });
+      
+      // IMPORTANT: For matches that don't have currentOverBalls in database,
+      // ensure we always update this field for future consistency
+      match.innings[currentInnings].currentOverBalls = newCurrentOverBalls;
+      
+      // WORKAROUND: Also save to localStorage as backup until server schema is applied
+      const matchStorageKey = `currentOverBalls_${matchId}_${currentInnings}`;
+      localStorage.setItem(matchStorageKey, JSON.stringify(newCurrentOverBalls));
+      console.log('Saved currentOverBalls to localStorage as backup:', matchStorageKey);
 
       // Check if match should end (for second innings)
       const matchEnded = checkMatchEnd(match);
@@ -1290,6 +1408,11 @@ const LiveScoring: React.FC<Props> = () => {
     // FIXED: Store current over balls in match data for persistence
     currentInning.currentOverBalls = newCurrentOverBalls;
     
+    // WORKAROUND: Also save to localStorage as backup until server schema is applied
+    const matchStorageKey = `currentOverBalls_${matchId}_${currentInnings}`;
+    localStorage.setItem(matchStorageKey, JSON.stringify(newCurrentOverBalls));
+    console.log('Saved extra ball currentOverBalls to localStorage as backup:', matchStorageKey, extraBall);
+    
     // Calculate overs and economy for bowler
     const totalBalls = bowlerBowlingStats.balls;
     const completeOvers = Math.floor(totalBalls / 6);
@@ -1492,6 +1615,11 @@ const LiveScoring: React.FC<Props> = () => {
     
     // FIXED: Store current over balls in match data for persistence
     currentInning.currentOverBalls = newCurrentOverBalls;
+    
+    // WORKAROUND: Also save to localStorage as backup until server schema is applied
+    const matchStorageKey = `currentOverBalls_${matchId}_${currentInnings}`;
+    localStorage.setItem(matchStorageKey, JSON.stringify(newCurrentOverBalls));
+    console.log('Saved wicket ball currentOverBalls to localStorage as backup:', matchStorageKey, wicketBall);
 
     // Check if no more batsmen are available (for teams with less than 10 players)
     const availableBatsmen = getAvailableBatsmen();
@@ -2137,25 +2265,27 @@ const LiveScoring: React.FC<Props> = () => {
       maxWidth="lg" 
       sx={{ 
         px: isMobile ? 0 : 3, // Remove padding on mobile for full screen usage
-        py: isMobile ? 0 : 2
+        py: isMobile ? 0 : 2,
+        margin: isMobile ? 0 : 'auto' // Remove auto margins on mobile
       }}
     >
       <Box 
         sx={{ 
           minHeight: '100vh',
           background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
-          p: isMobile ? 1 : 3, // Reduced padding for mobile
-          mx: isMobile ? 0 : 0 // Removed negative margin
+          p: isMobile ? 0 : 3, // Remove all padding on mobile
+          mx: isMobile ? 0 : 0 // No margin on mobile
         }}
       >
       <Paper 
         elevation={8}
         sx={{ 
-          p: isMobile ? 2 : 4, // Reduced padding for mobile
-          borderRadius: 3,
+          p: isMobile ? 1 : 4, // Minimal padding for mobile
+          borderRadius: isMobile ? 0 : 3, // No border radius on mobile for full width
           background: '#ffffff',
           border: '1px solid rgba(0,0,0,0.1)',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
+          boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+          margin: isMobile ? 0 : 'auto' // Remove margins on mobile
         }}
       >
         <Typography 
@@ -2297,9 +2427,9 @@ const LiveScoring: React.FC<Props> = () => {
       )}
 
       {/* Score Summary */}
-      <Paper sx={{ p: 2, mb: 3 }} component="div">
-        {/* Comprehensive Innings Display */}
-        {match.innings.length > 1 && (
+      <Paper sx={{ p: isMobile ? 1 : 2, mb: isMobile ? 2 : 3, mx: isMobile ? 0 : 'auto' }} component="div">
+        {/* Comprehensive Innings Display - Hidden on mobile */}
+        {match.innings.length > 1 && !isMobile && (
           <Box sx={{ mb: 3 }}>
             <Typography variant="h6" sx={{ mb: 2, textAlign: 'center', fontWeight: 'bold' }}>
               🏏 Match Scorecard
@@ -2340,8 +2470,16 @@ const LiveScoring: React.FC<Props> = () => {
         )}
 
         {/* Current Innings Detail */}
-        <Typography variant="h6" sx={{ mb: 2, textAlign: 'center' }}>
-          {currentInnings === 0 ? '1st Innings' : '2nd Innings'} - Current Over
+        <Typography 
+          variant={isMobile ? "body1" : "h6"} 
+          sx={{ 
+            mb: isMobile ? 1 : 2, 
+            textAlign: 'center',
+            fontWeight: 'bold',
+            fontSize: isMobile ? '1rem' : '1.25rem'
+          }}
+        >
+          {currentInnings === 0 ? '1st Innings' : '2nd Innings'}
         </Typography>
           <MatchDetails
           totalRuns={currentInning?.totalRuns || 0}
@@ -2550,15 +2688,15 @@ const LiveScoring: React.FC<Props> = () => {
       )}
 
       {/* Scoring Buttons */}
-      <Box sx={{ mb: 3 }}>
+      <Box sx={{ mb: isMobile ? 2 : 3 }}>
         <Typography 
-          variant="h6" 
+          variant={isMobile ? "body1" : "h6"} 
           gutterBottom 
           sx={{ 
             color: '#2c3e50',
             fontWeight: 'bold',
             textShadow: '1px 1px 2px rgba(0,0,0,0.1)',
-            mb: 2
+            mb: isMobile ? 1 : 2
           }}
         >
           🎯 Quick Scoring
@@ -2566,8 +2704,8 @@ const LiveScoring: React.FC<Props> = () => {
         <Box 
           sx={{ 
             display: 'grid',
-            gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(6, 1fr)',
-            gap: 2
+            gridTemplateColumns: isMobile ? 'repeat(4, 1fr)' : 'repeat(6, 1fr)',
+            gap: isMobile ? 1 : 2
           }}
         >
           {[0, 1, 2, 3, 4, 6].map((runs) => (
@@ -2577,20 +2715,20 @@ const LiveScoring: React.FC<Props> = () => {
               onClick={() => handleBallOutcome(runs)}
               disabled={!isAdmin || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
               sx={{
-                minHeight: isMobile ? '50px' : '60px',
-                borderRadius: '12px',
-                fontSize: isMobile ? '1.2rem' : '1.5rem',
+                minHeight: isMobile ? '40px' : '60px',
+                borderRadius: isMobile ? '8px' : '12px',
+                fontSize: isMobile ? '1rem' : '1.5rem',
                 fontWeight: 'bold',
                 background: runs === 0 
                   ? 'linear-gradient(45deg, #666 30%, #999 90%)'
                   : runs >= 4 
                     ? 'linear-gradient(45deg, #FF6B6B 30%, #FF5722 90%)'
                     : 'linear-gradient(45deg, #4CAF50 30%, #8BC34A 90%)',
-                boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+                boxShadow: isMobile ? '0 2px 4px rgba(0,0,0,0.2)' : '0 4px 8px rgba(0,0,0,0.2)',
                 transition: 'all 0.3s ease',
                 '&:hover': {
-                  transform: 'translateY(-2px)',
-                  boxShadow: '0 6px 12px rgba(0,0,0,0.3)',
+                  transform: isMobile ? 'scale(0.98)' : 'translateY(-2px)',
+                  boxShadow: isMobile ? '0 4px 8px rgba(0,0,0,0.3)' : '0 6px 12px rgba(0,0,0,0.3)',
                 },
                 '&:active': {
                   transform: 'translateY(0)',
@@ -2610,16 +2748,16 @@ const LiveScoring: React.FC<Props> = () => {
             onClick={() => setIsWicketDialogOpen(true)}
             disabled={!isAdmin || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
             sx={{
-              minHeight: isMobile ? '50px' : '60px',
-              borderRadius: '12px',
-              fontSize: isMobile ? '1.2rem' : '1.5rem',
+              minHeight: isMobile ? '40px' : '60px',
+              borderRadius: isMobile ? '8px' : '12px',
+              fontSize: isMobile ? '1rem' : '1.5rem',
               fontWeight: 'bold',
               background: 'linear-gradient(45deg, #f44336 30%, #d32f2f 90%)',
-              boxShadow: '0 4px 8px rgba(244, 67, 54, 0.3)',
+              boxShadow: isMobile ? '0 2px 4px rgba(244, 67, 54, 0.3)' : '0 4px 8px rgba(244, 67, 54, 0.3)',
               transition: 'all 0.3s ease',
               '&:hover': {
-                transform: 'translateY(-2px)',
-                boxShadow: '0 6px 12px rgba(244, 67, 54, 0.4)',
+                transform: isMobile ? 'scale(0.98)' : 'translateY(-2px)',
+                boxShadow: isMobile ? '0 4px 8px rgba(244, 67, 54, 0.4)' : '0 6px 12px rgba(244, 67, 54, 0.4)',
                 background: 'linear-gradient(45deg, #d32f2f 30%, #b71c1c 90%)',
               },
               '&:active': {
@@ -2633,15 +2771,15 @@ const LiveScoring: React.FC<Props> = () => {
       </Box>
 
       {/* Extras Buttons */}
-      <Box sx={{ mb: 3 }}>
+      <Box sx={{ mb: isMobile ? 2 : 3 }}>
         <Typography 
-          variant="h6" 
+          variant={isMobile ? "body1" : "h6"} 
           gutterBottom 
           sx={{ 
             color: '#2c3e50',
             fontWeight: 'bold',
             textShadow: '1px 1px 2px rgba(0,0,0,0.1)',
-            mb: 2
+            mb: isMobile ? 1 : 2
           }}
         >
           ⚡ Extras
@@ -2650,7 +2788,7 @@ const LiveScoring: React.FC<Props> = () => {
           sx={{ 
             display: 'grid',
             gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
-            gap: 2
+            gap: isMobile ? 1 : 2
           }}
         >
           <Button 
@@ -2662,10 +2800,11 @@ const LiveScoring: React.FC<Props> = () => {
             }}
             disabled={!isAdmin || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
             sx={{
-              minHeight: isMobile ? '45px' : '50px',
-              borderRadius: '10px',
+              minHeight: isMobile ? '36px' : '50px',
+              borderRadius: isMobile ? '8px' : '10px',
               fontWeight: 'bold',
-              color: '#FF9800', // Changed to more visible orange color
+              fontSize: isMobile ? '0.85rem' : '1rem',
+              color: '#FF9800',
               borderColor: '#FFB74D',
               background: 'rgba(255, 183, 77, 0.1)',
               backdropFilter: 'blur(10px)',
@@ -2673,12 +2812,12 @@ const LiveScoring: React.FC<Props> = () => {
               '&:hover': {
                 background: 'linear-gradient(45deg, #FFB74D 30%, #FFA726 90%)',
                 borderColor: '#FFA726',
-                color: '#fff', // White text on hover
-                transform: 'translateY(-1px)',
-                boxShadow: '0 4px 8px rgba(255, 183, 77, 0.3)',
+                color: '#fff',
+                transform: isMobile ? 'scale(0.98)' : 'translateY(-1px)',
+                boxShadow: isMobile ? '0 2px 4px rgba(255, 183, 77, 0.3)' : '0 4px 8px rgba(255, 183, 77, 0.3)',
               },
               '&:disabled': {
-                color: 'rgba(255, 152, 0, 0.5)', // Visible disabled state
+                color: 'rgba(255, 152, 0, 0.5)',
                 borderColor: 'rgba(255, 183, 77, 0.3)',
               }
             }}
@@ -2694,10 +2833,11 @@ const LiveScoring: React.FC<Props> = () => {
             }}
             disabled={!isAdmin || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
             sx={{
-              minHeight: isMobile ? '45px' : '50px',
-              borderRadius: '10px',
+              minHeight: isMobile ? '36px' : '50px',
+              borderRadius: isMobile ? '8px' : '10px',
               fontWeight: 'bold',
-              color: '#FF5722', // Changed to more visible red-orange color
+              fontSize: isMobile ? '0.85rem' : '1rem',
+              color: '#FF5722',
               borderColor: '#FF8A65',
               background: 'rgba(255, 138, 101, 0.1)',
               backdropFilter: 'blur(10px)',
@@ -2705,12 +2845,12 @@ const LiveScoring: React.FC<Props> = () => {
               '&:hover': {
                 background: 'linear-gradient(45deg, #FF8A65 30%, #FF7043 90%)',
                 borderColor: '#FF7043',
-                color: '#fff', // White text on hover
-                transform: 'translateY(-1px)',
-                boxShadow: '0 4px 8px rgba(255, 138, 101, 0.3)',
+                color: '#fff',
+                transform: isMobile ? 'scale(0.98)' : 'translateY(-1px)',
+                boxShadow: isMobile ? '0 2px 4px rgba(255, 138, 101, 0.3)' : '0 4px 8px rgba(255, 138, 101, 0.3)',
               },
               '&:disabled': {
-                color: 'rgba(255, 87, 34, 0.5)', // Visible disabled state
+                color: 'rgba(255, 87, 34, 0.5)',
                 borderColor: 'rgba(255, 138, 101, 0.3)',
               }
             }}
@@ -2726,10 +2866,11 @@ const LiveScoring: React.FC<Props> = () => {
             }}
             disabled={!isAdmin || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
             sx={{
-              minHeight: isMobile ? '45px' : '50px',
-              borderRadius: '10px',
+              minHeight: isMobile ? '36px' : '50px',
+              borderRadius: isMobile ? '8px' : '10px',
               fontWeight: 'bold',
-              color: '#4CAF50', // Changed to more visible green color
+              fontSize: isMobile ? '0.85rem' : '1rem',
+              color: '#4CAF50',
               borderColor: '#81C784',
               background: 'rgba(129, 199, 132, 0.1)',
               backdropFilter: 'blur(10px)',
@@ -2737,12 +2878,12 @@ const LiveScoring: React.FC<Props> = () => {
               '&:hover': {
                 background: 'linear-gradient(45deg, #81C784 30%, #66BB6A 90%)',
                 borderColor: '#66BB6A',
-                color: '#fff', // White text on hover
-                transform: 'translateY(-1px)',
-                boxShadow: '0 4px 8px rgba(129, 199, 132, 0.3)',
+                color: '#fff',
+                transform: isMobile ? 'scale(0.98)' : 'translateY(-1px)',
+                boxShadow: isMobile ? '0 2px 4px rgba(129, 199, 132, 0.3)' : '0 4px 8px rgba(129, 199, 132, 0.3)',
               },
               '&:disabled': {
-                color: 'rgba(76, 175, 80, 0.5)', // Visible disabled state
+                color: 'rgba(76, 175, 80, 0.5)',
                 borderColor: 'rgba(129, 199, 132, 0.3)',
               }
             }}
@@ -2758,10 +2899,11 @@ const LiveScoring: React.FC<Props> = () => {
             }}
             disabled={!isAdmin || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
             sx={{
-              minHeight: isMobile ? '45px' : '50px',
-              borderRadius: '10px',
+              minHeight: isMobile ? '36px' : '50px',
+              borderRadius: isMobile ? '8px' : '10px',
               fontWeight: 'bold',
-              color: '#9C27B0', // Changed to more visible purple color
+              fontSize: isMobile ? '0.85rem' : '1rem',
+              color: '#9C27B0',
               borderColor: '#9575CD',
               background: 'rgba(149, 117, 205, 0.1)',
               backdropFilter: 'blur(10px)',
@@ -2769,12 +2911,12 @@ const LiveScoring: React.FC<Props> = () => {
               '&:hover': {
                 background: 'linear-gradient(45deg, #9575CD 30%, #7E57C2 90%)',
                 borderColor: '#7E57C2',
-                color: '#fff', // White text on hover
-                transform: 'translateY(-1px)',
-                boxShadow: '0 4px 8px rgba(149, 117, 205, 0.3)',
+                color: '#fff',
+                transform: isMobile ? 'scale(0.98)' : 'translateY(-1px)',
+                boxShadow: isMobile ? '0 2px 4px rgba(149, 117, 205, 0.3)' : '0 4px 8px rgba(149, 117, 205, 0.3)',
               },
               '&:disabled': {
-                color: 'rgba(156, 39, 176, 0.5)', // Visible disabled state
+                color: 'rgba(156, 39, 176, 0.5)',
                 borderColor: 'rgba(149, 117, 205, 0.3)',
               }
             }}
@@ -2842,13 +2984,13 @@ const LiveScoring: React.FC<Props> = () => {
                 statusDisplay = `${stat.dismissalType || 'Out'}${stat.howOut ? ` (${stat.howOut})` : ''}`;
                 statusColor = 'error.main';
               } else if (playerId === striker) {
-                statusDisplay = 'Batting*';
+                statusDisplay = isMobile ? '🏏*' : 'Batting*';
                 statusColor = 'success.main';
               } else if (playerId === nonStriker) {
-                statusDisplay = 'Batting';
+                statusDisplay = isMobile ? '🏏' : 'Batting';
                 statusColor = 'primary.main';
               } else {
-                statusDisplay = 'Not Out';
+                statusDisplay = isMobile ? '✓' : 'Not Out';
                 statusColor = 'text.secondary';
               }
 
@@ -2878,9 +3020,28 @@ const LiveScoring: React.FC<Props> = () => {
                   <TableCell align="right">{stat.sixes}</TableCell>
                   <TableCell align="right">{strikeRate}</TableCell>
                   <TableCell align="center">
-                    <Typography variant="body2" sx={{ color: statusColor, fontSize: '0.75rem' }}>
-                      {statusDisplay}
-                    </Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+                      <Typography variant="body2" sx={{ color: statusColor, fontSize: '0.75rem' }}>
+                        {statusDisplay}
+                      </Typography>
+                      {isAdmin && !stat.isOut && (playerId === striker || playerId === nonStriker) && (
+                        <Tooltip title={`Change ${playerId === striker ? 'Striker' : 'Non-Striker'}`}>
+                          <IconButton
+                            size="small"
+                            onClick={() => handlePlayerChange(playerId === striker ? 'striker' : 'nonStriker')}
+                            sx={{ 
+                              minWidth: 20, 
+                              minHeight: 20, 
+                              padding: 0.25,
+                              color: 'primary.main',
+                              '&:hover': { backgroundColor: 'primary.light', color: 'primary.dark' }
+                            }}
+                          >
+                            <SwapHorizIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                    </Box>
                   </TableCell>
                 </TableRow>
               );
@@ -2950,13 +3111,13 @@ const LiveScoring: React.FC<Props> = () => {
               let statusColor = 'inherit';
               
               if (playerId === bowler) {
-                statusDisplay = 'Bowling*';
+                statusDisplay = isMobile ? '🎯*' : 'Bowling*';
                 statusColor = 'success.main';
               } else if (stat.lastBowledOver !== undefined) {
-                statusDisplay = `Last: Over ${stat.lastBowledOver + 1}`;
+                statusDisplay = isMobile ? `O${stat.lastBowledOver + 1}` : `Last: Over ${stat.lastBowledOver + 1}`;
                 statusColor = 'text.secondary';
               } else {
-                statusDisplay = 'Available';
+                statusDisplay = isMobile ? '✓' : 'Available';
                 statusColor = 'primary.main';
               }
 
@@ -2974,9 +3135,28 @@ const LiveScoring: React.FC<Props> = () => {
                   <TableCell align="right">{stat.wickets}</TableCell>
                   <TableCell align="right">{economy}</TableCell>
                   <TableCell align="center">
-                    <Typography variant="body2" sx={{ color: statusColor, fontSize: '0.75rem' }}>
-                      {statusDisplay}
-                    </Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+                      <Typography variant="body2" sx={{ color: statusColor, fontSize: '0.75rem' }}>
+                        {statusDisplay}
+                      </Typography>
+                      {isAdmin && playerId === bowler && (
+                        <Tooltip title="Change Bowler">
+                          <IconButton
+                            size="small"
+                            onClick={() => handlePlayerChange('bowler')}
+                            sx={{ 
+                              minWidth: 20, 
+                              minHeight: 20, 
+                              padding: 0.25,
+                              color: 'secondary.main',
+                              '&:hover': { backgroundColor: 'secondary.light', color: 'secondary.dark' }
+                            }}
+                          >
+                            <ChangeCircleIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                    </Box>
                   </TableCell>
                 </TableRow>
               );
@@ -2986,8 +3166,8 @@ const LiveScoring: React.FC<Props> = () => {
       </TableContainer>
       </Box>
 
-      {/* Extras Summary */}
-      {match && match.innings && match.innings.length > 0 && (
+      {/* Extras Summary - Hidden on mobile */}
+      {match && match.innings && match.innings.length > 0 && !isMobile && (
         <Box sx={{ mb: 3 }}>
           <Typography 
             variant="h6" 
@@ -3598,6 +3778,50 @@ const LiveScoring: React.FC<Props> = () => {
         </DialogActions>
       </Dialog>
 
+      {/* Player Change Reason Dialog */}
+      <Dialog
+        open={isPlayerChangeDialogOpen}
+        onClose={handlePlayerChangeCancel}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          Change {changePlayerType === 'striker' ? 'Striker' : 
+                  changePlayerType === 'nonStriker' ? 'Non-Striker' : 'Bowler'}
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 2 }}>
+            <Typography variant="body1" sx={{ mb: 2 }}>
+              Please select the reason for changing the {changePlayerType === 'striker' ? 'striker' : 
+                                                        changePlayerType === 'nonStriker' ? 'non-striker' : 'bowler'}:
+            </Typography>
+            <FormControl fullWidth>
+              <InputLabel>Reason</InputLabel>
+              <Select
+                value={changePlayerReason}
+                onChange={(e) => setChangePlayerReason(e.target.value)}
+                label="Reason"
+              >
+                <MenuItem value="injury">Injury</MenuItem>
+                <MenuItem value="retire_hurt">Retire Hurt</MenuItem>
+                <MenuItem value="tactical">Tactical Change</MenuItem>
+                <MenuItem value="other">Other</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handlePlayerChangeCancel}>Cancel</Button>
+          <Button 
+            variant="contained" 
+            onClick={handlePlayerChangeSubmit}
+            disabled={!changePlayerReason}
+          >
+            Continue
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Player Selection Dialog */}
       <Dialog 
         open={isPlayerSelectionDialogOpen} 
@@ -3646,8 +3870,8 @@ const LiveScoring: React.FC<Props> = () => {
           })()}
           
           <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 3 }}>
-            {/* Striker Selection - Show unless it's only bowler selection */}
-            {!getDialogContext().showOnlyBowler && (
+            {/* Striker Selection - Show unless it's only bowler selection, or show only if it's striker only */}
+            {(!getDialogContext().showOnlyBowler && !(getDialogContext() as any).showOnlyNonStriker) || getDialogContext().showOnlyStriker ? (
             <Autocomplete
               fullWidth
               options={players
@@ -3674,7 +3898,10 @@ const LiveScoring: React.FC<Props> = () => {
                   // Don't allow same player as non-striker
                   const isSameAsNonStriker = player._id === nonStriker;
                   
-                  return hasTeam && !isPlayerOut && !isSameAsNonStriker;
+                  // Don't allow same player as current striker when changing due to injury/retire hurt
+                  const isSameAsStriker = player._id === striker && changePlayerType === 'striker';
+                  
+                  return hasTeam && !isPlayerOut && !isSameAsNonStriker && !isSameAsStriker;
                 })}
               getOptionLabel={(option) => option.name}
               value={players.find(p => p._id === striker) || null}
@@ -3692,10 +3919,10 @@ const LiveScoring: React.FC<Props> = () => {
                 </Box>
               )}
             />
-            )}
+            ) : null}
 
-            {/* Non-Striker Selection - Show unless it's only bowler or only striker selection */}
-            {!getDialogContext().showOnlyBowler && !getDialogContext().showOnlyStriker && (
+            {/* Non-Striker Selection - Show unless it's only bowler or only striker selection, or show only if it's non-striker only */}
+            {(!getDialogContext().showOnlyBowler && !getDialogContext().showOnlyStriker) || (getDialogContext() as any).showOnlyNonStriker ? (
             <Autocomplete
               fullWidth
               options={players
@@ -3722,7 +3949,10 @@ const LiveScoring: React.FC<Props> = () => {
                   // Don't allow same player as striker
                   const isSameAsStriker = player._id === striker;
                   
-                  return hasTeam && !isPlayerOut && !isSameAsStriker;
+                  // Don't allow same player as current non-striker when changing due to injury/retire hurt
+                  const isSameAsNonStriker = player._id === nonStriker && changePlayerType === 'nonStriker';
+                  
+                  return hasTeam && !isPlayerOut && !isSameAsStriker && !isSameAsNonStriker;
                 })}
               getOptionLabel={(option) => option.name}
               value={players.find(p => p._id === nonStriker) || null}
@@ -3740,10 +3970,10 @@ const LiveScoring: React.FC<Props> = () => {
                 </Box>
               )}
             />
-            )}
+            ) : null}
 
-            {/* Bowler Selection - Show unless it's only striker selection */}
-            {!getDialogContext().showOnlyStriker && (
+            {/* Bowler Selection - Show unless it's only striker or only non-striker selection */}
+            {(!getDialogContext().showOnlyStriker && !(getDialogContext() as any).showOnlyNonStriker) || getDialogContext().showOnlyBowler ? (
             <Autocomplete
               fullWidth
               options={players
@@ -3760,7 +3990,10 @@ const LiveScoring: React.FC<Props> = () => {
                     return teamId === String(bowlingTeamId);
                   });
                   
-                  return hasTeam;
+                  // Don't allow same player as current bowler (unless it's match start)
+                  const isSameAsBowler = player._id === bowler && (match?.status !== 'upcoming' || isOverCompleted || changePlayerType === 'bowler');
+                  
+                  return hasTeam && !isSameAsBowler;
                 })}
               getOptionLabel={(option) => option.name}
               value={players.find(p => p._id === bowler) || null}
@@ -3778,7 +4011,7 @@ const LiveScoring: React.FC<Props> = () => {
                 </Box>
               )}
             />
-            )}
+            ) : null}
           </Box>
         </DialogContent>
         <DialogActions sx={{ p: 3 }}>
@@ -3795,7 +4028,11 @@ const LiveScoring: React.FC<Props> = () => {
                 setIsPlayerSelectionDialogOpen(false);
                 
                 // Handle different contexts
-                if (isOverCompleted) {
+                if (changePlayerType) {
+                  // Player change - reset the change state and continue
+                  setChangePlayerType(null);
+                  setChangePlayerReason('');
+                } else if (isOverCompleted) {
                   // Over completion - reset the over completion state and clear current over
                   setIsOverCompleted(false);
                   setOverCompletionMessage('');
@@ -3808,6 +4045,11 @@ const LiveScoring: React.FC<Props> = () => {
                   if (match && match.innings && match.innings[currentInnings]) {
                     match.innings[currentInnings].currentOverBalls = [];
                   }
+                  
+                  // WORKAROUND: Also clear localStorage backup when over is completed
+                  const matchStorageKey = `currentOverBalls_${matchId}_${currentInnings}`;
+                  localStorage.setItem(matchStorageKey, JSON.stringify([]));
+                  console.log('Cleared currentOverBalls from localStorage for new over:', matchStorageKey);
                 } else if (isWaitingForNewBatsman) {
                   // Wicket - reset the waiting state and continue
                   setIsWaitingForNewBatsman(false);
@@ -3829,7 +4071,8 @@ const LiveScoring: React.FC<Props> = () => {
               } : undefined
             }}
           >
-            {isOverCompleted ? '🎯 Continue with New Bowler' : 
+            {changePlayerType ? `🔄 Change ${changePlayerType === 'striker' ? 'Striker' : changePlayerType === 'nonStriker' ? 'Non-Striker' : 'Bowler'}` :
+             isOverCompleted ? '🎯 Continue with New Bowler' : 
              isWaitingForNewBatsman ? '🏏 Continue with New Batsman' : 
              '🚀 Start Match'}
           </Button>

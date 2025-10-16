@@ -21,7 +21,6 @@ import {
 import { useParams } from 'react-router-dom';
 import { Match, Team, Player, BattingStats, BowlingStats } from '../types';
 import { matchService, teamService, playerService } from '../services/api.service';
-import MatchCommentary from '../components/MatchCommentary';
 
 const MatchSummary: React.FC = () => {
   const { matchId } = useParams();
@@ -181,9 +180,9 @@ const MatchSummary: React.FC = () => {
                     fontWeight: 'bold'
                   }
                 }}>
-                  <TableCell>Batter</TableCell>
-                  <TableCell align="right">Runs</TableCell>
-                  <TableCell align="right">Balls</TableCell>
+                  <TableCell>{isMobile ? 'Player' : 'Batter'}</TableCell>
+                  <TableCell align="right">{isMobile ? 'R' : 'Runs'}</TableCell>
+                  <TableCell align="right">{isMobile ? 'B' : 'Balls'}</TableCell>
                   <TableCell align="right">4s</TableCell>
                   <TableCell align="right">6s</TableCell>
                   <TableCell align="right">SR</TableCell>
@@ -258,7 +257,7 @@ const MatchSummary: React.FC = () => {
                     fontWeight: 'bold'
                   }
                 }}>
-                  <TableCell>Bowler</TableCell>
+                  <TableCell>{isMobile ? 'Player' : 'Bowler'}</TableCell>
                   <TableCell align="right">O</TableCell>
                   <TableCell align="right">M</TableCell>
                   <TableCell align="right">R</TableCell>
@@ -459,16 +458,17 @@ const MatchSummary: React.FC = () => {
       sx={{
         minHeight: 'calc(100vh - 120px)', // Adjusted for header height
         background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
-        padding: { xs: 1, sm: 2 },
+        padding: { xs: 0, sm: 2 }, // Remove padding on mobile (xs: 0)
+        margin: { xs: 0, sm: 'auto' }, // Remove auto margins on mobile
       }}
     >
       <Paper
         elevation={8}
         sx={{
           maxWidth: '1200px',
-          margin: '0 auto',
-          padding: { xs: 2, sm: 4 },
-          borderRadius: 3,
+          margin: { xs: 0, sm: '0 auto' }, // Full width on mobile
+          padding: { xs: 1, sm: 4 }, // Minimal padding on mobile
+          borderRadius: { xs: 0, sm: 3 }, // No border radius on mobile for full width
           background: '#ffffff',
           border: '1px solid rgba(0,0,0,0.1)',
           boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
@@ -529,7 +529,6 @@ const MatchSummary: React.FC = () => {
           >
             <Tab label="📊 Match Summary" />
             <Tab label="🏆 Top Performers" />
-            <Tab label="📝 Commentary" />
           </Tabs>
         </Box>
 
@@ -559,12 +558,6 @@ const MatchSummary: React.FC = () => {
         )}
 
         {tabValue === 1 && renderTopPerformers()}
-        
-        {tabValue === 2 && (
-          <Box sx={{ mt: 3 }}>
-            <MatchCommentary match={match} />
-          </Box>
-        )}
       </Paper>
     </Container>
   );

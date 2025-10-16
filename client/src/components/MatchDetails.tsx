@@ -70,113 +70,184 @@ const MatchDetails: React.FC<MatchDetailsProps> = ({
 
   return (
     <Box>
-      <Box 
-        sx={{ 
-          display: 'flex', 
-          flexDirection: isMobile ? 'column' : 'row',
-          justifyContent: 'space-between', 
-          alignItems: isMobile ? 'center' : 'flex-start', 
-          mb: 2,
-          gap: 2 
-        }}
-      >
-        {/* Score Section */}
-        <Box sx={{ textAlign: isMobile ? 'center' : 'left' }}>
-          <Typography 
-            variant={isMobile ? "h3" : "h4"} 
-            sx={{ fontWeight: 'bold', color: '#1976d2' }}
-          >
-            {totalRuns}/{wickets}
-          </Typography>
-          <Typography 
-            variant={isMobile ? "h5" : "h6"} 
-            sx={{ color: '#666' }}
-          >
-            Overs: {totalBalls !== undefined ? formatOvers(totalBalls) : formatOversFromDecimal(overs)}
-          </Typography>
-        </Box>
-      </Box>
+      {/* Mobile-optimized layout */}
+      {isMobile ? (
+        <Box>
+          {/* Compact Score Section */}
+          <Box sx={{ textAlign: 'center', mb: 1 }}>
+            <Typography 
+              variant="h4" 
+              sx={{ fontWeight: 'bold', color: '#1976d2', mb: 0 }}
+            >
+              {totalRuns}/{wickets}
+            </Typography>
+            <Typography 
+              variant="body2" 
+              sx={{ color: '#666', mt: -0.5 }}
+            >
+              ({totalBalls !== undefined ? formatOvers(totalBalls) : formatOversFromDecimal(overs)} ov)
+            </Typography>
+          </Box>
 
-      <Box sx={{ mb: 2 }}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>
-          This Over:
-        </Typography>
-        {currentOverBalls.length > 0 ? (
-          <Stack 
-            direction="row" 
-            spacing={1} 
-            sx={{ 
-              flexWrap: 'wrap', 
-              gap: 1,
-              justifyContent: isMobile ? 'center' : 'flex-start'
-            }}
-          >
-            {currentOverBalls.map((ball, index) => (
-              <Chip
-                key={index}
-                label={getBallChipLabel(ball)}
-                color={getBallChipColor(ball)}
-                size={isMobile ? "medium" : "small"}
+          {/* Compact Ball Chips */}
+          {currentOverBalls.length > 0 && (
+            <Box sx={{ mb: 1 }}>
+              <Stack 
+                direction="row" 
+                spacing={0.5} 
                 sx={{ 
-                  minWidth: isMobile ? '32px' : '28px',
-                  height: isMobile ? '32px' : '28px',
-                  fontWeight: 'bold',
-                  fontSize: isMobile ? '0.8rem' : '0.7rem',
-                  '& .MuiChip-label': {
-                    px: 0.5
-                  }
+                  flexWrap: 'wrap', 
+                  gap: 0.5,
+                  justifyContent: 'center'
                 }}
-              />
-            ))}
-          </Stack>
-        ) : (
-          <Typography 
-            variant="body2" 
+              >
+                {currentOverBalls.map((ball, index) => (
+                  <Chip
+                    key={index}
+                    label={getBallChipLabel(ball)}
+                    color={getBallChipColor(ball)}
+                    size="small"
+                    sx={{ 
+                      minWidth: '24px',
+                      height: '24px',
+                      fontWeight: 'bold',
+                      fontSize: '0.7rem',
+                      '& .MuiChip-label': {
+                        px: 0.5
+                      }
+                    }}
+                  />
+                ))}
+              </Stack>
+            </Box>
+          )}
+
+          {/* Ultra-compact Player Info */}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+            <Box sx={{ flex: 1, textAlign: 'left' }}>
+              <Typography variant="caption" sx={{ fontWeight: 'bold', fontSize: '0.7rem' }}>
+                {(players.find(p => p._id === striker)?.name || 'Striker').split(' ')[0]} * {strikerStats.runs}({strikerStats.balls})
+              </Typography>
+            </Box>
+            <Box sx={{ flex: 1, textAlign: 'center' }}>
+              <Typography variant="caption" sx={{ fontSize: '0.7rem' }}>
+                {(players.find(p => p._id === nonStriker)?.name || 'Non-striker').split(' ')[0]} {nonStrikerStats.runs}({nonStrikerStats.balls})
+              </Typography>
+            </Box>
+          </Box>
+
+          {/* Compact Bowler Info */}
+          <Box sx={{ textAlign: 'center' }}>
+            <Typography variant="caption" sx={{ fontWeight: 'bold', fontSize: '0.7rem' }}>
+              {(players.find(p => p._id === bowler)?.name || 'Bowler').split(' ')[0]}: {formatOvers(bowlerStats.balls || 0)}-{bowlerStats.wickets}-{bowlerStats.runs}
+            </Typography>
+          </Box>
+        </Box>
+      ) : (
+        /* Desktop layout remains the same */
+        <Box>
+          <Box 
             sx={{ 
-              color: '#666', 
-              fontStyle: 'italic',
-              textAlign: isMobile ? 'center' : 'left'
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'flex-start', 
+              mb: 2,
+              gap: 2 
             }}
           >
-            No balls bowled yet
-          </Typography>
-        )}
-      </Box>
+            {/* Score Section */}
+            <Box>
+              <Typography 
+                variant="h4" 
+                sx={{ fontWeight: 'bold', color: '#1976d2' }}
+              >
+                {totalRuns}/{wickets}
+              </Typography>
+              <Typography 
+                variant="h6" 
+                sx={{ color: '#666' }}
+              >
+                Overs: {totalBalls !== undefined ? formatOvers(totalBalls) : formatOversFromDecimal(overs)}
+              </Typography>
+            </Box>
+          </Box>
 
-      <Box 
-        sx={{ 
-          display: 'flex', 
-          flexDirection: isMobile ? 'column' : 'row',
-          gap: isMobile ? 2 : 4, 
-          mb: 2 
-        }}
-      >
-        <Box sx={{ textAlign: isMobile ? 'center' : 'left' }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
-            {players.find(p => p._id === striker)?.name || 'Select Striker'} *
-          </Typography>
-          <Typography variant="body2">
-            {strikerStats.runs}({strikerStats.balls})
-          </Typography>
-        </Box>
-        <Box sx={{ textAlign: isMobile ? 'center' : 'left' }}>
-          <Typography variant="subtitle2">
-            {players.find(p => p._id === nonStriker)?.name || 'Select Non-striker'}
-          </Typography>
-          <Typography variant="body2">
-            {nonStrikerStats.runs}({nonStrikerStats.balls})
-          </Typography>
-        </Box>
-      </Box>
+          <Box sx={{ mb: 2 }}>
+            {currentOverBalls.length > 0 ? (
+              <Stack 
+                direction="row" 
+                spacing={1} 
+                sx={{ 
+                  flexWrap: 'wrap', 
+                  gap: 1
+                }}
+              >
+                {currentOverBalls.map((ball, index) => (
+                  <Chip
+                    key={index}
+                    label={getBallChipLabel(ball)}
+                    color={getBallChipColor(ball)}
+                    size="small"
+                    sx={{ 
+                      minWidth: '28px',
+                      height: '28px',
+                      fontWeight: 'bold',
+                      fontSize: '0.7rem',
+                      '& .MuiChip-label': {
+                        px: 0.5
+                      }
+                    }}
+                  />
+                ))}
+              </Stack>
+            ) : (
+              <Typography 
+                variant="body2" 
+                sx={{ 
+                  color: '#666', 
+                  fontStyle: 'italic'
+                }}
+              >
+                No balls bowled yet
+              </Typography>
+            )}
+          </Box>
 
-      <Box sx={{ textAlign: isMobile ? 'center' : 'left' }}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
-          Bowler: {players.find(p => p._id === bowler)?.name || 'Select Bowler'}
-        </Typography>
-        <Typography variant="body2">
-          {formatOvers(bowlerStats.balls || 0)}-{bowlerStats.wickets}-{bowlerStats.runs}
-        </Typography>
-      </Box>
+          <Box 
+            sx={{ 
+              display: 'flex', 
+              gap: 4, 
+              mb: 2 
+            }}
+          >
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+                {players.find(p => p._id === striker)?.name || 'Select Striker'} *
+              </Typography>
+              <Typography variant="body2">
+                {strikerStats.runs}({strikerStats.balls})
+              </Typography>
+            </Box>
+            <Box>
+              <Typography variant="subtitle2">
+                {players.find(p => p._id === nonStriker)?.name || 'Select Non-striker'}
+              </Typography>
+              <Typography variant="body2">
+                {nonStrikerStats.runs}({nonStrikerStats.balls})
+              </Typography>
+            </Box>
+          </Box>
+
+          <Box>
+            <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+              Bowler: {players.find(p => p._id === bowler)?.name || 'Select Bowler'}
+            </Typography>
+            <Typography variant="body2">
+              {formatOvers(bowlerStats.balls || 0)}-{bowlerStats.wickets}-{bowlerStats.runs}
+            </Typography>
+          </Box>
+        </Box>
+      )}
     </Box>
   );
 };

@@ -31,6 +31,7 @@ import {
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import AddIcon from '@mui/icons-material/Add';
 import { Team, Player } from '../types';
 import { teamService, playerService } from '../services/api.service';
 
@@ -57,6 +58,10 @@ const TeamList: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [newTeam, setNewTeam] = useState<TeamFormData>(defaultTeam);
+  
+  // Delete confirmation dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [teamToDelete, setTeamToDelete] = useState<Team | null>(null);
 
   useEffect(() => {
     fetchTeams();
@@ -123,18 +128,33 @@ const TeamList: React.FC = () => {
     setOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
+  // Delete dialog handlers
+  const handleDeleteClick = (team: Team) => {
+    setTeamToDelete(team);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!teamToDelete?._id) return;
+    
     setLoading(true);
     setError(null);
     try {
-      await teamService.delete(id);
+      await teamService.delete(teamToDelete._id);
       fetchTeams();
+      setDeleteDialogOpen(false);
+      setTeamToDelete(null);
     } catch (error) {
       setError('Failed to delete team');
       console.error('Error deleting team:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setTeamToDelete(null);
   };
 
   const handleSubmit = async () => {
@@ -194,8 +214,13 @@ const TeamList: React.FC = () => {
           onClick={handleOpen}
           disabled={loading}
           size={isMobile ? "small" : "medium"}
+          startIcon={!isMobile ? <AddIcon /> : undefined}
+          sx={{ 
+            minWidth: isMobile ? '40px' : 'auto',
+            px: isMobile ? 1 : 2 
+          }}
         >
-          Add Team
+          {isMobile ? <AddIcon /> : 'Add Team'}
         </Button>
       </Box>
 
@@ -237,21 +262,33 @@ const TeamList: React.FC = () => {
                   onClick={() => handleEdit(team)}
                   color="primary"
                   size="small"
-                  startIcon={<EditIcon />}
+                  sx={{ 
+                    minWidth: isMobile ? '40px' : 'auto',
+                    px: isMobile ? 1 : 2 
+                  }}
                 >
-                  Edit
+                  {isMobile ? <EditIcon /> : (
+                    <>
+                      <EditIcon sx={{ mr: 1 }} />
+                      Edit
+                    </>
+                  )}
                 </Button>
                 <Button
-                  onClick={() => {
-                    if (window.confirm('Are you sure you want to delete this team?')) {
-                      handleDelete(team._id!);
-                    }
-                  }}
+                  onClick={() => handleDeleteClick(team)}
                   color="error"
                   size="small"
-                  startIcon={<DeleteIcon />}
+                  sx={{ 
+                    minWidth: isMobile ? '40px' : 'auto',
+                    px: isMobile ? 1 : 2 
+                  }}
                 >
-                  Delete
+                  {isMobile ? <DeleteIcon /> : (
+                    <>
+                      <DeleteIcon sx={{ mr: 1 }} />
+                      Delete
+                    </>
+                  )}
                 </Button>
               </CardActions>
             </Card>
@@ -284,11 +321,7 @@ const TeamList: React.FC = () => {
                       <EditIcon />
                     </IconButton>
                     <IconButton
-                      onClick={() => {
-                        if (window.confirm('Are you sure you want to delete this team?')) {
-                          handleDelete(team._id!);
-                        }
-                      }}
+                      onClick={() => handleDeleteClick(team)}
                       color="error"
                       size="small"
                     >
@@ -410,6 +443,75 @@ const TeamList: React.FC = () => {
           {error}
         </Alert>
       </Snackbar>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog 
+        open={deleteDialogOpen} 
+        onClose={handleDeleteCancel}
+        maxWidth={isMobile ? "xs" : "sm"}
+        fullWidth
+        PaperProps={{
+          sx: {
+            ...(isMobile && {
+              m: 1,
+              maxHeight: '90vh'
+            })
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          color: 'error.main', 
+          fontWeight: 'bold',
+          fontSize: isMobile ? '1.1rem' : '1.25rem',
+          py: isMobile ? 1.5 : 2
+        }}>
+          ⚠️ Delete Team?
+        </DialogTitle>
+        <DialogContent sx={{ py: isMobile ? 1 : 2 }}>
+          <Typography variant="body1">
+            Are you sure you want to delete the team <strong>"{teamToDelete?.name}"</strong>?
+          </Typography>
+          {!isMobile && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              This action cannot be undone.
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ 
+          px: isMobile ? 2 : 3,
+          py: isMobile ? 1.5 : 2,
+          gap: isMobile ? 1 : 2
+        }}>
+          <Button 
+            onClick={handleDeleteCancel} 
+            color="primary"
+            size={isMobile ? "small" : "medium"}
+            sx={{ minWidth: isMobile ? '70px' : 'auto' }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleDeleteConfirm}
+            color="error"
+            variant="contained"
+            disabled={loading}
+            startIcon={!isMobile && !loading ? <DeleteIcon /> : undefined}
+            size={isMobile ? "small" : "medium"}
+            sx={{ minWidth: isMobile ? '70px' : 'auto' }}
+          >
+            {loading ? (
+              <CircularProgress size={20} color="inherit" />
+            ) : isMobile ? (
+              <>
+                <DeleteIcon sx={{ mr: 0.5 }} />
+                Delete
+              </>
+            ) : (
+              'Delete Team'
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };

@@ -35,6 +35,18 @@ interface ICurrentState {
   lastBallExtras?: string;
 }
 
+interface IBallOutcome {
+  ballNumber: number;
+  runs: number;
+  extras?: {
+    type: 'wide' | 'no-ball' | 'bye' | 'leg-bye';
+    runs: number;
+  };
+  isWicket: boolean;
+  dismissalType?: 'bowled' | 'caught' | 'run out' | 'stumped' | 'lbw' | 'hit wicket';
+  fielder?: string;
+}
+
 interface IInnings {
   battingTeam: mongoose.Types.ObjectId;
   bowlingTeam: mongoose.Types.ObjectId;
@@ -55,6 +67,7 @@ interface IInnings {
   };
   runRate: number; // Current run rate
   requiredRunRate?: number; // For second innings
+  currentOverBalls?: IBallOutcome[]; // Store current over's ball-by-ball data
 }
 
 const inningsSchema = new mongoose.Schema<IInnings>({
@@ -131,7 +144,24 @@ const inningsSchema = new mongoose.Schema<IInnings>({
     total: { type: Number, default: 0 }
   },
   runRate: { type: Number, default: 0 },
-  requiredRunRate: Number
+  requiredRunRate: Number,
+  currentOverBalls: [{
+    ballNumber: { type: Number, required: true },
+    runs: { type: Number, required: true },
+    extras: {
+      type: {
+        type: String,
+        enum: ['wide', 'no-ball', 'bye', 'leg-bye']
+      },
+      runs: { type: Number }
+    },
+    isWicket: { type: Boolean, required: true },
+    dismissalType: {
+      type: String,
+      enum: ['bowled', 'caught', 'run out', 'stumped', 'lbw', 'hit wicket']
+    },
+    fielder: String
+  }]
 });
 
 export interface IMatch {

@@ -31,6 +31,7 @@ import {
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import AddIcon from '@mui/icons-material/Add';
 import { Player, Team } from '../types';
 import { playerService, teamService } from '../services/api.service';
 
@@ -54,6 +55,10 @@ const PlayerList: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   const [newPlayer, setNewPlayer] = useState<Omit<Player, '_id'>>(defaultPlayer);
+  
+  // Delete confirmation dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [playerToDelete, setPlayerToDelete] = useState<Player | null>(null);
 
   useEffect(() => {
     fetchPlayers();
@@ -114,18 +119,33 @@ const PlayerList: React.FC = () => {
     setOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
+  // Delete dialog handlers
+  const handleDeleteClick = (player: Player) => {
+    setPlayerToDelete(player);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!playerToDelete?._id) return;
+    
     setLoading(true);
     setError(null);
     try {
-      await playerService.delete(id);
+      await playerService.delete(playerToDelete._id);
       fetchPlayers();
+      setDeleteDialogOpen(false);
+      setPlayerToDelete(null);
     } catch (error) {
       setError('Failed to delete player');
       console.error('Error deleting player:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setPlayerToDelete(null);
   };
 
   const handleSubmit = async () => {
@@ -170,8 +190,13 @@ const PlayerList: React.FC = () => {
           color="primary" 
           onClick={handleOpen}
           size={isMobile ? "small" : "medium"}
+          startIcon={!isMobile ? <AddIcon /> : undefined}
+          sx={{ 
+            minWidth: isMobile ? '40px' : 'auto',
+            px: isMobile ? 1 : 2 
+          }}
         >
-          Add Player
+          {isMobile ? <AddIcon /> : 'Add Player'}
         </Button>
       </Box>
 
@@ -226,21 +251,33 @@ const PlayerList: React.FC = () => {
                   onClick={() => handleEdit(player)}
                   color="primary"
                   size="small"
-                  startIcon={<EditIcon />}
+                  sx={{ 
+                    minWidth: isMobile ? '40px' : 'auto',
+                    px: isMobile ? 1 : 2 
+                  }}
                 >
-                  Edit
+                  {isMobile ? <EditIcon /> : (
+                    <>
+                      <EditIcon sx={{ mr: 1 }} />
+                      Edit
+                    </>
+                  )}
                 </Button>
                 <Button
-                  onClick={() => {
-                    if (window.confirm('Are you sure you want to delete this player?')) {
-                      handleDelete(player._id!);
-                    }
-                  }}
+                  onClick={() => handleDeleteClick(player)}
                   color="error"
                   size="small"
-                  startIcon={<DeleteIcon />}
+                  sx={{ 
+                    minWidth: isMobile ? '40px' : 'auto',
+                    px: isMobile ? 1 : 2 
+                  }}
                 >
-                  Delete
+                  {isMobile ? <DeleteIcon /> : (
+                    <>
+                      <DeleteIcon sx={{ mr: 1 }} />
+                      Delete
+                    </>
+                  )}
                 </Button>
               </CardActions>
             </Card>
@@ -284,11 +321,7 @@ const PlayerList: React.FC = () => {
                       <EditIcon />
                     </IconButton>
                     <IconButton
-                      onClick={() => {
-                        if (window.confirm('Are you sure you want to delete this player?')) {
-                          handleDelete(player._id!);
-                        }
-                      }}
+                      onClick={() => handleDeleteClick(player)}
                       color="error"
                       size="small"
                     >
@@ -447,6 +480,75 @@ const PlayerList: React.FC = () => {
           {error}
         </Alert>
       </Snackbar>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog 
+        open={deleteDialogOpen} 
+        onClose={handleDeleteCancel}
+        maxWidth={isMobile ? "xs" : "sm"}
+        fullWidth
+        PaperProps={{
+          sx: {
+            ...(isMobile && {
+              m: 1,
+              maxHeight: '90vh'
+            })
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          color: 'error.main', 
+          fontWeight: 'bold',
+          fontSize: isMobile ? '1.1rem' : '1.25rem',
+          py: isMobile ? 1.5 : 2
+        }}>
+          ⚠️ Delete Player?
+        </DialogTitle>
+        <DialogContent sx={{ py: isMobile ? 1 : 2 }}>
+          <Typography variant="body1">
+            Are you sure you want to delete <strong>"{playerToDelete?.name}"</strong>?
+          </Typography>
+          {!isMobile && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              This action cannot be undone.
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ 
+          px: isMobile ? 2 : 3,
+          py: isMobile ? 1.5 : 2,
+          gap: isMobile ? 1 : 2
+        }}>
+          <Button 
+            onClick={handleDeleteCancel} 
+            color="primary"
+            size={isMobile ? "small" : "medium"}
+            sx={{ minWidth: isMobile ? '70px' : 'auto' }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleDeleteConfirm}
+            color="error"
+            variant="contained"
+            disabled={loading}
+            startIcon={!isMobile && !loading ? <DeleteIcon /> : undefined}
+            size={isMobile ? "small" : "medium"}
+            sx={{ minWidth: isMobile ? '70px' : 'auto' }}
+          >
+            {loading ? (
+              <CircularProgress size={20} color="inherit" />
+            ) : isMobile ? (
+              <>
+                <DeleteIcon sx={{ mr: 0.5 }} />
+                Delete
+              </>
+            ) : (
+              'Delete Player'
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };

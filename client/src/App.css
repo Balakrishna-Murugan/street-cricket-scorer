@@ -36,3 +36,25 @@
     transform: rotate(360deg);
   }
 }
+
+/* Mobile-specific overrides for Container components */
+@media (max-width: 899px) {
+  .MuiContainer-root {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+  
+  /* Target the specific MUI Container class you mentioned */
+  .css-1nkhshj-MuiContainer-root {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+}

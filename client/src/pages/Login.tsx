@@ -17,7 +17,12 @@ const Login: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const handleLogin = () => {
-    if (username === 'admin' && password === 'admin') {
+    if (username === 'superadmin' && password === 'superadmin123') {
+      localStorage.setItem('isAuthenticated', 'true');
+      localStorage.setItem('userRole', 'superadmin');
+      localStorage.setItem('username', 'superadmin');
+      navigate('/');
+    } else if (username === 'admin' && password === 'admin') {
       localStorage.setItem('isAuthenticated', 'true');
       localStorage.setItem('userRole', 'admin');
       localStorage.setItem('username', 'admin');
@@ -80,6 +85,7 @@ const Login: React.FC = () => {
           </Button>
 
           <Typography variant="body2" sx={{ mt: 2 }} color="text.secondary" textAlign="center">
+            SuperAdmin: username: superadmin, password: superadmin123<br />
             Admin: username: admin, password: admin<br />
             Viewer: username: viewer, password: viewer
           </Typography>

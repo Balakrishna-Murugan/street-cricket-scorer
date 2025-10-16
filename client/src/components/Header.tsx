@@ -40,7 +40,6 @@ const Header: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [profileAnchorEl, setProfileAnchorEl] = useState<null | HTMLElement>(null);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [matchInfo, setMatchInfo] = useState<{ [key: string]: string }>({});
@@ -49,6 +48,7 @@ const Header: React.FC = () => {
   const userRole = localStorage.getItem('userRole') || 'viewer';
   const username = localStorage.getItem('username') || 'User';
   const isAdmin = userRole === 'admin';
+  const isSuperAdmin = userRole === 'superadmin';
 
   // Fetch match info when on a match page
   useEffect(() => {
@@ -81,8 +81,11 @@ const Header: React.FC = () => {
       '/teams': 'Teams',
       '/players': 'Players', 
       '/matches': 'Matches',
+      '/match-summary': 'Match Summary',
+      '/overview': 'Match Overview',
       '/live': 'Live Scoring',
-      '/summary': 'Match Summary'
+      '/summary': 'Match Summary',
+      '/commentary': 'Live Commentary'
     };
 
     if (pathnames.length === 0) {
@@ -91,37 +94,54 @@ const Header: React.FC = () => {
 
     const breadcrumbs = [{ label: 'Home', path: '/' }];
     
-    pathnames.forEach((pathname, index) => {
-      const path = `/${pathnames.slice(0, index + 1).join('/')}`;
-      let label = breadcrumbNameMap[`/${pathname}`] || pathname;
+    // Special handling for match-related pages - check navigation source
+    if (pathnames[0] === 'matches' && pathnames[2] && (pathnames[2] === 'overview' || pathnames[2] === 'summary' || pathnames[2] === 'commentary')) {
+      const navigationSource = sessionStorage.getItem('matchNavigationSource');
       
-      // Special handling for match IDs - show team names if available, otherwise "Match Details"
-      if (pathnames[index - 1] === 'matches' && pathname.length > 10) {
-        label = matchInfo[pathname] || 'Match Details';
+      if (navigationSource === 'match-summary') {
+        // User came from Match Summary
+        breadcrumbs.push({ label: 'Match Summary', path: '/match-summary' });
+      } else {
+        // User came from admin Matches or default
+        breadcrumbs.push({ label: 'Matches', path: '/matches' });
       }
       
-      breadcrumbs.push({ label, path });
-    });
+      // Add the match name (team vs team) 
+      const matchId = pathnames[1];
+      const matchLabel = matchInfo[matchId] || 'Match Details';
+      breadcrumbs.push({ label: matchLabel, path: `/matches/${matchId}/overview` });
+      
+      // Add the final page if not overview
+      if (pathnames[2] !== 'overview') {
+        const finalLabel = breadcrumbNameMap[`/${pathnames[2]}`] || pathnames[2];
+        breadcrumbs.push({ label: finalLabel, path: location.pathname });
+      }
+    } else {
+      // Regular breadcrumb generation for other pages
+      pathnames.forEach((pathname, index) => {
+        const path = `/${pathnames.slice(0, index + 1).join('/')}`;
+        let label = breadcrumbNameMap[`/${pathname}`] || pathname;
+        
+        // Special handling for match IDs - show team names if available, otherwise "Match Details"
+        if (pathnames[index - 1] === 'matches' && pathname.length > 10) {
+          label = matchInfo[pathname] || 'Match Details';
+        }
+        
+        breadcrumbs.push({ label, path });
+      });
+    }
 
     return breadcrumbs;
   };
 
   const breadcrumbs = generateBreadcrumbs();
 
-  const handleMenuClick = (event: React.MouseEvent<HTMLElement>) => {
-    if (isMobile) {
-      setMobileDrawerOpen(true);
-    } else {
-      setAnchorEl(event.currentTarget);
-    }
+  const handleMenuClick = () => {
+    setMobileDrawerOpen(true);
   };
 
   const handleProfileClick = (event: React.MouseEvent<HTMLElement>) => {
     setProfileAnchorEl(event.currentTarget);
-  };
-
-  const handleMenuClose = () => {
-    setAnchorEl(null);
   };
 
   const handleDrawerClose = () => {
@@ -147,16 +167,19 @@ const Header: React.FC = () => {
         boxShadow: '0 3px 5px 2px rgba(25, 118, 210, .3)',
       }}>
         <Toolbar>
-          <IconButton
-            size="large"
-            edge="start"
-            color="inherit"
-            aria-label="menu"
-            sx={{ mr: 2 }}
-            onClick={handleMenuClick}
-          >
-            <MenuIcon />
-          </IconButton>
+          {/* Mobile Menu Button - Only show on mobile */}
+          {isMobile && (
+            <IconButton
+              size="large"
+              edge="start"
+              color="inherit"
+              aria-label="menu"
+              sx={{ mr: 2 }}
+              onClick={handleMenuClick}
+            >
+              <MenuIcon />
+            </IconButton>
+          )}
 
           <IconButton color="inherit" onClick={() => navigate('/')} sx={{ mr: 1 }}>
             <HomeIcon />
@@ -171,13 +194,13 @@ const Header: React.FC = () => {
               textShadow: '1px 1px 2px rgba(0,0,0,0.3)',
             }}
           >
-            {isMobile ? 'Cricket' : 'Street Cricket'} {!isAdmin && !isMobile && '(Viewer Mode)'}
+            {isMobile ? 'Cricket' : 'Street Cricket'} {!isAdmin && !isSuperAdmin && !isMobile && '(Viewer Mode)'}
           </Typography>
 
           {/* Desktop Navigation */}
           {!isMobile && (
             <Box sx={{ display: 'flex', gap: 1, mr: 2 }}>
-              {isAdmin && (
+              {(isAdmin || isSuperAdmin) && (
                 <>
                   <Button 
                     color="inherit" 
@@ -217,13 +240,13 @@ const Header: React.FC = () => {
               <Button 
                 color="inherit" 
                 startIcon={<ScoreboardIcon />}
-                onClick={() => navigate('/matches')}
+                onClick={() => navigate('/match-summary')}
                 sx={{ 
                   minWidth: '120px',
                   '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }
                 }}
               >
-                View Matches
+                Match Summary
               </Button>
             </Box>
           )}
@@ -239,7 +262,7 @@ const Header: React.FC = () => {
               <Avatar sx={{ 
                 width: 36, 
                 height: 36, 
-                bgcolor: isAdmin ? 'secondary.main' : 'warning.main',
+                bgcolor: isSuperAdmin ? 'error.main' : (isAdmin ? 'secondary.main' : 'warning.main'),
                 border: '2px solid rgba(255,255,255,0.3)' 
               }}>
                 <AccountCircleIcon />
@@ -286,7 +309,7 @@ const Header: React.FC = () => {
           <ListItem sx={{ bgcolor: 'rgba(25, 118, 210, 0.1)', py: 2 }}>
             <ListItemIcon>
               <Avatar sx={{ 
-                bgcolor: isAdmin ? 'secondary.main' : 'warning.main',
+                bgcolor: isSuperAdmin ? 'error.main' : (isAdmin ? 'secondary.main' : 'warning.main'),
                 width: 40,
                 height: 40 
               }}>
@@ -295,7 +318,7 @@ const Header: React.FC = () => {
             </ListItemIcon>
             <ListItemText 
               primary={username}
-              secondary={`${userRole}${!isAdmin ? ' (View Only)' : ''}`}
+              secondary={`${userRole}${!isAdmin && !isSuperAdmin ? ' (View Only)' : ''}`}
               primaryTypographyProps={{ fontWeight: 'bold' }}
             />
           </ListItem>
@@ -308,7 +331,7 @@ const Header: React.FC = () => {
             <ListItemText primary="Home" />
           </ListItemButton>
           
-          {isAdmin && (
+          {(isAdmin || isSuperAdmin) && (
             <>
               <ListItemButton onClick={() => { navigate('/teams'); handleDrawerClose(); }}>
                 <ListItemIcon><GroupsIcon color="primary" /></ListItemIcon>
@@ -329,9 +352,9 @@ const Header: React.FC = () => {
             </>
           )}
           
-          <ListItemButton onClick={() => { navigate('/matches'); handleDrawerClose(); }}>
+          <ListItemButton onClick={() => { navigate('/match-summary'); handleDrawerClose(); }}>
             <ListItemIcon><ScoreboardIcon color="primary" /></ListItemIcon>
-            <ListItemText primary="View Matches" />
+            <ListItemText primary="Match Summary" />
           </ListItemButton>
           
           <Divider />
@@ -343,32 +366,7 @@ const Header: React.FC = () => {
         </List>
       </Drawer>
 
-      {/* Desktop Menu (for smaller desktop screens) */}
-      {!isMobile && (
-        <Menu
-          anchorEl={anchorEl}
-          open={Boolean(anchorEl)}
-          onClose={handleMenuClose}
-        >
-          {isAdmin && (
-            <>
-              <MenuItem onClick={() => { navigate('/teams'); handleMenuClose(); }}>
-                <GroupsIcon sx={{ mr: 1 }} /> Teams
-              </MenuItem>
-              <MenuItem onClick={() => { navigate('/players'); handleMenuClose(); }}>
-                <PeopleIcon sx={{ mr: 1 }} /> Players
-              </MenuItem>
-              <MenuItem onClick={() => { navigate('/matches'); handleMenuClose(); }}>
-                <SportsBaseballIcon sx={{ mr: 1 }} /> Matches
-              </MenuItem>
-              <Divider />
-            </>
-          )}
-          <MenuItem onClick={() => { navigate('/matches'); handleMenuClose(); }}>
-            <ScoreboardIcon sx={{ mr: 1 }} /> View Matches
-          </MenuItem>
-        </Menu>
-      )}
+
 
       {/* Profile Menu */}
       <Menu
@@ -424,7 +422,10 @@ const Header: React.FC = () => {
                 <Link
                   key={crumb.path}
                   color="inherit"
-                  onClick={() => navigate(crumb.path)}
+                  onClick={() => {
+                    console.log('Breadcrumb clicked - navigating to:', crumb.path);
+                    navigate(crumb.path);
+                  }}
                   sx={{ 
                     cursor: 'pointer',
                     textDecoration: 'none',

@@ -23,11 +23,19 @@ import {
   Container,
   useTheme,
   useMediaQuery,
-  Autocomplete
+  Autocomplete,
+  Alert,
+  AlertTitle,
+  Checkbox
 } from '@mui/material';
 import { Match, Team } from '../types';
 import { matchService, teamService } from '../services/api.service';
 import { useNavigate } from 'react-router-dom';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
+import AddIcon from '@mui/icons-material/Add';
+import SelectAllIcon from '@mui/icons-material/SelectAll';
+import DeselectIcon from '@mui/icons-material/Deselect';
 
 const defaultMatch: Omit<Match, '_id'> = {
   team1: '',
@@ -85,6 +93,12 @@ const MatchList: React.FC = () => {
   // Get user role for permissions
   const userRole = localStorage.getItem('userRole') || 'viewer';
   const isAdmin = userRole === 'admin';
+  const isSuperAdmin = userRole === 'superadmin';
+  
+  // State for multi-select delete functionality
+  const [selectedMatches, setSelectedMatches] = useState<string[]>([]);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   useEffect(() => {
     fetchMatches();
@@ -233,6 +247,64 @@ const MatchList: React.FC = () => {
     }
   };
 
+  // SuperAdmin functions for multi-select delete
+  const handleSelectMatch = (matchId: string) => {
+    setSelectedMatches(prev => 
+      prev.includes(matchId) 
+        ? prev.filter(id => id !== matchId)
+        : [...prev, matchId]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedMatches.length === matches.length) {
+      setSelectedMatches([]);
+    } else {
+      setSelectedMatches(matches.map(match => match._id).filter(Boolean) as string[]);
+    }
+  };
+
+  const handleDeleteSelectedOpen = () => {
+    if (selectedMatches.length === 0) return;
+    setIsDeleteDialogOpen(true);
+    setDeleteConfirmText('');
+  };
+
+  const handleDeleteDialogClose = () => {
+    setIsDeleteDialogOpen(false);
+    setDeleteConfirmText('');
+  };
+
+  const handleDeleteSelected = async () => {
+    const expectedText = isMobile ? 'DELETE' : 'DELETE SELECTED MATCHES';
+    if (deleteConfirmText !== expectedText) {
+      return;
+    }
+
+    try {
+      // Delete selected matches one by one
+      for (const matchId of selectedMatches) {
+        await matchService.delete(matchId);
+      }
+      
+      // Clear local storage backup data for deleted matches
+      if (selectedMatches.length === matches.length) {
+        // If all matches deleted, clear all backup data
+        localStorage.removeItem('matchBackup');
+        localStorage.removeItem('currentOverBalls');
+      }
+      
+      // Reset selection and refresh matches
+      setSelectedMatches([]);
+      await fetchMatches();
+      handleDeleteDialogClose();
+      
+      console.log(`${selectedMatches.length} match(es) deleted successfully`);
+    } catch (error) {
+      console.error('Error deleting selected matches:', error);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'upcoming':
@@ -250,13 +322,69 @@ const MatchList: React.FC = () => {
     <Container maxWidth="lg">
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
         <Typography variant="h5">
-          {isAdmin ? 'Matches' : 'View Matches'}
+          {(isAdmin || isSuperAdmin) ? 'Matches' : 'View Matches'}
+          {isSuperAdmin && selectedMatches.length > 0 && (
+            <Chip 
+              label={`${selectedMatches.length} selected`} 
+              color="secondary" 
+              size="small" 
+              sx={{ ml: 2 }}
+            />
+          )}
         </Typography>
-        {isAdmin && (
-          <Button variant="contained" color="primary" onClick={handleOpen}>
-            Add Match
-          </Button>
-        )}
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          {(isAdmin || isSuperAdmin) && (
+            <Button 
+              variant="contained" 
+              color="primary" 
+              onClick={handleOpen}
+              startIcon={!isMobile ? <AddIcon /> : undefined}
+              sx={{ 
+                minWidth: isMobile ? '40px' : 'auto',
+                px: isMobile ? 1 : 2 
+              }}
+            >
+              {isMobile ? <AddIcon /> : 'Add Match'}
+            </Button>
+          )}
+          {isSuperAdmin && (
+            <>
+              <Button 
+                variant="outlined" 
+                color="secondary" 
+                onClick={handleSelectAll}
+                startIcon={!isMobile ? (selectedMatches.length === matches.length ? <DeselectIcon /> : <SelectAllIcon />) : undefined}
+                sx={{ 
+                  ml: 1,
+                  minWidth: isMobile ? '40px' : 'auto',
+                  px: isMobile ? 1 : 2 
+                }}
+              >
+                {isMobile ? 
+                  (selectedMatches.length === matches.length ? <DeselectIcon /> : <SelectAllIcon />) :
+                  (selectedMatches.length === matches.length ? 'Deselect All' : 'Select All')
+                }
+              </Button>
+              <Button 
+                variant="contained" 
+                color="error" 
+                onClick={handleDeleteSelectedOpen}
+                startIcon={!isMobile ? <DeleteForeverIcon /> : undefined}
+                disabled={selectedMatches.length === 0}
+                sx={{ 
+                  ml: 1,
+                  minWidth: isMobile ? '40px' : 'auto',
+                  px: isMobile ? 1 : 2 
+                }}
+              >
+                {isMobile ? 
+                  <DeleteForeverIcon /> : 
+                  `Delete Selected (${selectedMatches.length})`
+                }
+              </Button>
+            </>
+          )}
+        </Box>
       </Box>
 
       {isMobile ? (
@@ -268,11 +396,20 @@ const MatchList: React.FC = () => {
               elevation={3}
               sx={{ 
                 borderRadius: 2,
-                border: '1px solid rgba(0,0,0,0.1)'
+                border: selectedMatches.includes(match._id || '') ? '2px solid #f44336' : '1px solid rgba(0,0,0,0.1)',
+                backgroundColor: selectedMatches.includes(match._id || '') ? 'rgba(244, 67, 54, 0.05)' : 'inherit'
               }}
             >
                 <CardContent sx={{ pb: 1 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                    {isSuperAdmin && (
+                      <Checkbox
+                        checked={selectedMatches.includes(match._id || '')}
+                        onChange={() => handleSelectMatch(match._id || '')}
+                        color="error"
+                        sx={{ mt: -0.5, mr: 1 }}
+                      />
+                    )}
                     <Typography variant="h6" sx={{ fontWeight: 'bold', flex: 1 }}>
                       {typeof match.team1 === 'object' ? match.team1.name : match.team1} 
                       <Box component="span" sx={{ color: 'text.secondary', mx: 1 }}>vs</Box>
@@ -311,47 +448,28 @@ const MatchList: React.FC = () => {
                 </CardContent>
                 
                 <CardActions sx={{ pt: 0, px: 2, pb: 2 }}>
-                  <Stack direction="column" spacing={1} sx={{ width: '100%' }}>
-                    <Button 
-                      color="primary" 
+                  <Stack direction="row" spacing={1} sx={{ width: '100%' }}>
+                    <Button
                       size="medium"
                       variant="outlined"
-                      fullWidth
-                      onClick={() => navigate(`/matches/${match._id}/summary`)}
+                      startIcon={<VisibilityIcon />}
+                      onClick={() => {
+                        // Store navigation source for breadcrumb tracking
+                        sessionStorage.setItem('matchNavigationSource', 'matches');
+                        navigate(`/matches/${match._id}/overview`);
+                      }}
+                      sx={{ flex: 1 }}
                     >
-                      View Summary
+                      View Details
                     </Button>
-                    {isAdmin && match.status === 'upcoming' && (
+                    {isAdmin && (
                       <Button 
                         color="info" 
                         size="medium"
                         variant="outlined"
-                        fullWidth
                         onClick={() => handleEditOpen(match)}
                       >
-                        Edit Match
-                      </Button>
-                    )}
-                    {isAdmin && match.status === 'upcoming' && (
-                      <Button 
-                        color="success" 
-                        size="medium"
-                        variant="contained"
-                        fullWidth
-                        onClick={() => navigate(`/matches/${match._id}/live`)}
-                      >
-                        Start Match
-                      </Button>
-                    )}
-                    {isAdmin && match.status === 'in-progress' && (
-                      <Button 
-                        color="secondary" 
-                        size="medium"
-                        variant="contained"
-                        fullWidth
-                        onClick={() => navigate(`/matches/${match._id}/live`)}
-                      >
-                        Continue Match
+                        Edit
                       </Button>
                     )}
                   </Stack>
@@ -365,9 +483,19 @@ const MatchList: React.FC = () => {
           <Table>
             <TableHead>
               <TableRow>
+                {isSuperAdmin && (
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      indeterminate={selectedMatches.length > 0 && selectedMatches.length < matches.length}
+                      checked={matches.length > 0 && selectedMatches.length === matches.length}
+                      onChange={handleSelectAll}
+                      color="error"
+                    />
+                  </TableCell>
+                )}
                 <TableCell>Teams</TableCell>
                 <TableCell>Date</TableCell>
-                <TableCell>Overs</TableCell>
+                <TableCell>{isMobile ? 'O' : 'Overs'}</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell>Result</TableCell>
                 <TableCell>Actions</TableCell>
@@ -375,7 +503,21 @@ const MatchList: React.FC = () => {
             </TableHead>
             <TableBody>
               {matches.map((match) => (
-                <TableRow key={match._id}>
+                <TableRow 
+                  key={match._id}
+                  sx={{
+                    backgroundColor: selectedMatches.includes(match._id || '') ? 'rgba(244, 67, 54, 0.05)' : 'inherit'
+                  }}
+                >
+                  {isSuperAdmin && (
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        checked={selectedMatches.includes(match._id || '')}
+                        onChange={() => handleSelectMatch(match._id || '')}
+                        color="error"
+                      />
+                    </TableCell>
+                  )}
                   <TableCell>
                     {typeof match.team1 === 'object' ? match.team1.name : match.team1} vs{' '}
                     {typeof match.team2 === 'object' ? match.team2.name : match.team2}
@@ -411,38 +553,23 @@ const MatchList: React.FC = () => {
                         color="primary" 
                         size="small" 
                         variant="outlined"
-                        onClick={() => navigate(`/matches/${match._id}/summary`)}
+                        startIcon={<VisibilityIcon />}
+                        onClick={() => {
+                          // Store navigation source for breadcrumb tracking
+                          sessionStorage.setItem('matchNavigationSource', 'matches');
+                          navigate(`/matches/${match._id}/overview`);
+                        }}
                       >
-                        View Summary
+                        View Details
                       </Button>
-                      {isAdmin && match.status === 'upcoming' && (
-                        <>
-                          <Button 
-                            color="info" 
-                            size="small"
-                            variant="outlined"
-                            onClick={() => handleEditOpen(match)}
-                          >
-                            Edit
-                          </Button>
-                          <Button 
-                            color="success" 
-                            size="small"
-                            variant="contained"
-                            onClick={() => navigate(`/matches/${match._id}/live`)}
-                          >
-                            Start Match
-                          </Button>
-                        </>
-                      )}
-                      {isAdmin && match.status === 'in-progress' && (
+                      {isAdmin && (
                         <Button 
-                          color="secondary" 
+                          color="info" 
                           size="small"
-                          variant="contained"
-                          onClick={() => navigate(`/matches/${match._id}/live`)}
+                          variant="outlined"
+                          onClick={() => handleEditOpen(match)}
                         >
-                          Continue Match
+                          Edit
                         </Button>
                       )}
                     </Stack>
@@ -740,6 +867,117 @@ const MatchList: React.FC = () => {
           <Button onClick={handleEditClose}>Cancel</Button>
           <Button onClick={handleEditSubmit} variant="contained" color="primary">
             Save Changes
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* SuperAdmin Multi-Select Delete Confirmation Dialog */}
+      <Dialog 
+        open={isDeleteDialogOpen} 
+        onClose={handleDeleteDialogClose}
+        maxWidth={isMobile ? "xs" : "md"}
+        fullWidth
+        PaperProps={{
+          sx: {
+            ...(isMobile && {
+              m: 1,
+              maxHeight: '90vh'
+            })
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          color: 'error.main', 
+          fontWeight: 'bold',
+          fontSize: isMobile ? '1.1rem' : '1.25rem',
+          py: isMobile ? 1.5 : 2
+        }}>
+          ⚠️ Delete {selectedMatches.length} Match{selectedMatches.length > 1 ? 'es' : ''}?
+        </DialogTitle>
+        <DialogContent sx={{ py: isMobile ? 1 : 2 }}>
+          <Alert severity="warning" sx={{ mb: isMobile ? 2 : 3 }}>
+            <AlertTitle sx={{ fontWeight: 'bold', fontSize: isMobile ? '0.9rem' : '1rem' }}>
+              ⚠️ Permanent Deletion
+            </AlertTitle>
+            {isMobile ? (
+              <Typography variant="body2">
+                This will permanently delete {selectedMatches.length} match record{selectedMatches.length > 1 ? 's' : ''} and cannot be undone!
+              </Typography>
+            ) : (
+              <>
+                This action will permanently delete the selected {selectedMatches.length} match record(s) from the database and cannot be undone!
+                <br /><br />
+                <strong>What will be deleted:</strong>
+                <ul>
+                  <li>Selected match data (scores, statistics, players, etc.)</li>
+                  <li>All innings information for selected matches</li>
+                  <li>All ball-by-ball records for selected matches</li>
+                  <li>Related local storage backup data</li>
+                </ul>
+              </>
+            )}
+          </Alert>
+          
+          {isMobile ? (
+            <Typography variant="body2" sx={{ mb: 2, fontWeight: 'bold', textAlign: 'center' }}>
+              Type <code style={{ backgroundColor: '#fff3e0', padding: '2px 6px', borderRadius: '4px', color: '#f57c00' }}>DELETE</code> to confirm:
+            </Typography>
+          ) : (
+            <Typography variant="body1" sx={{ mb: 2, fontWeight: 'bold' }}>
+              To confirm this action, type exactly: <code style={{ backgroundColor: '#fff3e0', padding: '4px 8px', borderRadius: '4px', color: '#f57c00' }}>DELETE SELECTED MATCHES</code>
+            </Typography>
+          )}
+          
+          <TextField
+            fullWidth
+            label="Confirmation Text"
+            value={deleteConfirmText}
+            onChange={(e) => setDeleteConfirmText(e.target.value)}
+            placeholder={isMobile ? "Type: DELETE" : "Type: DELETE SELECTED MATCHES"}
+            error={deleteConfirmText !== '' && deleteConfirmText !== (isMobile ? 'DELETE' : 'DELETE SELECTED MATCHES')}
+            helperText={deleteConfirmText !== '' && deleteConfirmText !== (isMobile ? 'DELETE' : 'DELETE SELECTED MATCHES') ? 'Text must match exactly' : ''}
+            sx={{ mb: isMobile ? 1 : 2 }}
+            size={isMobile ? "small" : "medium"}
+          />
+          
+          {!isMobile && (
+            <Typography variant="body2" color="text.secondary">
+              <strong>SuperAdmin Only:</strong> Only users with superadmin privileges can perform this operation.
+              <br />
+              <strong>Selected Matches:</strong> {selectedMatches.length} of {matches.length} total matches
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ 
+          px: isMobile ? 2 : 3,
+          py: isMobile ? 1.5 : 2,
+          gap: isMobile ? 1 : 2
+        }}>
+          <Button 
+            onClick={handleDeleteDialogClose} 
+            color="primary"
+            size={isMobile ? "small" : "medium"}
+            sx={{ minWidth: isMobile ? '70px' : 'auto' }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleDeleteSelected}
+            color="error"
+            variant="contained"
+            disabled={deleteConfirmText !== (isMobile ? 'DELETE' : 'DELETE SELECTED MATCHES')}
+            startIcon={!isMobile ? <DeleteForeverIcon /> : undefined}
+            size={isMobile ? "small" : "medium"}
+            sx={{ minWidth: isMobile ? '70px' : 'auto' }}
+          >
+            {isMobile ? (
+              <>
+                <DeleteForeverIcon sx={{ mr: 0.5 }} />
+                Delete
+              </>
+            ) : (
+              `Delete ${selectedMatches.length} Match(es)`
+            )}
           </Button>
         </DialogActions>
       </Dialog>
