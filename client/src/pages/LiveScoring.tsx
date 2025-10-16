@@ -2794,7 +2794,7 @@ const LiveScoring: React.FC<Props> = () => {
             mb: 2
           }}
         >
-          🏏 Batting Scorecard
+          🏏 {isMobile ? 'Batting' : 'Batting Scorecard'}
         </Typography>
         <TableContainer 
           component={Paper} 
@@ -2814,13 +2814,13 @@ const LiveScoring: React.FC<Props> = () => {
                   fontWeight: 'bold'
                 }
               }}>
-                <TableCell>Batter</TableCell>
-                <TableCell align="right">Runs</TableCell>
-                <TableCell align="right">Balls</TableCell>
+                <TableCell>{isMobile ? 'Player' : 'Batter'}</TableCell>
+                <TableCell align="right">{isMobile ? 'R' : 'Runs'}</TableCell>
+                <TableCell align="right">{isMobile ? 'B' : 'Balls'}</TableCell>
                 <TableCell align="right">4s</TableCell>
                 <TableCell align="right">6s</TableCell>
-                <TableCell align="right">S/R</TableCell>
-                <TableCell align="center">Status</TableCell>
+                <TableCell align="right">{isMobile ? 'SR' : 'S/R'}</TableCell>
+                <TableCell align="center">{isMobile ? 'Sts' : 'Status'}</TableCell>
               </TableRow>
             </TableHead>
           <TableBody>
@@ -2903,7 +2903,7 @@ const LiveScoring: React.FC<Props> = () => {
             mb: 2
           }}
         >
-          🎯 Bowling Scorecard
+          🎯 {isMobile ? 'Bowling' : 'Bowling Scorecard'}
         </Typography>
         <TableContainer 
           component={Paper}
@@ -2923,13 +2923,13 @@ const LiveScoring: React.FC<Props> = () => {
                   fontWeight: 'bold'
                 }
               }}>
-                <TableCell>Bowler</TableCell>
-                <TableCell align="right">Overs</TableCell>
-                <TableCell align="right">Balls</TableCell>
-                <TableCell align="right">Runs</TableCell>
-                <TableCell align="right">Wickets</TableCell>
-                <TableCell align="right">Economy</TableCell>
-                <TableCell align="center">Status</TableCell>
+                <TableCell>{isMobile ? 'Player' : 'Bowler'}</TableCell>
+                <TableCell align="right">{isMobile ? 'O' : 'Overs'}</TableCell>
+                <TableCell align="right">{isMobile ? 'B' : 'Balls'}</TableCell>
+                <TableCell align="right">{isMobile ? 'R' : 'Runs'}</TableCell>
+                <TableCell align="right">{isMobile ? 'W' : 'Wickets'}</TableCell>
+                <TableCell align="right">{isMobile ? 'Eco' : 'Economy'}</TableCell>
+                <TableCell align="center">{isMobile ? 'Sts' : 'Status'}</TableCell>
               </TableRow>
             </TableHead>
           <TableBody>
@@ -2999,7 +2999,7 @@ const LiveScoring: React.FC<Props> = () => {
               mb: 2
             }}
           >
-            ⚡ Extras Summary
+            ⚡ {isMobile ? 'Extras' : 'Extras Summary'}
           </Typography>
           <Paper sx={{ 
             p: 3,
@@ -3014,7 +3014,7 @@ const LiveScoring: React.FC<Props> = () => {
                   {match.innings[currentInnings]?.extras?.wides || 0}
                 </Typography>
                 <Typography variant="body2" color="textSecondary">
-                  Wides
+                  {isMobile ? 'W' : 'Wides'}
                 </Typography>
               </Box>
               <Box sx={{ minWidth: '100px' }}>
@@ -3022,7 +3022,7 @@ const LiveScoring: React.FC<Props> = () => {
                   {match.innings[currentInnings]?.extras?.noBalls || 0}
                 </Typography>
                 <Typography variant="body2" color="textSecondary">
-                  No Balls
+                  {isMobile ? 'NB' : 'No Balls'}
                 </Typography>
               </Box>
               <Box sx={{ minWidth: '100px' }}>
@@ -3030,7 +3030,7 @@ const LiveScoring: React.FC<Props> = () => {
                   {match.innings[currentInnings]?.extras?.byes || 0}
                 </Typography>
                 <Typography variant="body2" color="textSecondary">
-                  Byes
+                  {isMobile ? 'B' : 'Byes'}
                 </Typography>
               </Box>
               <Box sx={{ minWidth: '100px' }}>
@@ -3038,7 +3038,7 @@ const LiveScoring: React.FC<Props> = () => {
                   {match.innings[currentInnings]?.extras?.legByes || 0}
                 </Typography>
                 <Typography variant="body2" color="textSecondary">
-                  Leg Byes
+                  {isMobile ? 'LB' : 'Leg Byes'}
                 </Typography>
               </Box>
               <Box sx={{ minWidth: '100px', 
@@ -3051,7 +3051,7 @@ const LiveScoring: React.FC<Props> = () => {
                   {match.innings[currentInnings]?.extras?.total || 0}
                 </Typography>
                 <Typography variant="body2">
-                  Total Extras
+                  {isMobile ? 'Total' : 'Total Extras'}
                 </Typography>
               </Box>
             </Stack>
