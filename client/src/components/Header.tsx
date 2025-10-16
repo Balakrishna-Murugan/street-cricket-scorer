@@ -14,6 +14,12 @@ import {
   useMediaQuery,
   Button,
   Divider,
+  Drawer,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  ListItemButton,
 } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { matchService } from '../services/api.service';
@@ -25,6 +31,8 @@ import GroupsIcon from '@mui/icons-material/Groups';
 import PeopleIcon from '@mui/icons-material/People';
 import SportsBaseballIcon from '@mui/icons-material/SportsBaseball';
 import ScoreboardIcon from '@mui/icons-material/Scoreboard';
+import CloseIcon from '@mui/icons-material/Close';
+import LogoutIcon from '@mui/icons-material/Logout';
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
@@ -34,6 +42,7 @@ const Header: React.FC = () => {
   
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [profileAnchorEl, setProfileAnchorEl] = useState<null | HTMLElement>(null);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [matchInfo, setMatchInfo] = useState<{ [key: string]: string }>({});
   
   // Get user role and username from localStorage
@@ -100,7 +109,11 @@ const Header: React.FC = () => {
   const breadcrumbs = generateBreadcrumbs();
 
   const handleMenuClick = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(event.currentTarget);
+    if (isMobile) {
+      setMobileDrawerOpen(true);
+    } else {
+      setAnchorEl(event.currentTarget);
+    }
   };
 
   const handleProfileClick = (event: React.MouseEvent<HTMLElement>) => {
@@ -109,6 +122,10 @@ const Header: React.FC = () => {
 
   const handleMenuClose = () => {
     setAnchorEl(null);
+  };
+
+  const handleDrawerClose = () => {
+    setMobileDrawerOpen(false);
   };
 
   const handleProfileClose = () => {
@@ -125,7 +142,10 @@ const Header: React.FC = () => {
 
   return (
     <Box>
-      <AppBar position="static">
+      <AppBar position="static" sx={{ 
+        background: 'linear-gradient(45deg, #1976d2 30%, #42a5f5 90%)',
+        boxShadow: '0 3px 5px 2px rgba(25, 118, 210, .3)',
+      }}>
         <Toolbar>
           <IconButton
             size="large"
@@ -138,129 +158,292 @@ const Header: React.FC = () => {
             <MenuIcon />
           </IconButton>
 
-          <IconButton color="inherit" onClick={() => navigate('/')}>
+          <IconButton color="inherit" onClick={() => navigate('/')} sx={{ mr: 1 }}>
             <HomeIcon />
           </IconButton>
 
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1, ml: 1 }}>
-            Street Cricket {!isAdmin && '(Viewer Mode)'}
+          <Typography 
+            variant={isMobile ? "h6" : "h5"} 
+            component="div" 
+            sx={{ 
+              flexGrow: 1, 
+              fontWeight: 'bold',
+              textShadow: '1px 1px 2px rgba(0,0,0,0.3)',
+            }}
+          >
+            {isMobile ? 'Cricket' : 'Street Cricket'} {!isAdmin && !isMobile && '(Viewer Mode)'}
           </Typography>
 
-          {/* Quick Actions for larger screens */}
-          {!isMobile && isAdmin && (
+          {/* Desktop Navigation */}
+          {!isMobile && (
             <Box sx={{ display: 'flex', gap: 1, mr: 2 }}>
+              {isAdmin && (
+                <>
+                  <Button 
+                    color="inherit" 
+                    startIcon={<GroupsIcon />}
+                    onClick={() => navigate('/teams')}
+                    sx={{ 
+                      minWidth: '100px',
+                      '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }
+                    }}
+                  >
+                    Teams
+                  </Button>
+                  <Button 
+                    color="inherit" 
+                    startIcon={<PeopleIcon />}
+                    onClick={() => navigate('/players')}
+                    sx={{ 
+                      minWidth: '100px',
+                      '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }
+                    }}
+                  >
+                    Players
+                  </Button>
+                  <Button 
+                    color="inherit" 
+                    startIcon={<SportsBaseballIcon />}
+                    onClick={() => navigate('/matches')}
+                    sx={{ 
+                      minWidth: '100px',
+                      '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }
+                    }}
+                  >
+                    Matches
+                  </Button>
+                </>
+              )}
               <Button 
                 color="inherit" 
-                startIcon={<GroupsIcon />}
-                onClick={() => navigate('/teams')}
-                size="small"
-              >
-                Teams
-              </Button>
-              <Button 
-                color="inherit" 
-                startIcon={<PeopleIcon />}
-                onClick={() => navigate('/players')}
-                size="small"
-              >
-                Players
-              </Button>
-              <Button 
-                color="inherit" 
-                startIcon={<SportsBaseballIcon />}
+                startIcon={<ScoreboardIcon />}
                 onClick={() => navigate('/matches')}
-                size="small"
+                sx={{ 
+                  minWidth: '120px',
+                  '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }
+                }}
               >
-                Matches
+                View Matches
               </Button>
             </Box>
           )}
 
-          <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
-            <Typography variant="body2" sx={{ mr: 1 }}>
-              {username} ({userRole})
-            </Typography>
+          {/* User Profile Section */}
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            {!isMobile && (
+              <Typography variant="body2" sx={{ mr: 1, fontWeight: 500 }}>
+                {username} ({userRole})
+              </Typography>
+            )}
             <IconButton color="inherit" onClick={handleProfileClick}>
-              <Avatar sx={{ width: 32, height: 32, bgcolor: isAdmin ? 'secondary.main' : 'warning.main' }}>
+              <Avatar sx={{ 
+                width: 36, 
+                height: 36, 
+                bgcolor: isAdmin ? 'secondary.main' : 'warning.main',
+                border: '2px solid rgba(255,255,255,0.3)' 
+              }}>
                 <AccountCircleIcon />
               </Avatar>
             </IconButton>
           </Box>
-
-          {/* Navigation Menu */}
-          <Menu
-            anchorEl={anchorEl}
-            open={Boolean(anchorEl)}
-            onClose={handleMenuClose}
-          >
-            {isAdmin && (
-              <>
-                <MenuItem onClick={() => { navigate('/teams'); handleMenuClose(); }}>
-                  <GroupsIcon sx={{ mr: 1 }} /> Teams
-                </MenuItem>
-                <MenuItem onClick={() => { navigate('/players'); handleMenuClose(); }}>
-                  <PeopleIcon sx={{ mr: 1 }} /> Players
-                </MenuItem>
-                <MenuItem onClick={() => { navigate('/matches'); handleMenuClose(); }}>
-                  <SportsBaseballIcon sx={{ mr: 1 }} /> Matches
-                </MenuItem>
-                <Divider />
-              </>
-            )}
-            <MenuItem onClick={() => { navigate('/matches'); handleMenuClose(); }}>
-              <ScoreboardIcon sx={{ mr: 1 }} /> View Matches
-            </MenuItem>
-          </Menu>
-
-          {/* Profile Menu */}
-          <Menu
-            anchorEl={profileAnchorEl}
-            open={Boolean(profileAnchorEl)}
-            onClose={handleProfileClose}
-          >
-            <MenuItem onClick={handleLogout}>Logout</MenuItem>
-          </Menu>
         </Toolbar>
       </AppBar>
 
-      {/* Breadcrumbs Bar */}
-      <Box sx={{ 
-        bgcolor: 'grey.100', 
-        py: 1, 
-        px: 2, 
-        borderBottom: 1, 
-        borderColor: 'divider' 
-      }}>
-        <Breadcrumbs 
-          separator={<NavigateNextIcon fontSize="small" />}
-          aria-label="breadcrumb"
-          sx={{ fontSize: '0.875rem' }}
+      {/* Mobile Drawer Navigation */}
+      <Drawer
+        anchor="left"
+        open={mobileDrawerOpen}
+        onClose={handleDrawerClose}
+        sx={{
+          '& .MuiDrawer-paper': {
+            width: 280,
+            background: 'linear-gradient(180deg, #f5f5f5 0%, #e3f2fd 100%)',
+          },
+        }}
+      >
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          p: 2,
+          bgcolor: 'primary.main',
+          color: 'white'
+        }}>
+          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+            Menu
+          </Typography>
+          <IconButton 
+            color="inherit" 
+            onClick={handleDrawerClose}
+            sx={{ p: 1 }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </Box>
+        
+        <List sx={{ pt: 0 }}>
+          {/* User Info */}
+          <ListItem sx={{ bgcolor: 'rgba(25, 118, 210, 0.1)', py: 2 }}>
+            <ListItemIcon>
+              <Avatar sx={{ 
+                bgcolor: isAdmin ? 'secondary.main' : 'warning.main',
+                width: 40,
+                height: 40 
+              }}>
+                <AccountCircleIcon />
+              </Avatar>
+            </ListItemIcon>
+            <ListItemText 
+              primary={username}
+              secondary={`${userRole}${!isAdmin ? ' (View Only)' : ''}`}
+              primaryTypographyProps={{ fontWeight: 'bold' }}
+            />
+          </ListItem>
+          
+          <Divider />
+          
+          {/* Navigation Items */}
+          <ListItemButton onClick={() => { navigate('/'); handleDrawerClose(); }}>
+            <ListItemIcon><HomeIcon color="primary" /></ListItemIcon>
+            <ListItemText primary="Home" />
+          </ListItemButton>
+          
+          {isAdmin && (
+            <>
+              <ListItemButton onClick={() => { navigate('/teams'); handleDrawerClose(); }}>
+                <ListItemIcon><GroupsIcon color="primary" /></ListItemIcon>
+                <ListItemText primary="Teams" />
+              </ListItemButton>
+              
+              <ListItemButton onClick={() => { navigate('/players'); handleDrawerClose(); }}>
+                <ListItemIcon><PeopleIcon color="primary" /></ListItemIcon>
+                <ListItemText primary="Players" />
+              </ListItemButton>
+              
+              <ListItemButton onClick={() => { navigate('/matches'); handleDrawerClose(); }}>
+                <ListItemIcon><SportsBaseballIcon color="primary" /></ListItemIcon>
+                <ListItemText primary="Matches" />
+              </ListItemButton>
+              
+              <Divider />
+            </>
+          )}
+          
+          <ListItemButton onClick={() => { navigate('/matches'); handleDrawerClose(); }}>
+            <ListItemIcon><ScoreboardIcon color="primary" /></ListItemIcon>
+            <ListItemText primary="View Matches" />
+          </ListItemButton>
+          
+          <Divider />
+          
+          <ListItemButton onClick={handleLogout} sx={{ color: 'error.main' }}>
+            <ListItemIcon><LogoutIcon color="error" /></ListItemIcon>
+            <ListItemText primary="Logout" />
+          </ListItemButton>
+        </List>
+      </Drawer>
+
+      {/* Desktop Menu (for smaller desktop screens) */}
+      {!isMobile && (
+        <Menu
+          anchorEl={anchorEl}
+          open={Boolean(anchorEl)}
+          onClose={handleMenuClose}
         >
-          {breadcrumbs.map((crumb, index) => (
-            index === breadcrumbs.length - 1 ? (
-              <Typography key={crumb.path} color="text.primary" fontSize="inherit">
-                {crumb.label}
-              </Typography>
-            ) : (
-              <Link
-                key={crumb.path}
-                color="inherit"
-                onClick={() => navigate(crumb.path)}
-                sx={{ 
-                  cursor: 'pointer',
-                  textDecoration: 'none',
-                  '&:hover': {
-                    textDecoration: 'underline'
+          {isAdmin && (
+            <>
+              <MenuItem onClick={() => { navigate('/teams'); handleMenuClose(); }}>
+                <GroupsIcon sx={{ mr: 1 }} /> Teams
+              </MenuItem>
+              <MenuItem onClick={() => { navigate('/players'); handleMenuClose(); }}>
+                <PeopleIcon sx={{ mr: 1 }} /> Players
+              </MenuItem>
+              <MenuItem onClick={() => { navigate('/matches'); handleMenuClose(); }}>
+                <SportsBaseballIcon sx={{ mr: 1 }} /> Matches
+              </MenuItem>
+              <Divider />
+            </>
+          )}
+          <MenuItem onClick={() => { navigate('/matches'); handleMenuClose(); }}>
+            <ScoreboardIcon sx={{ mr: 1 }} /> View Matches
+          </MenuItem>
+        </Menu>
+      )}
+
+      {/* Profile Menu */}
+      <Menu
+        anchorEl={profileAnchorEl}
+        open={Boolean(profileAnchorEl)}
+        onClose={handleProfileClose}
+        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+      >
+        {isMobile && (
+          <MenuItem disabled>
+            <Typography variant="body2" color="textSecondary">
+              {username} ({userRole})
+            </Typography>
+          </MenuItem>
+        )}
+        <MenuItem onClick={handleLogout}>
+          <LogoutIcon sx={{ mr: 1 }} /> Logout
+        </MenuItem>
+      </Menu>
+
+      {/* Breadcrumbs Bar - Hide on mobile for LiveScoring page */}
+      {!(isMobile && location.pathname.includes('/live')) && (
+        <Box sx={{ 
+          bgcolor: 'grey.50', 
+          py: isMobile ? 0.5 : 1, 
+          px: 2, 
+          borderBottom: 1, 
+          borderColor: 'divider',
+          minHeight: isMobile ? '32px' : '40px',
+          display: 'flex',
+          alignItems: 'center'
+        }}>
+          <Breadcrumbs 
+            separator={<NavigateNextIcon fontSize="small" />}
+            aria-label="breadcrumb"
+            sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }}
+          >
+            {breadcrumbs.map((crumb, index) => (
+              index === breadcrumbs.length - 1 ? (
+                <Typography 
+                  key={crumb.path} 
+                  color="text.primary" 
+                  fontSize="inherit"
+                  sx={{ fontWeight: 500 }}
+                >
+                  {isMobile && crumb.label.length > 15 
+                    ? `${crumb.label.substring(0, 15)}...` 
+                    : crumb.label
                   }
-                }}
-                fontSize="inherit"
-              >
-                {crumb.label}
-              </Link>
-            )
-          ))}
-        </Breadcrumbs>
-      </Box>
+                </Typography>
+              ) : (
+                <Link
+                  key={crumb.path}
+                  color="inherit"
+                  onClick={() => navigate(crumb.path)}
+                  sx={{ 
+                    cursor: 'pointer',
+                    textDecoration: 'none',
+                    '&:hover': {
+                      textDecoration: 'underline'
+                    }
+                  }}
+                  fontSize="inherit"
+                >
+                  {isMobile && crumb.label.length > 12 
+                    ? `${crumb.label.substring(0, 12)}...` 
+                    : crumb.label
+                  }
+                </Link>
+              )
+            ))}
+          </Breadcrumbs>
+        </Box>
+      )}
     </Box>
   );
 };
