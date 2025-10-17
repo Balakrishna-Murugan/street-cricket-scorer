@@ -129,7 +129,7 @@ const MatchDetails: React.FC<MatchDetailsProps> = ({
                 {(players.find(p => p._id === striker)?.name || 'Striker').split(' ')[0]} * {strikerStats.runs}({strikerStats.balls})
               </Typography>
             </Box>
-            <Box sx={{ flex: 1, textAlign: 'center' }}>
+            <Box sx={{ flex: 1, textAlign: 'right' }}>
               <Typography variant="caption" sx={{ fontSize: '0.7rem' }}>
                 {(players.find(p => p._id === nonStriker)?.name || 'Non-striker').split(' ')[0]} {nonStrikerStats.runs}({nonStrikerStats.balls})
               </Typography>

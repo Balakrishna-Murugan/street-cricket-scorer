@@ -2688,7 +2688,7 @@ const LiveScoring: React.FC<Props> = () => {
       )}
 
       {/* Scoring Buttons */}
-      <Box sx={{ mb: isMobile ? 2 : 3 }}>
+      <Box sx={{ mb: isMobile ? 1.5 : 3 }}>
         <Typography 
           variant={isMobile ? "body1" : "h6"} 
           gutterBottom 
@@ -2696,7 +2696,8 @@ const LiveScoring: React.FC<Props> = () => {
             color: '#2c3e50',
             fontWeight: 'bold',
             textShadow: '1px 1px 2px rgba(0,0,0,0.1)',
-            mb: isMobile ? 1 : 2
+            mb: isMobile ? 0.5 : 2,
+            fontSize: isMobile ? '0.9rem' : undefined
           }}
         >
           🎯 Quick Scoring
@@ -2705,7 +2706,7 @@ const LiveScoring: React.FC<Props> = () => {
           sx={{ 
             display: 'grid',
             gridTemplateColumns: isMobile ? 'repeat(4, 1fr)' : 'repeat(6, 1fr)',
-            gap: isMobile ? 1 : 2
+            gap: isMobile ? 0.5 : 2
           }}
         >
           {[0, 1, 2, 3, 4, 6].map((runs) => (
@@ -2715,20 +2716,20 @@ const LiveScoring: React.FC<Props> = () => {
               onClick={() => handleBallOutcome(runs)}
               disabled={!isAdmin || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
               sx={{
-                minHeight: isMobile ? '40px' : '60px',
-                borderRadius: isMobile ? '8px' : '12px',
-                fontSize: isMobile ? '1rem' : '1.5rem',
+                minHeight: isMobile ? '35px' : '60px',
+                borderRadius: isMobile ? '6px' : '12px',
+                fontSize: isMobile ? '0.9rem' : '1.5rem',
                 fontWeight: 'bold',
                 background: runs === 0 
                   ? 'linear-gradient(45deg, #666 30%, #999 90%)'
                   : runs >= 4 
                     ? 'linear-gradient(45deg, #FF6B6B 30%, #FF5722 90%)'
                     : 'linear-gradient(45deg, #4CAF50 30%, #8BC34A 90%)',
-                boxShadow: isMobile ? '0 2px 4px rgba(0,0,0,0.2)' : '0 4px 8px rgba(0,0,0,0.2)',
+                boxShadow: isMobile ? '0 1px 3px rgba(0,0,0,0.2)' : '0 4px 8px rgba(0,0,0,0.2)',
                 transition: 'all 0.3s ease',
                 '&:hover': {
                   transform: isMobile ? 'scale(0.98)' : 'translateY(-2px)',
-                  boxShadow: isMobile ? '0 4px 8px rgba(0,0,0,0.3)' : '0 6px 12px rgba(0,0,0,0.3)',
+                  boxShadow: isMobile ? '0 2px 6px rgba(0,0,0,0.3)' : '0 6px 12px rgba(0,0,0,0.3)',
                 },
                 '&:active': {
                   transform: 'translateY(0)',
@@ -2748,16 +2749,16 @@ const LiveScoring: React.FC<Props> = () => {
             onClick={() => setIsWicketDialogOpen(true)}
             disabled={!isAdmin || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
             sx={{
-              minHeight: isMobile ? '40px' : '60px',
-              borderRadius: isMobile ? '8px' : '12px',
-              fontSize: isMobile ? '1rem' : '1.5rem',
+              minHeight: isMobile ? '35px' : '60px',
+              borderRadius: isMobile ? '6px' : '12px',
+              fontSize: isMobile ? '0.9rem' : '1.5rem',
               fontWeight: 'bold',
               background: 'linear-gradient(45deg, #f44336 30%, #d32f2f 90%)',
-              boxShadow: isMobile ? '0 2px 4px rgba(244, 67, 54, 0.3)' : '0 4px 8px rgba(244, 67, 54, 0.3)',
+              boxShadow: isMobile ? '0 1px 3px rgba(244, 67, 54, 0.3)' : '0 4px 8px rgba(244, 67, 54, 0.3)',
               transition: 'all 0.3s ease',
               '&:hover': {
                 transform: isMobile ? 'scale(0.98)' : 'translateY(-2px)',
-                boxShadow: isMobile ? '0 4px 8px rgba(244, 67, 54, 0.4)' : '0 6px 12px rgba(244, 67, 54, 0.4)',
+                boxShadow: isMobile ? '0 2px 6px rgba(244, 67, 54, 0.4)' : '0 6px 12px rgba(244, 67, 54, 0.4)',
                 background: 'linear-gradient(45deg, #d32f2f 30%, #b71c1c 90%)',
               },
               '&:active': {
@@ -2771,7 +2772,7 @@ const LiveScoring: React.FC<Props> = () => {
       </Box>
 
       {/* Extras Buttons */}
-      <Box sx={{ mb: isMobile ? 2 : 3 }}>
+      <Box sx={{ mb: isMobile ? 1.5 : 3 }}>
         <Typography 
           variant={isMobile ? "body1" : "h6"} 
           gutterBottom 
@@ -2779,7 +2780,8 @@ const LiveScoring: React.FC<Props> = () => {
             color: '#2c3e50',
             fontWeight: 'bold',
             textShadow: '1px 1px 2px rgba(0,0,0,0.1)',
-            mb: isMobile ? 1 : 2
+            mb: isMobile ? 0.5 : 2,
+            fontSize: isMobile ? '0.9rem' : undefined
           }}
         >
           ⚡ Extras
@@ -2788,7 +2790,7 @@ const LiveScoring: React.FC<Props> = () => {
           sx={{ 
             display: 'grid',
             gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
-            gap: isMobile ? 1 : 2
+            gap: isMobile ? 0.5 : 2
           }}
         >
           <Button 
@@ -2800,10 +2802,10 @@ const LiveScoring: React.FC<Props> = () => {
             }}
             disabled={!isAdmin || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
             sx={{
-              minHeight: isMobile ? '36px' : '50px',
-              borderRadius: isMobile ? '8px' : '10px',
+              minHeight: isMobile ? '32px' : '50px',
+              borderRadius: isMobile ? '6px' : '10px',
               fontWeight: 'bold',
-              fontSize: isMobile ? '0.85rem' : '1rem',
+              fontSize: isMobile ? '0.75rem' : '1rem',
               color: '#FF9800',
               borderColor: '#FFB74D',
               background: 'rgba(255, 183, 77, 0.1)',
@@ -2814,7 +2816,7 @@ const LiveScoring: React.FC<Props> = () => {
                 borderColor: '#FFA726',
                 color: '#fff',
                 transform: isMobile ? 'scale(0.98)' : 'translateY(-1px)',
-                boxShadow: isMobile ? '0 2px 4px rgba(255, 183, 77, 0.3)' : '0 4px 8px rgba(255, 183, 77, 0.3)',
+                boxShadow: isMobile ? '0 1px 3px rgba(255, 183, 77, 0.3)' : '0 4px 8px rgba(255, 183, 77, 0.3)',
               },
               '&:disabled': {
                 color: 'rgba(255, 152, 0, 0.5)',
@@ -2833,10 +2835,10 @@ const LiveScoring: React.FC<Props> = () => {
             }}
             disabled={!isAdmin || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
             sx={{
-              minHeight: isMobile ? '36px' : '50px',
-              borderRadius: isMobile ? '8px' : '10px',
+              minHeight: isMobile ? '32px' : '50px',
+              borderRadius: isMobile ? '6px' : '10px',
               fontWeight: 'bold',
-              fontSize: isMobile ? '0.85rem' : '1rem',
+              fontSize: isMobile ? '0.75rem' : '1rem',
               color: '#FF5722',
               borderColor: '#FF8A65',
               background: 'rgba(255, 138, 101, 0.1)',
@@ -2847,7 +2849,7 @@ const LiveScoring: React.FC<Props> = () => {
                 borderColor: '#FF7043',
                 color: '#fff',
                 transform: isMobile ? 'scale(0.98)' : 'translateY(-1px)',
-                boxShadow: isMobile ? '0 2px 4px rgba(255, 138, 101, 0.3)' : '0 4px 8px rgba(255, 138, 101, 0.3)',
+                boxShadow: isMobile ? '0 1px 3px rgba(255, 138, 101, 0.3)' : '0 4px 8px rgba(255, 138, 101, 0.3)',
               },
               '&:disabled': {
                 color: 'rgba(255, 87, 34, 0.5)',
@@ -2866,10 +2868,10 @@ const LiveScoring: React.FC<Props> = () => {
             }}
             disabled={!isAdmin || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
             sx={{
-              minHeight: isMobile ? '36px' : '50px',
-              borderRadius: isMobile ? '8px' : '10px',
+              minHeight: isMobile ? '32px' : '50px',
+              borderRadius: isMobile ? '6px' : '10px',
               fontWeight: 'bold',
-              fontSize: isMobile ? '0.85rem' : '1rem',
+              fontSize: isMobile ? '0.75rem' : '1rem',
               color: '#4CAF50',
               borderColor: '#81C784',
               background: 'rgba(129, 199, 132, 0.1)',
@@ -2880,7 +2882,7 @@ const LiveScoring: React.FC<Props> = () => {
                 borderColor: '#66BB6A',
                 color: '#fff',
                 transform: isMobile ? 'scale(0.98)' : 'translateY(-1px)',
-                boxShadow: isMobile ? '0 2px 4px rgba(129, 199, 132, 0.3)' : '0 4px 8px rgba(129, 199, 132, 0.3)',
+                boxShadow: isMobile ? '0 1px 3px rgba(129, 199, 132, 0.3)' : '0 4px 8px rgba(129, 199, 132, 0.3)',
               },
               '&:disabled': {
                 color: 'rgba(76, 175, 80, 0.5)',
@@ -2899,10 +2901,10 @@ const LiveScoring: React.FC<Props> = () => {
             }}
             disabled={!isAdmin || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
             sx={{
-              minHeight: isMobile ? '36px' : '50px',
-              borderRadius: isMobile ? '8px' : '10px',
+              minHeight: isMobile ? '32px' : '50px',
+              borderRadius: isMobile ? '6px' : '10px',
               fontWeight: 'bold',
-              fontSize: isMobile ? '0.85rem' : '1rem',
+              fontSize: isMobile ? '0.75rem' : '1rem',
               color: '#9C27B0',
               borderColor: '#9575CD',
               background: 'rgba(149, 117, 205, 0.1)',
@@ -2913,7 +2915,7 @@ const LiveScoring: React.FC<Props> = () => {
                 borderColor: '#7E57C2',
                 color: '#fff',
                 transform: isMobile ? 'scale(0.98)' : 'translateY(-1px)',
-                boxShadow: isMobile ? '0 2px 4px rgba(149, 117, 205, 0.3)' : '0 4px 8px rgba(149, 117, 205, 0.3)',
+                boxShadow: isMobile ? '0 1px 3px rgba(149, 117, 205, 0.3)' : '0 4px 8px rgba(149, 117, 205, 0.3)',
               },
               '&:disabled': {
                 color: 'rgba(156, 39, 176, 0.5)',
@@ -2984,10 +2986,10 @@ const LiveScoring: React.FC<Props> = () => {
                 statusDisplay = `${stat.dismissalType || 'Out'}${stat.howOut ? ` (${stat.howOut})` : ''}`;
                 statusColor = 'error.main';
               } else if (playerId === striker) {
-                statusDisplay = isMobile ? '🏏*' : 'Batting*';
+                statusDisplay = isMobile ? '' : 'Batting*';
                 statusColor = 'success.main';
               } else if (playerId === nonStriker) {
-                statusDisplay = isMobile ? '🏏' : 'Batting';
+                statusDisplay = isMobile ? '' : 'Batting';
                 statusColor = 'primary.main';
               } else {
                 statusDisplay = isMobile ? '✓' : 'Not Out';
@@ -3111,7 +3113,7 @@ const LiveScoring: React.FC<Props> = () => {
               let statusColor = 'inherit';
               
               if (playerId === bowler) {
-                statusDisplay = isMobile ? '🎯*' : 'Bowling*';
+                statusDisplay = isMobile ? '' : 'Bowling*';
                 statusColor = 'success.main';
               } else if (stat.lastBowledOver !== undefined) {
                 statusDisplay = isMobile ? `O${stat.lastBowledOver + 1}` : `Last: Over ${stat.lastBowledOver + 1}`;
