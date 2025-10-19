@@ -24,19 +24,24 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({ match }) => {
     return (
       <Paper sx={{ 
         p: isMobile ? 2 : 3, 
-        borderRadius: isMobile ? 2 : 3, 
-        background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' 
+        borderRadius: 2, 
+        background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
+        boxShadow: '0 8px 32px rgba(2, 14, 67, 0.3)'
       }}>
         <Typography 
           variant={isMobile ? 'subtitle1' : 'h6'} 
           gutterBottom 
-          sx={{ color: '#2c3e50', fontWeight: 'bold' }}
+          sx={{ 
+            color: 'white', 
+            fontWeight: 'bold',
+            textShadow: '2px 2px 4px rgba(0,0,0,0.3)'
+          }}
         >
           🏏 Live Commentary
         </Typography>
         <Typography 
           variant={isMobile ? 'body2' : 'body1'} 
-          color="text.secondary"
+          sx={{ color: 'rgba(255, 255, 255, 0.9)' }}
         >
           {match?.status === 'upcoming' && 'Match has not started yet. Live commentary will appear once the match begins.'}
           {match?.status === 'completed' && 'Match completed. Live commentary is only available during active matches.'}
@@ -51,19 +56,24 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({ match }) => {
     return (
       <Paper sx={{ 
         p: isMobile ? 2 : 3, 
-        borderRadius: isMobile ? 2 : 3, 
-        background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' 
+        borderRadius: 2, 
+        background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
+        boxShadow: '0 8px 32px rgba(2, 14, 67, 0.3)'
       }}>
         <Typography 
           variant={isMobile ? 'subtitle1' : 'h6'} 
           gutterBottom 
-          sx={{ color: '#2c3e50', fontWeight: 'bold' }}
+          sx={{ 
+            color: 'white', 
+            fontWeight: 'bold',
+            textShadow: '2px 2px 4px rgba(0,0,0,0.3)'
+          }}
         >
           🏏 Live Commentary
         </Typography>
         <Typography 
           variant={isMobile ? 'body2' : 'body1'} 
-          color="text.secondary"
+          sx={{ color: 'rgba(255, 255, 255, 0.9)' }}
         >
           Match is in progress but no innings data available yet.
         </Typography>
@@ -80,19 +90,24 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({ match }) => {
     return (
       <Paper sx={{ 
         p: isMobile ? 2 : 3, 
-        borderRadius: isMobile ? 2 : 3, 
-        background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' 
+        borderRadius: 2, 
+        background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
+        boxShadow: '0 8px 32px rgba(2, 14, 67, 0.3)'
       }}>
         <Typography 
           variant={isMobile ? 'subtitle1' : 'h6'} 
           gutterBottom 
-          sx={{ color: '#2c3e50', fontWeight: 'bold' }}
+          sx={{ 
+            color: 'white', 
+            fontWeight: 'bold',
+            textShadow: '2px 2px 4px rgba(0,0,0,0.3)'
+          }}
         >
           🏏 Live Commentary
         </Typography>
         <Typography 
           variant={isMobile ? 'body2' : 'body1'} 
-          color="text.secondary"
+          sx={{ color: 'rgba(255, 255, 255, 0.9)' }}
         >
           No active innings data available.
         </Typography>
@@ -144,17 +159,19 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({ match }) => {
   return (
     <Paper sx={{ 
       p: isMobile ? 2 : 3, 
-      borderRadius: isMobile ? 2 : 3, 
-      background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' 
+      borderRadius: 2, 
+      background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
+      boxShadow: '0 8px 32px rgba(2, 14, 67, 0.3)'
     }}>
       <Typography 
         variant={isMobile ? 'subtitle1' : 'h6'} 
         gutterBottom 
         sx={{ 
-          color: '#2c3e50', 
+          color: 'white', 
           fontWeight: 'bold', 
           mb: isMobile ? 2 : 3,
-          fontSize: isMobile ? '1rem' : '1.25rem'
+          fontSize: isMobile ? '1rem' : '1.25rem',
+          textShadow: '2px 2px 4px rgba(0,0,0,0.3)'
         }}
       >
         🏏 Live Commentary
@@ -166,9 +183,10 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({ match }) => {
           variant={isMobile ? 'subtitle1' : 'h6'} 
           sx={{ 
             fontWeight: 'bold', 
-            color: currentInningsIndex === 0 ? '#1976d2' : '#9c27b0',
+            color: 'white',
             mb: isMobile ? 1.5 : 2,
-            fontSize: isMobile ? '0.95rem' : '1.25rem'
+            fontSize: isMobile ? '0.95rem' : '1.25rem',
+            textShadow: '1px 1px 2px rgba(0,0,0,0.3)'
           }}
         >
           {battingTeamName} - {inningsNumber === 1 ? '1st' : '2nd'} Innings
@@ -179,7 +197,15 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({ match }) => {
             sx={{ 
               ml: isMobile ? 1 : 2, 
               fontWeight: 'bold',
-              fontSize: isMobile ? '0.65rem' : '0.75rem'
+              fontSize: isMobile ? '0.65rem' : '0.75rem',
+              backgroundColor: '#4caf50',
+              color: 'white',
+              boxShadow: '0 2px 8px rgba(76, 175, 80, 0.4)',
+              animation: 'pulse 2s ease-in-out infinite',
+              '@keyframes pulse': {
+                '0%, 100%': { opacity: 1 },
+                '50%': { opacity: 0.7 }
+              }
             }}
           />
         </Typography>
@@ -196,33 +222,138 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({ match }) => {
         >
           <Chip 
             label={`${currentInnings.totalRuns}/${currentInnings.wickets}`}
-            color="primary"
-            size={isMobile ? 'small' : 'medium'}
             sx={{ 
               fontWeight: 'bold',
-              fontSize: isMobile ? '0.75rem' : '0.875rem'
+              fontSize: isMobile ? '0.75rem' : '0.875rem',
+              backgroundColor: 'white',
+              color: '#020e43',
+              boxShadow: '0 2px 8px rgba(255,255,255,0.3)'
             }}
           />
           <Chip 
-            label={`${Math.floor(currentInnings.balls / 6)}.${currentInnings.balls % 6} overs`}
-            variant="outlined"
-            size={isMobile ? 'small' : 'medium'}
+            label={`${Math.floor(currentInnings.balls / 6)}${currentInnings.balls % 6 > 0 ? `.${currentInnings.balls % 6}` : ''} overs`}
             sx={{
-              fontSize: isMobile ? '0.75rem' : '0.875rem'
+              fontSize: isMobile ? '0.75rem' : '0.875rem',
+              backgroundColor: 'rgba(255, 255, 255, 0.2)',
+              color: 'white',
+              border: '1px solid rgba(255, 255, 255, 0.3)'
             }}
           />
           {currentInnings.runRate && (
             <Chip 
               label={`RR: ${currentInnings.runRate.toFixed(2)}`}
-              variant="outlined"
-              color="secondary"
-              size={isMobile ? 'small' : 'medium'}
               sx={{
-                fontSize: isMobile ? '0.75rem' : '0.875rem'
+                fontSize: isMobile ? '0.75rem' : '0.875rem',
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                color: 'white',
+                border: '1px solid rgba(255, 255, 255, 0.3)'
               }}
             />
           )}
         </Stack>
+        
+        {/* Fall of Wickets */}
+        {(() => {
+          const fallOfWickets = currentInnings.battingStats
+            .filter(stat => stat.isOut)
+            .map((stat, index) => {
+              const playerName = typeof stat.player === 'object' ? 
+                stat.player.name : 
+                'Player';
+              
+              // Calculate runs at this wicket
+              let runsAtWicket = 0;
+              for (let i = 0; i <= currentInnings.battingStats.indexOf(stat); i++) {
+                runsAtWicket += currentInnings.battingStats[i].runs || 0;
+              }
+              
+              return {
+                wicketNumber: index + 1,
+                playerName,
+                runs: stat.runs,
+                totalRuns: runsAtWicket,
+                dismissalType: stat.dismissalType || 'out'
+              };
+            });
+
+          if (fallOfWickets.length > 0) {
+            return (
+              <Box sx={{ 
+                mb: 2, 
+                p: 2, 
+                bgcolor: 'rgba(255,255,255,0.95)', 
+                borderRadius: 2,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                border: '1px solid rgba(255,255,255,0.3)'
+              }}>
+                <Typography 
+                  variant="subtitle2" 
+                  sx={{ 
+                    color: '#020e43', 
+                    fontWeight: 'bold', 
+                    mb: 1.5, 
+                    fontSize: isMobile ? '0.85rem' : '0.95rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1
+                  }}
+                >
+                  📉 Fall of Wickets
+                </Typography>
+                <Stack spacing={1}>
+                  {fallOfWickets.map((wicket: { wicketNumber: number; playerName: string; runs: number; totalRuns: number; dismissalType: string }) => (
+                    <Box
+                      key={wicket.wicketNumber}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1.5,
+                        p: 1,
+                        bgcolor: wicket.wicketNumber % 2 === 0 ? 'rgba(240, 240, 240, 0.5)' : 'transparent',
+                        borderRadius: 1,
+                        borderLeft: '3px solid #d32f2f',
+                      }}
+                    >
+                      <Chip
+                        label={`${wicket.totalRuns}/${wicket.wicketNumber}`}
+                        size="small"
+                        sx={{
+                          bgcolor: '#d32f2f',
+                          color: 'white',
+                          fontWeight: 'bold',
+                          fontSize: isMobile ? '0.7rem' : '0.75rem',
+                          minWidth: '50px'
+                        }}
+                      />
+                      <Box>
+                        <Typography 
+                          variant="body2" 
+                          sx={{ 
+                            fontWeight: 600,
+                            fontSize: isMobile ? '0.75rem' : '0.85rem',
+                            color: '#1a1a2e'
+                          }}
+                        >
+                          {wicket.playerName}
+                        </Typography>
+                        <Typography 
+                          variant="caption" 
+                          sx={{ 
+                            color: '#666',
+                            fontSize: isMobile ? '0.65rem' : '0.7rem'
+                          }}
+                        >
+                          {wicket.runs} runs • {wicket.dismissalType}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  ))}
+                </Stack>
+              </Box>
+            );
+          }
+          return null;
+        })()}
         
         {/* Ball Commentary */}
         {allBalls.length > 0 ? (
@@ -238,12 +369,13 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({ match }) => {
             {/* Debug information for troubleshooting */}
             <Typography variant="body2" sx={{ 
               fontStyle: 'italic', 
-              color: '#666',
+              color: 'rgba(255, 255, 255, 0.9)',
               textAlign: 'center',
               py: 3,
-              bgcolor: 'rgba(255,255,255,0.7)',
+              bgcolor: 'rgba(255,255,255,0.1)',
               borderRadius: 2,
-              mb: 2
+              mb: 2,
+              border: '1px solid rgba(255, 255, 255, 0.2)'
             }}>
               {currentInnings.balls > 0 
                 ? `${currentInnings.balls} balls bowled - Ball-by-ball commentary will appear when scoring new balls in Live Scoring`
@@ -256,7 +388,7 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({ match }) => {
               <Typography variant="caption" sx={{ 
                 display: 'block',
                 textAlign: 'center',
-                color: '#999',
+                color: 'rgba(255, 255, 255, 0.6)',
                 fontFamily: 'monospace',
                 mb: 1
               }}>
@@ -269,8 +401,20 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({ match }) => {
 
       {/* Match Result */}
       {match.result && (
-        <Box sx={{ mt: 3, p: 2, bgcolor: 'success.light', borderRadius: 2 }}>
-          <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'success.dark', textAlign: 'center' }}>
+        <Box sx={{ 
+          mt: 3, 
+          p: 2, 
+          background: 'linear-gradient(135deg, rgba(76, 175, 80, 0.2) 0%, rgba(139, 195, 74, 0.2) 100%)', 
+          borderRadius: 2,
+          border: '2px solid rgba(76, 175, 80, 0.5)',
+          boxShadow: '0 4px 16px rgba(76, 175, 80, 0.3)'
+        }}>
+          <Typography variant="h6" sx={{ 
+            fontWeight: 'bold', 
+            color: 'white', 
+            textAlign: 'center',
+            textShadow: '2px 2px 4px rgba(0,0,0,0.3)'
+          }}>
             🏆 {match.result}
           </Typography>
         </Box>

@@ -147,18 +147,39 @@ const BallCommentary: React.FC<BallCommentaryProps> = ({
       </Stack>
 
       {/* Recent ball commentary */}
-      <Box sx={{ mt: 2, p: 2, bgcolor: 'rgba(255,255,255,0.5)', borderRadius: 2 }}>
-        <Typography variant="caption" sx={{ color: '#888', fontWeight: 'bold', mb: 1, display: 'block' }}>
-          Recent Balls:
+      <Box sx={{ 
+        mt: 2, 
+        p: 2, 
+        bgcolor: 'rgba(255,255,255,0.95)', 
+        borderRadius: 2,
+        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+        border: '1px solid rgba(255,255,255,0.3)'
+      }}>
+        <Typography variant="caption" sx={{ 
+          color: '#020e43', 
+          fontWeight: 'bold', 
+          mb: 1.5, 
+          display: 'block',
+          fontSize: '0.85rem',
+          letterSpacing: '0.5px'
+        }}>
+          📝 Recent Balls:
         </Typography>
         {balls.slice(-3).map((ball, index) => (
           <Typography 
             key={index} 
             variant="body2" 
             sx={{ 
-              color: '#555', 
-              mb: 0.5,
-              fontSize: '0.875rem'
+              color: '#1a1a2e', 
+              mb: 1,
+              fontSize: '0.95rem',
+              fontWeight: 500,
+              lineHeight: 1.6,
+              padding: '6px 12px',
+              bgcolor: index === balls.slice(-3).length - 1 ? 'rgba(2, 14, 67, 0.05)' : 'transparent',
+              borderRadius: 1,
+              borderLeft: '3px solid',
+              borderLeftColor: ball.isWicket ? '#d32f2f' : ball.runs >= 4 ? '#4caf50' : 'rgba(2, 14, 67, 0.2)'
             }}
           >
             {generateSimpleCommentary(ball, balls.length - 3 + index)}

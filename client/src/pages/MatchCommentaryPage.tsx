@@ -100,7 +100,17 @@ const MatchCommentaryPage: React.FC = () => {
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
       {/* Header with Navigation */}
-      <Paper elevation={2} sx={{ p: isMobile ? 2 : 3, mb: 3, background: 'linear-gradient(45deg, #1976d2 30%, #42a5f5 90%)', color: 'white' }}>
+      <Paper 
+        elevation={3} 
+        sx={{ 
+          p: isMobile ? 2 : 3, 
+          mb: 3, 
+          background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)', 
+          color: 'white',
+          borderRadius: 2,
+          boxShadow: '0 8px 32px rgba(2, 14, 67, 0.3)'
+        }}
+      >
         <Stack 
           direction={isMobile ? "column" : "row"} 
           justifyContent="space-between" 
@@ -114,13 +124,17 @@ const MatchCommentaryPage: React.FC = () => {
             onClick={() => navigate(`/matches/${matchId}/overview`)}
             sx={{ 
               color: 'white', 
-              borderColor: 'white',
+              borderColor: 'rgba(255, 255, 255, 0.5)',
               fontSize: isMobile ? '0.8rem' : '0.875rem',
               py: isMobile ? 0.75 : 1,
+              borderRadius: '8px',
               '&:hover': { 
                 borderColor: 'white', 
-                backgroundColor: 'rgba(255,255,255,0.1)' 
-              }
+                backgroundColor: 'rgba(255,255,255,0.15)',
+                transform: 'translateY(-2px)',
+                boxShadow: '0 4px 12px rgba(255,255,255,0.2)'
+              },
+              transition: 'all 0.3s ease'
             }}
           >
             {isMobile ? 'Back' : 'Back to Overview'}
@@ -132,12 +146,17 @@ const MatchCommentaryPage: React.FC = () => {
             onClick={() => navigate(`/matches/${matchId}/summary`)}
             sx={{ 
               backgroundColor: 'white',
-              color: 'primary.main',
+              color: '#020e43',
               fontSize: isMobile ? '0.8rem' : '0.875rem',
               py: isMobile ? 0.75 : 1,
+              borderRadius: '8px',
+              fontWeight: 'bold',
               '&:hover': { 
-                backgroundColor: 'rgba(255,255,255,0.9)' 
-              }
+                backgroundColor: 'rgba(255,255,255,0.95)',
+                transform: 'translateY(-2px)',
+                boxShadow: '0 4px 12px rgba(255,255,255,0.3)'
+              },
+              transition: 'all 0.3s ease'
             }}
           >
             {isMobile ? 'Summary' : 'View Summary'}
@@ -149,7 +168,10 @@ const MatchCommentaryPage: React.FC = () => {
             variant={isMobile ? "h5" : "h4"} 
             component="h1" 
             gutterBottom 
-            sx={{ fontWeight: 'bold' }}
+            sx={{ 
+              fontWeight: 'bold',
+              textShadow: '2px 2px 4px rgba(0,0,0,0.3)'
+            }}
           >
             {getTeamName(match.team1)} vs {getTeamName(match.team2)}
           </Typography>
@@ -159,18 +181,26 @@ const MatchCommentaryPage: React.FC = () => {
             spacing={2} 
             justifyContent="center" 
             alignItems="center"
+            flexWrap="wrap"
           >
             <Chip 
               label={getStatusLabel(match.status)} 
               color={getStatusColor(match.status) as any}
               sx={{ 
                 backgroundColor: 'white',
-                color: 'primary.main',
-                fontWeight: 'bold'
+                color: match.status === 'in-progress' ? '#ff9800' : '#020e43',
+                fontWeight: 'bold',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
               }}
             />
-            <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>
-              Live Commentary
+            <Typography 
+              variant="subtitle1" 
+              sx={{ 
+                fontWeight: 'medium',
+                textShadow: '1px 1px 2px rgba(0,0,0,0.3)'
+              }}
+            >
+              📺 Live Commentary
             </Typography>
           </Stack>
         </Box>
