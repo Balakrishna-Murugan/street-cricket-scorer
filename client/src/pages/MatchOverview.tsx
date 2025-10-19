@@ -37,6 +37,7 @@ const MatchOverview: React.FC = () => {
   // Get user role for admin buttons
   const userRole = localStorage.getItem('userRole') || 'viewer';
   const isAdmin = userRole === 'admin';
+  const isSuperAdmin = userRole === 'superadmin';
 
   useEffect(() => {
     const fetchData = async () => {
@@ -265,8 +266,8 @@ const MatchOverview: React.FC = () => {
               </Button>
             </Stack>
 
-            {/* Admin Actions - Only for Admins */}
-            {isAdmin && (
+            {/* Admin Actions - Only for Admins and SuperAdmins */}
+            {(isAdmin || isSuperAdmin) && (
               <Stack 
                 direction={isMobile ? "column" : "row"} 
                 spacing={2}
@@ -317,7 +318,7 @@ const MatchOverview: React.FC = () => {
           </Stack>
           
           <Typography variant="body2" color="textSecondary" sx={{ mt: 3 }}>
-            {isAdmin 
+            {(isAdmin || isSuperAdmin) 
               ? "View match details, commentary, or manage the match"
               : "View detailed statistics and scores, or watch the ball-by-ball commentary"
             }

@@ -76,12 +76,11 @@ const Header: React.FC = () => {
   // Generate breadcrumbs based on current path
   const generateBreadcrumbs = () => {
     const pathnames = location.pathname.split('/').filter((x) => x);
-    const breadcrumbNameMap: { [key: string]: string } = {
+    const pathSegmentNames: { [key: string]: string } = {
       '/': 'Home',
       '/teams': 'Teams',
       '/players': 'Players', 
       '/matches': 'Matches',
-      '/match-summary': 'Match Summary',
       '/overview': 'Match Overview',
       '/live': 'Live Scoring',
       '/summary': 'Match Summary',
@@ -94,17 +93,10 @@ const Header: React.FC = () => {
 
     const breadcrumbs = [{ label: 'Home', path: '/' }];
     
-    // Special handling for match-related pages - check navigation source
+    // Special handling for match-related pages
     if (pathnames[0] === 'matches' && pathnames[2] && (pathnames[2] === 'overview' || pathnames[2] === 'summary' || pathnames[2] === 'commentary')) {
-      const navigationSource = sessionStorage.getItem('matchNavigationSource');
-      
-      if (navigationSource === 'match-summary') {
-        // User came from Match Summary
-        breadcrumbs.push({ label: 'Match Summary', path: '/match-summary' });
-      } else {
-        // User came from admin Matches or default
-        breadcrumbs.push({ label: 'Matches', path: '/matches' });
-      }
+      // Always go to Matches 
+      breadcrumbs.push({ label: 'Matches', path: '/matches' });
       
       // Add the match name (team vs team) 
       const matchId = pathnames[1];
@@ -113,14 +105,14 @@ const Header: React.FC = () => {
       
       // Add the final page if not overview
       if (pathnames[2] !== 'overview') {
-        const finalLabel = breadcrumbNameMap[`/${pathnames[2]}`] || pathnames[2];
+        const finalLabel = pathSegmentNames[`/${pathnames[2]}`] || pathnames[2];
         breadcrumbs.push({ label: finalLabel, path: location.pathname });
       }
     } else {
       // Regular breadcrumb generation for other pages
       pathnames.forEach((pathname, index) => {
         const path = `/${pathnames.slice(0, index + 1).join('/')}`;
-        let label = breadcrumbNameMap[`/${pathname}`] || pathname;
+        let label = pathSegmentNames[`/${pathname}`] || pathname;
         
         // Special handling for match IDs - show team names if available, otherwise "Match Details"
         if (pathnames[index - 1] === 'matches' && pathname.length > 10) {
@@ -162,16 +154,38 @@ const Header: React.FC = () => {
 
   return (
     <Box>
-      <AppBar position="static" sx={{ 
-        background: 'linear-gradient(45deg, #1976d2 30%, #42a5f5 90%)',
-        boxShadow: '0 3px 5px 2px rgba(25, 118, 210, .3)',
+      <AppBar position="fixed" sx={{ 
+        background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
+        boxShadow: '0 3px 5px 2px rgba(2, 14, 67, .3)',
+        zIndex: (theme) => theme.zIndex.drawer + 1,
       }}>
         <Toolbar>
+          {/* Logo - Left corner, circular */}
+          <Box
+            component="img"
+            src={require('../Image/TNCC.png')}
+            alt="Cricket Logo"
+            onClick={() => navigate('/')}
+            sx={{
+              height: isMobile ? 40 : 50,
+              width: isMobile ? 40 : 50,
+              borderRadius: '50%',
+              objectFit: 'cover',
+              cursor: 'pointer',
+              mr: isMobile ? 1 : 2,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'scale(1.1)',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+              }
+            }}
+          />
+
           {/* Mobile Menu Button - Only show on mobile */}
           {isMobile && (
             <IconButton
               size="large"
-              edge="start"
               color="inherit"
               aria-label="menu"
               sx={{ mr: 2 }}
@@ -181,10 +195,6 @@ const Header: React.FC = () => {
             </IconButton>
           )}
 
-          <IconButton color="inherit" onClick={() => navigate('/')} sx={{ mr: 1 }}>
-            <HomeIcon />
-          </IconButton>
-
           <Typography 
             variant={isMobile ? "h6" : "h5"} 
             component="div" 
@@ -192,6 +202,9 @@ const Header: React.FC = () => {
               flexGrow: 1, 
               fontWeight: 'bold',
               textShadow: '1px 1px 2px rgba(0,0,0,0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: isMobile ? 'center' : 'flex-start'
             }}
           >
             {isMobile ? 'Cricket' : 'Street Cricket'} {!isAdmin && !isSuperAdmin && !isMobile && '(Viewer Mode)'}
@@ -237,17 +250,6 @@ const Header: React.FC = () => {
                   </Button>
                 </>
               )}
-              <Button 
-                color="inherit" 
-                startIcon={<ScoreboardIcon />}
-                onClick={() => navigate('/match-summary')}
-                sx={{ 
-                  minWidth: '120px',
-                  '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }
-                }}
-              >
-                Match Summary
-              </Button>
             </Box>
           )}
 
@@ -280,7 +282,7 @@ const Header: React.FC = () => {
         sx={{
           '& .MuiDrawer-paper': {
             width: 280,
-            background: 'linear-gradient(180deg, #f5f5f5 0%, #e3f2fd 100%)',
+            background: 'linear-gradient(180deg, #020e43 0%, #764ba2 100%)',
           },
         }}
       >
@@ -289,7 +291,7 @@ const Header: React.FC = () => {
           justifyContent: 'space-between', 
           alignItems: 'center',
           p: 2,
-          bgcolor: 'primary.main',
+          bgcolor: 'rgba(0, 0, 0, 0.2)',
           color: 'white'
         }}>
           <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
@@ -306,7 +308,7 @@ const Header: React.FC = () => {
         
         <List sx={{ pt: 0 }}>
           {/* User Info */}
-          <ListItem sx={{ bgcolor: 'rgba(25, 118, 210, 0.1)', py: 2 }}>
+          <ListItem sx={{ bgcolor: 'rgba(255, 255, 255, 0.1)', py: 2 }}>
             <ListItemIcon>
               <Avatar sx={{ 
                 bgcolor: isSuperAdmin ? 'error.main' : (isAdmin ? 'secondary.main' : 'warning.main'),
@@ -319,48 +321,74 @@ const Header: React.FC = () => {
             <ListItemText 
               primary={username}
               secondary={`${userRole}${!isAdmin && !isSuperAdmin ? ' (View Only)' : ''}`}
-              primaryTypographyProps={{ fontWeight: 'bold' }}
+              primaryTypographyProps={{ fontWeight: 'bold', color: 'white' }}
+              secondaryTypographyProps={{ color: 'rgba(255, 255, 255, 0.7)' }}
             />
           </ListItem>
           
-          <Divider />
+          <Divider sx={{ bgcolor: 'rgba(255, 255, 255, 0.2)' }} />
           
           {/* Navigation Items */}
-          <ListItemButton onClick={() => { navigate('/'); handleDrawerClose(); }}>
-            <ListItemIcon><HomeIcon color="primary" /></ListItemIcon>
+          <ListItemButton 
+            onClick={() => { navigate('/'); handleDrawerClose(); }}
+            sx={{ 
+              color: 'white',
+              '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' }
+            }}
+          >
+            <ListItemIcon><HomeIcon sx={{ color: 'white' }} /></ListItemIcon>
             <ListItemText primary="Home" />
           </ListItemButton>
           
           {(isAdmin || isSuperAdmin) && (
             <>
-              <ListItemButton onClick={() => { navigate('/teams'); handleDrawerClose(); }}>
-                <ListItemIcon><GroupsIcon color="primary" /></ListItemIcon>
+              <ListItemButton 
+                onClick={() => { navigate('/teams'); handleDrawerClose(); }}
+                sx={{ 
+                  color: 'white',
+                  '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' }
+                }}
+              >
+                <ListItemIcon><GroupsIcon sx={{ color: 'white' }} /></ListItemIcon>
                 <ListItemText primary="Teams" />
               </ListItemButton>
               
-              <ListItemButton onClick={() => { navigate('/players'); handleDrawerClose(); }}>
-                <ListItemIcon><PeopleIcon color="primary" /></ListItemIcon>
+              <ListItemButton 
+                onClick={() => { navigate('/players'); handleDrawerClose(); }}
+                sx={{ 
+                  color: 'white',
+                  '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' }
+                }}
+              >
+                <ListItemIcon><PeopleIcon sx={{ color: 'white' }} /></ListItemIcon>
                 <ListItemText primary="Players" />
               </ListItemButton>
               
-              <ListItemButton onClick={() => { navigate('/matches'); handleDrawerClose(); }}>
-                <ListItemIcon><SportsBaseballIcon color="primary" /></ListItemIcon>
-                <ListItemText primary="Matches" />
-              </ListItemButton>
-              
-              <Divider />
+              <Divider sx={{ bgcolor: 'rgba(255, 255, 255, 0.2)' }} />
             </>
           )}
           
-          <ListItemButton onClick={() => { navigate('/match-summary'); handleDrawerClose(); }}>
-            <ListItemIcon><ScoreboardIcon color="primary" /></ListItemIcon>
-            <ListItemText primary="Match Summary" />
+          <ListItemButton 
+            onClick={() => { navigate('/matches'); handleDrawerClose(); }}
+            sx={{ 
+              color: 'white',
+              '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' }
+            }}
+          >
+            <ListItemIcon><ScoreboardIcon sx={{ color: 'white' }} /></ListItemIcon>
+            <ListItemText primary="Matches" />
           </ListItemButton>
           
-          <Divider />
+          <Divider sx={{ bgcolor: 'rgba(255, 255, 255, 0.2)' }} />
           
-          <ListItemButton onClick={handleLogout} sx={{ color: 'error.main' }}>
-            <ListItemIcon><LogoutIcon color="error" /></ListItemIcon>
+          <ListItemButton 
+            onClick={handleLogout} 
+            sx={{ 
+              color: '#ff6b6b',
+              '&:hover': { bgcolor: 'rgba(255, 107, 107, 0.1)' }
+            }}
+          >
+            <ListItemIcon><LogoutIcon sx={{ color: '#ff6b6b' }} /></ListItemIcon>
             <ListItemText primary="Logout" />
           </ListItemButton>
         </List>
@@ -388,22 +416,22 @@ const Header: React.FC = () => {
         </MenuItem>
       </Menu>
 
-      {/* Breadcrumbs Bar - Hide on mobile for LiveScoring page */}
-      {!(isMobile && location.pathname.includes('/live')) && (
+      {/* Breadcrumbs Bar - Hide on mobile */}
+      {!isMobile && (
         <Box sx={{ 
           bgcolor: 'grey.50', 
-          py: isMobile ? 0.5 : 1, 
+          py: 1, 
           px: 2, 
           borderBottom: 1, 
           borderColor: 'divider',
-          minHeight: isMobile ? '32px' : '40px',
+          minHeight: '40px',
           display: 'flex',
           alignItems: 'center'
         }}>
           <Breadcrumbs 
             separator={<NavigateNextIcon fontSize="small" />}
             aria-label="breadcrumb"
-            sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }}
+            sx={{ fontSize: '0.875rem' }}
           >
             {breadcrumbs.map((crumb, index) => (
               index === breadcrumbs.length - 1 ? (

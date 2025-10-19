@@ -45,6 +45,8 @@ interface IBallOutcome {
   isWicket: boolean;
   dismissalType?: 'bowled' | 'caught' | 'run out' | 'stumped' | 'lbw' | 'hit wicket';
   fielder?: string;
+  timestamp?: number;
+  sequenceNumber?: number;
 }
 
 interface IInnings {
@@ -68,6 +70,7 @@ interface IInnings {
   runRate: number; // Current run rate
   requiredRunRate?: number; // For second innings
   currentOverBalls?: IBallOutcome[]; // Store current over's ball-by-ball data
+  recentBalls?: IBallOutcome[]; // Store last 12 balls for live commentary
 }
 
 const inningsSchema = new mongoose.Schema<IInnings>({
@@ -160,7 +163,28 @@ const inningsSchema = new mongoose.Schema<IInnings>({
       type: String,
       enum: ['bowled', 'caught', 'run out', 'stumped', 'lbw', 'hit wicket']
     },
-    fielder: String
+    fielder: String,
+    timestamp: Number,
+    sequenceNumber: Number
+  }],
+  recentBalls: [{
+    ballNumber: { type: Number, required: true },
+    runs: { type: Number, required: true },
+    extras: {
+      type: {
+        type: String,
+        enum: ['wide', 'no-ball', 'bye', 'leg-bye']
+      },
+      runs: { type: Number }
+    },
+    isWicket: { type: Boolean, required: true },
+    dismissalType: {
+      type: String,
+      enum: ['bowled', 'caught', 'run out', 'stumped', 'lbw', 'hit wicket']
+    },
+    fielder: String,
+    timestamp: Number,
+    sequenceNumber: Number
   }]
 });
 

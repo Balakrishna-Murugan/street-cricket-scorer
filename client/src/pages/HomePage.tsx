@@ -12,7 +12,6 @@ import { useNavigate } from 'react-router-dom';
 import SportsCricketIcon from '@mui/icons-material/SportsCricket';
 import GroupsIcon from '@mui/icons-material/Groups';
 import PersonIcon from '@mui/icons-material/Person';
-import AssessmentIcon from '@mui/icons-material/Assessment';
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
@@ -161,36 +160,6 @@ const HomePage: React.FC = () => {
                 <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#2c3e50' }}>Matches</Typography>
                 <Typography variant="body2" color="text.secondary">
                   {isAdmin ? 'Create and manage matches' : 'View live matches'}
-                </Typography>
-              </Paper>
-            </Box>
-
-            <Box width={{ xs: '100%', sm: isMobile ? '100%' : 'calc(50% - 12px)', md: 'calc(25% - 18px)' }}>
-              <Paper
-                onClick={() => navigate('/match-summary')}
-                sx={{
-                  p: 3,
-                  textAlign: 'center',
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  borderRadius: '12px',
-                  background: 'linear-gradient(45deg, #f3e5f5 30%, #ce93d8 90%)',
-                  border: '1px solid #9C27B0',
-                  minHeight: isMobile ? '120px' : '140px',
-                  '&:hover': {
-                    transform: 'translateY(-4px)',
-                    boxShadow: '0 8px 16px rgba(156, 39, 176, 0.3)'
-                  }
-                }}
-              >
-                <AssessmentIcon sx={{ fontSize: isMobile ? 40 : 50, mb: 2, color: '#7b1fa2' }} />
-                <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#2c3e50' }}>Match Summary</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  View match results & stats
                 </Typography>
               </Paper>
             </Box>

@@ -256,7 +256,11 @@ export const matchController = {
       const { matchId } = req.params;
       const scoreUpdate = req.body;
 
-      console.log('Updating match score (legacy):', { matchId, scoreUpdate });
+      console.log('Updating match score (legacy):', { matchId });
+      console.log('Ball tracking data received:', {
+        recentBalls: scoreUpdate.innings?.[0]?.recentBalls?.length || 0,
+        currentOverBalls: scoreUpdate.innings?.[0]?.currentOverBalls?.length || 0
+      });
       
       // Clean up the score update data
       const cleanScoreUpdate = {
@@ -265,6 +269,9 @@ export const matchController = {
           ...inning,
           battingTeam: inning.battingTeam?._id || inning.battingTeam,
           bowlingTeam: inning.bowlingTeam?._id || inning.bowlingTeam,
+          // CRITICAL: Explicitly preserve ball tracking arrays
+          currentOverBalls: inning.currentOverBalls || [],
+          recentBalls: inning.recentBalls || [],
           battingStats: inning.battingStats.map((stat: any) => ({
             ...stat,
             player: stat.player?._id || stat.player,
@@ -287,7 +294,12 @@ export const matchController = {
         cleanScoreUpdate.status = 'in-progress';
       }
 
-      console.log('Clean score update:', cleanScoreUpdate);
+      console.log('Clean score update:', {
+        firstInning: {
+          recentBalls: cleanScoreUpdate.innings?.[0]?.recentBalls?.length || 0,
+          currentOverBalls: cleanScoreUpdate.innings?.[0]?.currentOverBalls?.length || 0
+        }
+      });
       
       const match = await Match.findByIdAndUpdate(
         matchId,
@@ -304,6 +316,14 @@ export const matchController = {
       if (!match) {
         return res.status(404).json({ message: 'Match not found' });
       }
+      
+      console.log('Returning match with ball tracking:', {
+        firstInning: {
+          recentBalls: match.innings?.[0]?.recentBalls?.length || 0,
+          currentOverBalls: match.innings?.[0]?.currentOverBalls?.length || 0
+        }
+      });
+      
       res.json(match);
     } catch (error: any) {
       res.status(400).json({ message: error.message || 'Error updating match score' });

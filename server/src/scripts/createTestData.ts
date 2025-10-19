@@ -190,7 +190,8 @@ const createTestData = async () => {
               total: 0
             },
             runRate: 0,
-            currentOverBalls: []
+            currentOverBalls: [],
+            recentBalls: []
           },
           {
             battingTeam: matchData.team2,
@@ -215,7 +216,8 @@ const createTestData = async () => {
               total: 0
             },
             runRate: 0,
-            currentOverBalls: []
+            currentOverBalls: [],
+            recentBalls: []
           }
         ]
       });

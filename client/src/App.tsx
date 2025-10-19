@@ -1,11 +1,10 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { CssBaseline, ThemeProvider, createTheme, Box } from '@mui/material';
+import { CssBaseline, ThemeProvider, createTheme, Box, Toolbar } from '@mui/material';
 import HomePage from './pages/HomePage';
 import TeamList from './pages/TeamList';
 import PlayerList from './pages/PlayerList';
 import MatchList from './pages/MatchList';
-import MatchListSummary from './pages/MatchListSummary';
 import MatchOverview from './pages/MatchOverview';
 import LiveScoring from './pages/LiveScoring';
 import MatchSummary from './pages/MatchSummary';
@@ -115,6 +114,7 @@ function App() {
               <AuthGuard>
                 <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
                   <Header />
+                  <Toolbar /> {/* Spacer for fixed header */}
                   <Box sx={{ 
                     p: { xs: 0, sm: 1.5, md: 2 }, // Remove padding on mobile
                     flexGrow: 1,
@@ -126,7 +126,6 @@ function App() {
                       <Route path="/teams" element={<AdminGuard><TeamList /></AdminGuard>} />
                       <Route path="/players" element={<AdminGuard><PlayerList /></AdminGuard>} />
                       <Route path="/matches" element={<MatchList />} />
-                      <Route path="/match-summary" element={<MatchListSummary />} />
                       <Route path="/matches/:matchId" element={<MatchOverview />} />
                       <Route path="/matches/:matchId/overview" element={<MatchOverview />} />
                       <Route path="/matches/:matchId/live" element={<AdminGuard><LiveScoring /></AdminGuard>} />

@@ -39,6 +39,8 @@ export interface BallOutcome {
   isWicket: boolean;
   dismissalType?: 'bowled' | 'caught' | 'run out' | 'stumped' | 'lbw' | 'hit wicket';
   fielder?: string;
+  timestamp?: number; // Add timestamp to ensure proper ordering
+  sequenceNumber?: number; // Add sequence number for precise ordering
 }
 
 export interface BattingStats {
@@ -100,6 +102,7 @@ export interface Innings {
   runRate: number;
   requiredRunRate?: number;
   currentOverBalls?: BallOutcome[]; // Store current over's ball-by-ball data
+  recentBalls?: BallOutcome[]; // Store last 12 balls for live commentary
 }
 
 export interface Over {

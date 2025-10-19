@@ -26,7 +26,8 @@ import {
   Autocomplete,
   Alert,
   AlertTitle,
-  Checkbox
+  Checkbox,
+  Fab
 } from '@mui/material';
 import { Match, Team } from '../types';
 import { matchService, teamService } from '../services/api.service';
@@ -319,73 +320,85 @@ const MatchList: React.FC = () => {
   };
 
   return (
-    <Container maxWidth="lg">
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-        <Typography variant="h5">
-          {(isAdmin || isSuperAdmin) ? 'Matches' : 'View Matches'}
-          {isSuperAdmin && selectedMatches.length > 0 && (
-            <Chip 
-              label={`${selectedMatches.length} selected`} 
-              color="secondary" 
-              size="small" 
-              sx={{ ml: 2 }}
-            />
-          )}
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 2 }}>
-          {(isAdmin || isSuperAdmin) && (
-            <Button 
-              variant="contained" 
-              color="primary" 
-              onClick={handleOpen}
-              startIcon={!isMobile ? <AddIcon /> : undefined}
-              sx={{ 
-                minWidth: isMobile ? '40px' : 'auto',
-                px: isMobile ? 1 : 2 
-              }}
-            >
-              {isMobile ? <AddIcon /> : 'Add Match'}
-            </Button>
-          )}
-          {isSuperAdmin && (
-            <>
-              <Button 
-                variant="outlined" 
+    <Container maxWidth="lg" sx={{ py: isMobile ? 2 : 3 }}>
+      {!isMobile && (
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          mb: 3
+        }}>
+          <Typography variant="h5">
+            {(isAdmin || isSuperAdmin) ? 'Matches' : 'View Matches'}
+            {isSuperAdmin && selectedMatches.length > 0 && (
+              <Chip 
+                label={`${selectedMatches.length} selected`} 
                 color="secondary" 
-                onClick={handleSelectAll}
-                startIcon={!isMobile ? (selectedMatches.length === matches.length ? <DeselectIcon /> : <SelectAllIcon />) : undefined}
-                sx={{ 
-                  ml: 1,
-                  minWidth: isMobile ? '40px' : 'auto',
-                  px: isMobile ? 1 : 2 
-                }}
-              >
-                {isMobile ? 
-                  (selectedMatches.length === matches.length ? <DeselectIcon /> : <SelectAllIcon />) :
-                  (selectedMatches.length === matches.length ? 'Deselect All' : 'Select All')
-                }
-              </Button>
+                size="small" 
+                sx={{ ml: 2 }}
+              />
+            )}
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            {(isAdmin || isSuperAdmin) && (
               <Button 
                 variant="contained" 
-                color="error" 
-                onClick={handleDeleteSelectedOpen}
-                startIcon={!isMobile ? <DeleteForeverIcon /> : undefined}
-                disabled={selectedMatches.length === 0}
-                sx={{ 
-                  ml: 1,
-                  minWidth: isMobile ? '40px' : 'auto',
-                  px: isMobile ? 1 : 2 
-                }}
+                color="primary" 
+                onClick={handleOpen}
+                startIcon={<AddIcon />}
               >
-                {isMobile ? 
-                  <DeleteForeverIcon /> : 
-                  `Delete Selected (${selectedMatches.length})`
-                }
+                Add Match
               </Button>
-            </>
-          )}
+            )}
+            {isSuperAdmin && (
+              <>
+                <Button 
+                  variant="outlined" 
+                  color="secondary" 
+                  onClick={handleSelectAll}
+                  startIcon={selectedMatches.length === matches.length ? <DeselectIcon /> : <SelectAllIcon />}
+                  sx={{ ml: 1 }}
+                >
+                  {selectedMatches.length === matches.length ? 'Deselect All' : 'Select All'}
+                </Button>
+                <Button 
+                  variant="contained" 
+                  color="error" 
+                  onClick={handleDeleteSelectedOpen}
+                  startIcon={<DeleteForeverIcon />}
+                  disabled={selectedMatches.length === 0}
+                  sx={{ ml: 1 }}
+                >
+                  Delete Selected ({selectedMatches.length})
+                </Button>
+              </>
+            )}
+          </Box>
         </Box>
-      </Box>
+      )}
+
+      {/* Floating Action Button for Mobile */}
+      {(isAdmin || isSuperAdmin) && isMobile && (
+        <Fab 
+          aria-label="add"
+          onClick={handleOpen}
+          sx={{
+            position: 'fixed',
+            bottom: 24,
+            right: 24,
+            zIndex: 1000,
+            background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
+            color: 'white',
+            '&:hover': {
+              background: 'linear-gradient(135deg, #764ba2 0%, #020e43 100%)',
+              transform: 'scale(1.1)',
+            },
+            transition: 'all 0.3s ease',
+          }}
+        >
+          <AddIcon />
+        </Fab>
+      )}
 
       {isMobile ? (
         // Mobile Card Layout
@@ -462,7 +475,7 @@ const MatchList: React.FC = () => {
                     >
                       View Details
                     </Button>
-                    {isAdmin && (
+                    {isAdmin && match.status === 'upcoming' && (
                       <Button 
                         color="info" 
                         size="medium"
@@ -562,7 +575,7 @@ const MatchList: React.FC = () => {
                       >
                         View Details
                       </Button>
-                      {isAdmin && (
+                      {isAdmin && match.status === 'upcoming' && (
                         <Button 
                           color="info" 
                           size="small"

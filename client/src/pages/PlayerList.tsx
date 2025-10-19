@@ -27,7 +27,8 @@ import {
   useTheme,
   useMediaQuery,
   Chip,
-  Autocomplete
+  Autocomplete,
+  Fab
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -182,23 +183,48 @@ const PlayerList: React.FC = () => {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ p: { xs: 1, sm: 3 } }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-        <Typography variant="h5">Players</Typography>
-        <Button 
-          variant="contained" 
-          color="primary" 
+    <Container maxWidth="lg" sx={{ py: isMobile ? 2 : 3, px: { xs: 1, sm: 3 } }}>
+      {!isMobile && (
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          mb: 3
+        }}>
+          <Typography variant="h5">Players</Typography>
+          <Button 
+            variant="contained" 
+            color="primary" 
+            onClick={handleOpen}
+            startIcon={<AddIcon />}
+          >
+            Add Player
+          </Button>
+        </Box>
+      )}
+
+      {/* Floating Action Button for Mobile */}
+      {isMobile && (
+        <Fab 
+          aria-label="add player"
           onClick={handleOpen}
-          size={isMobile ? "small" : "medium"}
-          startIcon={!isMobile ? <AddIcon /> : undefined}
-          sx={{ 
-            minWidth: isMobile ? '40px' : 'auto',
-            px: isMobile ? 1 : 2 
+          sx={{
+            position: 'fixed',
+            bottom: 24,
+            right: 24,
+            zIndex: 1000,
+            background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
+            color: 'white',
+            '&:hover': {
+              background: 'linear-gradient(135deg, #764ba2 0%, #020e43 100%)',
+              transform: 'scale(1.1)',
+            },
+            transition: 'all 0.3s ease',
           }}
         >
-          {isMobile ? <AddIcon /> : 'Add Player'}
-        </Button>
-      </Box>
+          <AddIcon />
+        </Fab>
+      )}
 
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>

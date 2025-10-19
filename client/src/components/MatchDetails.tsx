@@ -101,7 +101,8 @@ const MatchDetails: React.FC<MatchDetailsProps> = ({
                   justifyContent: 'center'
                 }}
               >
-                {currentOverBalls.map((ball, index) => (
+                {/* Only show current over balls (max 6) */}
+                {currentOverBalls.slice(-6).map((ball, index) => (
                   <Chip
                     key={index}
                     label={getBallChipLabel(ball)}
@@ -182,7 +183,8 @@ const MatchDetails: React.FC<MatchDetailsProps> = ({
                   gap: 1
                 }}
               >
-                {currentOverBalls.map((ball, index) => (
+                {/* Only show current over balls (max 6) */}
+                {currentOverBalls.slice(-6).map((ball, index) => (
                   <Chip
                     key={index}
                     label={getBallChipLabel(ball)}

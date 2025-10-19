@@ -1,24 +1,13 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Box,
   Paper,
   Typography,
   Chip,
   Stack,
-  Divider,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  useTheme,
   useMediaQuery,
+  useTheme,
 } from '@mui/material';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { Match, BallOutcome } from '../types';
 import BallCommentary from './BallCommentary';
 
@@ -28,300 +17,261 @@ interface MatchCommentaryProps {
 
 const MatchCommentary: React.FC<MatchCommentaryProps> = ({ match }) => {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const [expandedPanel, setExpandedPanel] = useState<string | false>(false);
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
-  const handleChange = (panel: string) => (event: React.SyntheticEvent, isExpanded: boolean) => {
-    setExpandedPanel(isExpanded ? panel : false);
-  };
-
-  if (!match || !match.innings || match.innings.length === 0) {
+  // Only show live commentary for matches that are currently in progress
+  if (!match || match.status !== 'in-progress') {
     return (
-      <Paper sx={{ p: 3, borderRadius: 3, background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' }}>
-        <Typography variant="h6" gutterBottom sx={{ color: '#2c3e50', fontWeight: 'bold' }}>
-          📝 Match Commentary
+      <Paper sx={{ 
+        p: isMobile ? 2 : 3, 
+        borderRadius: isMobile ? 2 : 3, 
+        background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' 
+      }}>
+        <Typography 
+          variant={isMobile ? 'subtitle1' : 'h6'} 
+          gutterBottom 
+          sx={{ color: '#2c3e50', fontWeight: 'bold' }}
+        >
+          🏏 Live Commentary
         </Typography>
-        <Typography color="text.secondary">
-          No match data available for commentary.
+        <Typography 
+          variant={isMobile ? 'body2' : 'body1'} 
+          color="text.secondary"
+        >
+          {match?.status === 'upcoming' && 'Match has not started yet. Live commentary will appear once the match begins.'}
+          {match?.status === 'completed' && 'Match completed. Live commentary is only available during active matches.'}
+          {match?.status === 'abandoned' && 'Match was abandoned. No live commentary available.'}
+          {!match && 'No match data available for commentary.'}
         </Typography>
       </Paper>
     );
   }
 
+  if (!match.innings || match.innings.length === 0) {
+    return (
+      <Paper sx={{ 
+        p: isMobile ? 2 : 3, 
+        borderRadius: isMobile ? 2 : 3, 
+        background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' 
+      }}>
+        <Typography 
+          variant={isMobile ? 'subtitle1' : 'h6'} 
+          gutterBottom 
+          sx={{ color: '#2c3e50', fontWeight: 'bold' }}
+        >
+          🏏 Live Commentary
+        </Typography>
+        <Typography 
+          variant={isMobile ? 'body2' : 'body1'} 
+          color="text.secondary"
+        >
+          Match is in progress but no innings data available yet.
+        </Typography>
+      </Paper>
+    );
+  }
+
+  // Get the current active innings based on match.currentInnings
+  const currentInningsIndex = match.currentInnings || 0;
+  const currentInnings = match.innings[currentInningsIndex];
+
+  // If no current innings exists, show message
+  if (!currentInnings) {
+    return (
+      <Paper sx={{ 
+        p: isMobile ? 2 : 3, 
+        borderRadius: isMobile ? 2 : 3, 
+        background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' 
+      }}>
+        <Typography 
+          variant={isMobile ? 'subtitle1' : 'h6'} 
+          gutterBottom 
+          sx={{ color: '#2c3e50', fontWeight: 'bold' }}
+        >
+          🏏 Live Commentary
+        </Typography>
+        <Typography 
+          variant={isMobile ? 'body2' : 'body1'} 
+          color="text.secondary"
+        >
+          No active innings data available.
+        </Typography>
+      </Paper>
+    );
+  }
+
+  const inningsNumber = currentInningsIndex + 1;
+  const battingTeamName = typeof currentInnings.battingTeam === 'object' 
+    ? currentInnings.battingTeam.name 
+    : `Team ${inningsNumber}`;
+  
+  // Get ball outcomes from recent balls (last 12 balls for live commentary)
+  const allBalls: BallOutcome[] = [];
+  
+  // DEBUG: Check ball data availability
+  console.log(`Commentary: ${currentInnings.balls} balls, recentBalls=${currentInnings.recentBalls?.length || 0}, currentOverBalls=${currentInnings.currentOverBalls?.length || 0}`);
+  
+  // Use recent balls if available (last 12 balls across overs)
+  if (currentInnings.recentBalls && Array.isArray(currentInnings.recentBalls) && currentInnings.recentBalls.length > 0) {
+    // Sort balls by sequence number and timestamp to ensure proper order
+    const sortedBalls = [...currentInnings.recentBalls].sort((a, b) => {
+      if (a.sequenceNumber && b.sequenceNumber) {
+        return a.sequenceNumber - b.sequenceNumber;
+      }
+      if (a.timestamp && b.timestamp) {
+        return a.timestamp - b.timestamp;
+      }
+      return 0; // Keep original order if no sorting criteria
+    });
+    allBalls.push(...sortedBalls);
+
+  } 
+  // Fallback to current over balls if recentBalls not available
+  else if (currentInnings.currentOverBalls && Array.isArray(currentInnings.currentOverBalls) && currentInnings.currentOverBalls.length > 0) {
+    // Sort current over balls too for consistency
+    const sortedCurrentBalls = [...currentInnings.currentOverBalls].sort((a, b) => {
+      if (a.sequenceNumber && b.sequenceNumber) {
+        return a.sequenceNumber - b.sequenceNumber;
+      }
+      if (a.timestamp && b.timestamp) {
+        return a.timestamp - b.timestamp;
+      }
+      return 0;
+    });
+    allBalls.push(...sortedCurrentBalls);
+  }
+
   return (
-    <Paper sx={{ p: 3, borderRadius: 3, background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' }}>
-      <Typography variant="h6" gutterBottom sx={{ color: '#2c3e50', fontWeight: 'bold', mb: 3 }}>
-        📝 Match Commentary
+    <Paper sx={{ 
+      p: isMobile ? 2 : 3, 
+      borderRadius: isMobile ? 2 : 3, 
+      background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' 
+    }}>
+      <Typography 
+        variant={isMobile ? 'subtitle1' : 'h6'} 
+        gutterBottom 
+        sx={{ 
+          color: '#2c3e50', 
+          fontWeight: 'bold', 
+          mb: isMobile ? 2 : 3,
+          fontSize: isMobile ? '1rem' : '1.25rem'
+        }}
+      >
+        🏏 Live Commentary
       </Typography>
 
-      {/* Ball-by-Ball Commentary Section - Prominently displayed at top */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h6" gutterBottom sx={{ 
-          color: '#1976d2', 
-          fontWeight: 'bold', 
-          mb: 2,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1
-        }}>
-          🏏 Live Ball-by-Ball Commentary
+      <Box sx={{ mb: isMobile ? 2 : 3 }}>
+        {/* Innings Header */}
+        <Typography 
+          variant={isMobile ? 'subtitle1' : 'h6'} 
+          sx={{ 
+            fontWeight: 'bold', 
+            color: currentInningsIndex === 0 ? '#1976d2' : '#9c27b0',
+            mb: isMobile ? 1.5 : 2,
+            fontSize: isMobile ? '0.95rem' : '1.25rem'
+          }}
+        >
+          {battingTeamName} - {inningsNumber === 1 ? '1st' : '2nd'} Innings
+          <Chip 
+            label="Currently Playing" 
+            color="success" 
+            size={isMobile ? 'small' : 'small'} 
+            sx={{ 
+              ml: isMobile ? 1 : 2, 
+              fontWeight: 'bold',
+              fontSize: isMobile ? '0.65rem' : '0.75rem'
+            }}
+          />
         </Typography>
         
-        {match.innings.map((innings, inningsIndex) => {
-          const inningsNumber = inningsIndex + 1;
-          const battingTeamName = typeof innings.battingTeam === 'object' 
-            ? innings.battingTeam.name 
-            : `Team ${inningsNumber}`;
-          
-          // Get ball outcomes from current over balls
-          const allBalls: BallOutcome[] = [];
-          
-          // Use current over balls for any innings that has them
-          if (innings.currentOverBalls && Array.isArray(innings.currentOverBalls) && innings.currentOverBalls.length > 0) {
-            allBalls.push(...innings.currentOverBalls);
-          }
-          
-          // For active innings, also check if we should show all historical balls
-          // (This would require storing ball history properly, which we'll implement later)
-          
-          return (
-            <Paper 
-              key={`ball-commentary-${inningsIndex}`}
-              elevation={2}
-              sx={{ 
-                p: 2, 
-                mb: 2, 
-                borderRadius: 2,
-                border: `2px solid ${inningsIndex === 0 ? '#1976d2' : '#9c27b0'}`,
-                background: '#ffffff'
+        {/* Score Summary */}
+        <Stack 
+          direction="row" 
+          spacing={isMobile ? 1 : 2} 
+          sx={{ 
+            mb: isMobile ? 1.5 : 2, 
+            flexWrap: 'wrap',
+            gap: isMobile ? 1 : 2
+          }}
+        >
+          <Chip 
+            label={`${currentInnings.totalRuns}/${currentInnings.wickets}`}
+            color="primary"
+            size={isMobile ? 'small' : 'medium'}
+            sx={{ 
+              fontWeight: 'bold',
+              fontSize: isMobile ? '0.75rem' : '0.875rem'
+            }}
+          />
+          <Chip 
+            label={`${Math.floor(currentInnings.balls / 6)}.${currentInnings.balls % 6} overs`}
+            variant="outlined"
+            size={isMobile ? 'small' : 'medium'}
+            sx={{
+              fontSize: isMobile ? '0.75rem' : '0.875rem'
+            }}
+          />
+          {currentInnings.runRate && (
+            <Chip 
+              label={`RR: ${currentInnings.runRate.toFixed(2)}`}
+              variant="outlined"
+              color="secondary"
+              size={isMobile ? 'small' : 'medium'}
+              sx={{
+                fontSize: isMobile ? '0.75rem' : '0.875rem'
               }}
-            >
-              <Typography variant="subtitle1" sx={{ 
-                fontWeight: 'bold', 
-                color: inningsIndex === 0 ? '#1976d2' : '#9c27b0',
+            />
+          )}
+        </Stack>
+        
+        {/* Ball Commentary */}
+        {allBalls.length > 0 ? (
+          <BallCommentary
+            balls={allBalls}
+            currentOver={Math.floor(currentInnings.balls / 6) + 1}
+            bowlerName=""
+            strikerName=""
+            nonStrikerName=""
+          />
+        ) : (
+          <Box>
+            {/* Debug information for troubleshooting */}
+            <Typography variant="body2" sx={{ 
+              fontStyle: 'italic', 
+              color: '#666',
+              textAlign: 'center',
+              py: 3,
+              bgcolor: 'rgba(255,255,255,0.7)',
+              borderRadius: 2,
+              mb: 2
+            }}>
+              {currentInnings.balls > 0 
+                ? `${currentInnings.balls} balls bowled - Ball-by-ball commentary will appear when scoring new balls in Live Scoring`
+                : 'No balls bowled yet in this innings'
+              }
+            </Typography>
+            
+            {/* Show some debug info if balls have been bowled but no ball data available */}
+            {currentInnings.balls > 0 && process.env.NODE_ENV === 'development' && (
+              <Typography variant="caption" sx={{ 
+                display: 'block',
+                textAlign: 'center',
+                color: '#999',
+                fontFamily: 'monospace',
                 mb: 1
               }}>
-                {battingTeamName} - {inningsNumber === 1 ? '1st' : '2nd'} Innings
+                Debug: recentBalls={currentInnings.recentBalls?.length || 0}, currentOverBalls={currentInnings.currentOverBalls?.length || 0}
               </Typography>
-              
-              <Box sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 2, 
-                mb: 2,
-                flexWrap: 'wrap'
-              }}>
-                <Chip 
-                  label={`${innings.totalRuns}/${innings.wickets}`}
-                  color="primary"
-                  size="medium"
-                  sx={{ fontWeight: 'bold', fontSize: '1rem' }}
-                />
-                <Chip 
-                  label={`${Math.floor(innings.balls / 6)}.${innings.balls % 6} overs`}
-                  variant="outlined"
-                  size="medium"
-                />
-                {innings.runRate && (
-                  <Chip 
-                    label={`RR: ${innings.runRate.toFixed(2)}`}
-                    variant="outlined"
-                    color="secondary"
-                    size="medium"
-                  />
-                )}
-              </Box>
-              
-              {allBalls.length > 0 ? (
-                <BallCommentary
-                  balls={allBalls.slice(-12)} // Show last 12 balls (2 overs)
-                  currentOver={1} // Not used anymore, calculated inside BallCommentary
-                  bowlerName=""
-                  strikerName=""
-                  nonStrikerName=""
-                />
-              ) : (
-                <Typography variant="body2" sx={{ 
-                  fontStyle: 'italic', 
-                  color: '#666',
-                  textAlign: 'center',
-                  py: 2
-                }}>
-                  {innings.balls > 0 
-                    ? `${innings.balls} balls bowled - Detailed ball-by-ball data not available`
-                    : 'No balls bowled yet in this innings'
-                  }
-                </Typography>
-              )}
-            </Paper>
-          );
-        })}
+            )}
+          </Box>
+        )}
       </Box>
-
-      {/* Detailed Over-by-Over Commentary */}
-      <Typography variant="h6" gutterBottom sx={{ 
-        color: '#2c3e50', 
-        fontWeight: 'bold', 
-        mb: 2,
-        borderTop: '2px solid #e0e0e0',
-        pt: 2
-      }}>
-        📊 Detailed Over-by-Over Analysis
-      </Typography>
-
-      {match.innings.map((innings, inningsIndex) => (
-        <Accordion 
-          key={inningsIndex}
-          expanded={expandedPanel === `innings${inningsIndex}`}
-          onChange={handleChange(`innings${inningsIndex}`)}
-          sx={{ mb: 2, borderRadius: 2, '&:before': { display: 'none' } }}
-        >
-          <AccordionSummary 
-            expandIcon={<ExpandMoreIcon />}
-            sx={{ 
-              bgcolor: inningsIndex === 0 ? 'primary.light' : 'secondary.light',
-              color: 'white',
-              borderRadius: 2,
-              '&.Mui-expanded': { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }
-            }}
-          >
-            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-              {inningsIndex === 0 ? '🏏 First Innings' : '🔄 Second Innings'}: {' '}
-              {typeof innings.battingTeam === 'object' ? innings.battingTeam.name : 'Team'} - {' '}
-              {innings.totalRuns}/{innings.wickets} ({innings.overs}.{Math.floor((innings.balls || 0) % 6)} overs)
-            </Typography>
-          </AccordionSummary>
-          <AccordionDetails sx={{ bgcolor: 'background.paper' }}>
-            {/* Mock over-by-over commentary since we don't have actual over data */}
-            <Box sx={{ p: 2 }}>
-              <Typography variant="body1" color="text.secondary" sx={{ mb: 2, fontStyle: 'italic' }}>
-                📊 Innings Summary: {innings.totalRuns} runs, {innings.wickets} wickets in {innings.overs}.{Math.floor((innings.balls || 0) % 6)} overs
-              </Typography>
-              
-              <Divider sx={{ my: 2 }} />
-              
-              {/* Key Statistics */}
-              <Stack direction="row" spacing={3} sx={{ mb: 2, flexWrap: 'wrap' }}>
-                <Box>
-                  <Typography variant="body2" color="text.secondary">Run Rate</Typography>
-                  <Typography variant="h6" color="primary">{innings.runRate.toFixed(2)}</Typography>
-                </Box>
-                <Box>
-                  <Typography variant="body2" color="text.secondary">Extras</Typography>
-                  <Typography variant="h6" color="warning.main">{innings.extras.total}</Typography>
-                </Box>
-                {innings.requiredRunRate && (
-                  <Box>
-                    <Typography variant="body2" color="text.secondary">Required Rate</Typography>
-                    <Typography variant="h6" color="error.main">{innings.requiredRunRate.toFixed(2)}</Typography>
-                  </Box>
-                )}
-              </Stack>
-
-              {/* Extras Breakdown */}
-              {innings.extras.total > 0 && (
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="subtitle2" gutterBottom>Extras Breakdown:</Typography>
-                  <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-                    {innings.extras.wides > 0 && <Chip label={`Wides: ${innings.extras.wides}`} size="small" color="warning" />}
-                    {innings.extras.noBalls > 0 && <Chip label={`No Balls: ${innings.extras.noBalls}`} size="small" color="warning" />}
-                    {innings.extras.byes > 0 && <Chip label={`Byes: ${innings.extras.byes}`} size="small" color="info" />}
-                    {innings.extras.legByes > 0 && <Chip label={`Leg Byes: ${innings.extras.legByes}`} size="small" color="info" />}
-                  </Stack>
-                </Box>
-              )}
-
-              {/* Top Performers */}
-              <Box sx={{ mt: 3 }}>
-                <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
-                  🌟 Key Performances
-                </Typography>
-                
-                {/* Top Batsmen */}
-                {innings.battingStats && innings.battingStats.length > 0 && (
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="subtitle2" gutterBottom>Top Batsmen:</Typography>
-                    <TableContainer component={Paper} sx={{ maxHeight: 200 }}>
-                      <Table size="small">
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>{isMobile ? 'Player' : 'Batsman'}</TableCell>
-                            <TableCell align="right">{isMobile ? 'R' : 'Runs'}</TableCell>
-                            <TableCell align="right">{isMobile ? 'B' : 'Balls'}</TableCell>
-                            <TableCell align="right">4s</TableCell>
-                            <TableCell align="right">6s</TableCell>
-                            <TableCell align="right">SR</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {innings.battingStats
-                            .sort((a, b) => b.runs - a.runs)
-                            .slice(0, 3)
-                            .map((stat, index) => (
-                            <TableRow key={index}>
-                              <TableCell>
-                                {typeof stat.player === 'object' ? stat.player.name : 'Player'}
-                                {stat.isOut && ' *'}
-                              </TableCell>
-                              <TableCell align="right">{stat.runs}</TableCell>
-                              <TableCell align="right">{stat.balls}</TableCell>
-                              <TableCell align="right">{stat.fours}</TableCell>
-                              <TableCell align="right">{stat.sixes}</TableCell>
-                              <TableCell align="right">{stat.strikeRate.toFixed(1)}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  </Box>
-                )}
-
-                {/* Top Bowlers */}
-                {innings.bowlingStats && innings.bowlingStats.length > 0 && (
-                  <Box>
-                    <Typography variant="subtitle2" gutterBottom>Top Bowlers:</Typography>
-                    <TableContainer component={Paper} sx={{ maxHeight: 200 }}>
-                      <Table size="small">
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>{isMobile ? 'Player' : 'Bowler'}</TableCell>
-                            <TableCell align="right">{isMobile ? 'O' : 'Overs'}</TableCell>
-                            <TableCell align="right">{isMobile ? 'R' : 'Runs'}</TableCell>
-                            <TableCell align="right">{isMobile ? 'W' : 'Wickets'}</TableCell>
-                            <TableCell align="right">Economy</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {innings.bowlingStats
-                            .sort((a, b) => b.wickets - a.wickets || a.economy - b.economy)
-                            .slice(0, 3)
-                            .map((stat, index) => (
-                            <TableRow key={index}>
-                              <TableCell>
-                                {typeof stat.player === 'object' ? stat.player.name : 'Player'}
-                              </TableCell>
-                              <TableCell align="right">{stat.overs}.{stat.balls || 0}</TableCell>
-                              <TableCell align="right">{stat.runs}</TableCell>
-                              <TableCell align="right">{stat.wickets}</TableCell>
-                              <TableCell align="right">{stat.economy.toFixed(2)}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  </Box>
-                )}
-              </Box>
-            </Box>
-          </AccordionDetails>
-        </Accordion>
-      ))}
 
       {/* Match Result */}
       {match.result && (
-        <Box sx={{ mt: 2, p: 2, bgcolor: 'success.light', borderRadius: 2 }}>
-          <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'success.dark' }}>
-            🏆 Result: {match.result}
+        <Box sx={{ mt: 3, p: 2, bgcolor: 'success.light', borderRadius: 2 }}>
+          <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'success.dark', textAlign: 'center' }}>
+            🏆 {match.result}
           </Typography>
         </Box>
       )}

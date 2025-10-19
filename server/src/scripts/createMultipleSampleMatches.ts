@@ -156,9 +156,9 @@ async function createMultipleSampleMatches() {
       await matchesCollection.insertOne(match);
       createdCount++;
       
-      const team1Name = teams.find(t => t._id.equals(matchData.team1))?.name;
-      const team2Name = teams.find(t => t._id.equals(matchData.team2))?.name;
-      const tossWinnerName = teams.find(t => t._id.equals(matchData.tossWinner))?.name;
+      const team1Name = teams.find(t => t._id && matchData.team1 && t._id.equals(matchData.team1))?.name;
+      const team2Name = teams.find(t => t._id && matchData.team2 && t._id.equals(matchData.team2))?.name;
+      const tossWinnerName = teams.find(t => t._id && matchData.tossWinner && t._id.equals(matchData.tossWinner))?.name;
       
       console.log(`✅ Created: ${team1Name} vs ${team2Name}`);
       console.log(`   🏆 Toss: ${tossWinnerName} won and chose to ${matchData.tossDecision} first`);

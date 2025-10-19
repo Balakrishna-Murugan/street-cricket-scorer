@@ -100,8 +100,14 @@ const MatchCommentaryPage: React.FC = () => {
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
       {/* Header with Navigation */}
-      <Paper elevation={2} sx={{ p: 3, mb: 3, background: 'linear-gradient(45deg, #1976d2 30%, #42a5f5 90%)', color: 'white' }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+      <Paper elevation={2} sx={{ p: isMobile ? 2 : 3, mb: 3, background: 'linear-gradient(45deg, #1976d2 30%, #42a5f5 90%)', color: 'white' }}>
+        <Stack 
+          direction={isMobile ? "column" : "row"} 
+          justifyContent="space-between" 
+          alignItems={isMobile ? "stretch" : "center"} 
+          spacing={isMobile ? 1 : 0}
+          sx={{ mb: 2 }}
+        >
           <Button
             variant="outlined"
             startIcon={<ArrowBackIcon />}
@@ -109,13 +115,15 @@ const MatchCommentaryPage: React.FC = () => {
             sx={{ 
               color: 'white', 
               borderColor: 'white',
+              fontSize: isMobile ? '0.8rem' : '0.875rem',
+              py: isMobile ? 0.75 : 1,
               '&:hover': { 
                 borderColor: 'white', 
                 backgroundColor: 'rgba(255,255,255,0.1)' 
               }
             }}
           >
-            Back to Overview
+            {isMobile ? 'Back' : 'Back to Overview'}
           </Button>
           
           <Button
@@ -125,12 +133,14 @@ const MatchCommentaryPage: React.FC = () => {
             sx={{ 
               backgroundColor: 'white',
               color: 'primary.main',
+              fontSize: isMobile ? '0.8rem' : '0.875rem',
+              py: isMobile ? 0.75 : 1,
               '&:hover': { 
                 backgroundColor: 'rgba(255,255,255,0.9)' 
               }
             }}
           >
-            View Summary
+            {isMobile ? 'Summary' : 'View Summary'}
           </Button>
         </Stack>
         
