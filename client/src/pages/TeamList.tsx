@@ -279,7 +279,7 @@ const TeamList: React.FC = () => {
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                     <Typography variant="body2" color="text.secondary">Captain:</Typography>
                     <Typography variant="body2">
-                      {typeof team.captain === 'object' ? team.captain.name : team.captain || 'No Captain'}
+                      {team.captain && typeof team.captain === 'object' ? team.captain.name : team.captain || 'No Captain'}
                     </Typography>
                   </Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -341,7 +341,7 @@ const TeamList: React.FC = () => {
               {teams.map((team) => (
                 <TableRow key={team._id}>
                   <TableCell>{team.name}</TableCell>
-                  <TableCell>{typeof team.captain === 'object' ? team.captain.name : team.captain}</TableCell>
+                  <TableCell>{team.captain && typeof team.captain === 'object' ? team.captain.name : team.captain || 'No Captain'}</TableCell>
                   <TableCell>{team.members.length}</TableCell>
                   <TableCell>
                     <IconButton 
