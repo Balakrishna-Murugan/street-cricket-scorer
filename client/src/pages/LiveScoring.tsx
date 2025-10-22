@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { Match, Player, BallOutcome } from '../types';
 import { matchService, playerService } from '../services/api.service';
@@ -647,8 +647,8 @@ const LiveScoring: React.FC<Props> = () => {
             fallbackReconstruction();
           }
         } else if (totalBalls > 0 && currentBall === 0) {
-          // If total balls is multiple of 6, over might be completed
-          setIsOverCompleted(false);
+          // If total balls is multiple of 6, over is completed - need new bowler
+          setIsOverCompleted(true);
           setIsOverInProgress(false);
           setCurrentOverBalls([]);
         }
