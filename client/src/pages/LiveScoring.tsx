@@ -39,6 +39,15 @@ import ChangeCircleIcon from '@mui/icons-material/ChangeCircle';
 
 interface Props {}
 
+interface DialogContext {
+  title: string;
+  message: string;
+  showOnlyBowler: boolean;
+  showOnlyStriker: boolean;
+  showOnlyNonStriker: boolean;
+  gradientColor: string;
+}
+
 const LiveScoring: React.FC<Props> = () => {
   const { matchId } = useParams();
   const theme = useTheme();
@@ -135,69 +144,118 @@ const LiveScoring: React.FC<Props> = () => {
   }, [match, players, currentInnings]);
 
   // Helper function to get dialog context
-  const getDialogContext = useCallback(() => {
+  const getDialogContext = useCallback((): DialogContext => {
+    console.log('🔍 DEBUG getDialogContext called with:', {
+      changePlayerType,
+      isOverCompleted,
+      isWaitingForNewBatsman,
+      matchInningsLength: match?.innings?.length,
+      currentInnings
+    });
+
     if (changePlayerType) {
       // Player change context
       if (changePlayerType === 'bowler') {
-        return {
+        const context = {
           title: `🔄 Change Bowler (${changePlayerReason})`,
           message: 'Please select a new bowler:',
           showOnlyBowler: true,
+          showOnlyStriker: false,
+          showOnlyNonStriker: false,
           gradientColor: 'linear-gradient(45deg, #9C27B0 30%, #BA68C8 90%)'
         };
+        console.log('🔍 DEBUG returning bowler change context:', context);
+        return context;
       } else if (changePlayerType === 'striker') {
-        return {
+        const context = {
           title: `🔄 Change Striker (${changePlayerReason})`,
           message: 'Please select a new striker:',
+          showOnlyBowler: false,
           showOnlyStriker: true,
+          showOnlyNonStriker: false,
           gradientColor: 'linear-gradient(45deg, #FF5722 30%, #FF8A65 90%)'
         };
+        console.log('🔍 DEBUG returning striker change context:', context);
+        return context;
       } else if (changePlayerType === 'nonStriker') {
-        return {
+        const context = {
           title: `🔄 Change Non-Striker (${changePlayerReason})`,
           message: 'Please select a new non-striker:',
+          showOnlyBowler: false,
+          showOnlyStriker: false,
           showOnlyNonStriker: true,
           gradientColor: 'linear-gradient(45deg, #607D8B 30%, #90A4AE 90%)'
         };
+        console.log('🔍 DEBUG returning nonStriker change context:', context);
+        return context;
       }
     }
     
     if (isOverCompleted) {
-      return {
+      const context = {
         title: '🎯 Over Completed - Select New Bowler',
         message: 'The over is completed. Please select a new bowler to continue:',
         showOnlyBowler: true,
+        showOnlyStriker: false,
+        showOnlyNonStriker: false,
         gradientColor: 'linear-gradient(45deg, #FF9800 30%, #FFB74D 90%)'
       };
+      console.log('🔍 DEBUG returning over completed context:', context);
+      return context;
     } else if (isWaitingForNewBatsman) {
-      return {
+      const context = {
         title: '🏏 Wicket! Select New Batsman',
         message: 'A wicket has been taken. Please select a new striker to continue:',
+        showOnlyBowler: false,
         showOnlyStriker: true,
+        showOnlyNonStriker: false,
         gradientColor: 'linear-gradient(45deg, #f44336 30%, #e57373 90%)'
       };
+      console.log('🔍 DEBUG returning wicket context:', context);
+      return context;
     } else {
-      return {
+      const context = {
         title: '🏏 Select Players to Start Match',
         message: `Please select the striker, non-striker, and bowler to ${match && match.innings.length > 1 && currentInnings === 1 ? 'continue with the match' : 'start the match'}:`,
         showOnlyBowler: false,
         showOnlyStriker: false,
+        showOnlyNonStriker: false,
         gradientColor: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)'
       };
+      console.log('🔍 DEBUG returning default match start context:', context);
+      return context;
     }
   }, [isOverCompleted, isWaitingForNewBatsman, match, currentInnings, changePlayerType, changePlayerReason]);
 
   // Helper function to check if required selections are made based on context
   const areRequiredSelectionsComplete = useCallback(() => {
     const context = getDialogContext();
+    console.log('🔍 DEBUG areRequiredSelectionsComplete:', {
+      context,
+      bowler,
+      striker,
+      nonStriker,
+      showOnlyBowler: context.showOnlyBowler,
+      showOnlyStriker: context.showOnlyStriker,
+      showOnlyNonStriker: (context as any).showOnlyNonStriker
+    });
+
     if (context.showOnlyBowler) {
-      return !!bowler;
+      const result = !!bowler;
+      console.log('🔍 DEBUG showOnlyBowler check:', result);
+      return result;
     } else if (context.showOnlyStriker) {
-      return !!striker && striker !== nonStriker;
+      const result = !!striker && striker !== nonStriker;
+      console.log('🔍 DEBUG showOnlyStriker check:', result, { striker, nonStriker, different: striker !== nonStriker });
+      return result;
     } else if ((context as any).showOnlyNonStriker) {
-      return !!nonStriker && striker !== nonStriker;
+      const result = !!nonStriker && striker !== nonStriker;
+      console.log('🔍 DEBUG showOnlyNonStriker check:', result, { striker, nonStriker, different: striker !== nonStriker });
+      return result;
     } else {
-      return arePlayersSelected();
+      const result = arePlayersSelected();
+      console.log('🔍 DEBUG arePlayersSelected check:', result, { striker, nonStriker, bowler, strikerNotEqualNonStriker: striker !== nonStriker });
+      return result;
     }
   }, [getDialogContext, bowler, striker, nonStriker, arePlayersSelected]);
 
@@ -778,15 +836,32 @@ const LiveScoring: React.FC<Props> = () => {
 
   // Auto-open player selection dialog when match loads if no players selected
   useEffect(() => {
-    if (match && isAdmin && !arePlayersSelected() && !isPlayerSelectionDialogOpen && !loading) {
+    console.log('🔍 DEBUG Auto-open useEffect triggered:', {
+      match: !!match,
+      isAdmin,
+      arePlayersSelected: arePlayersSelected(),
+      isPlayerSelectionDialogOpen,
+      loading,
+      userDismissedDialog,
+      isOverInProgress,
+      striker,
+      nonStriker,
+      bowler
+    });
+
+    if (match && isAdmin && !isPlayerSelectionDialogOpen && !loading && !userDismissedDialog && 
+        (!arePlayersSelected() || (arePlayersSelected() && !isOverInProgress))) {
+      console.log('🔍 DEBUG Opening player selection dialog automatically');
       // Small delay to ensure UI has rendered
       const timer = setTimeout(() => {
         setIsPlayerSelectionDialogOpen(true);
       }, 500);
       
       return () => clearTimeout(timer);
+    } else {
+      console.log('🔍 DEBUG NOT opening dialog - conditions not met');
     }
-  }, [match, isAdmin, arePlayersSelected, isPlayerSelectionDialogOpen, loading]);
+  }, [match, isAdmin, arePlayersSelected, isPlayerSelectionDialogOpen, loading, userDismissedDialog, isOverInProgress, striker, nonStriker, bowler]);
 
   // Auto-open player selection dialog when over is completed and needs new bowler
   useEffect(() => {
@@ -4024,15 +4099,30 @@ const LiveScoring: React.FC<Props> = () => {
           <Button 
             variant="contained" 
             onClick={() => {
+              console.log('🔍 DEBUG Dialog Continue button clicked:', {
+                areRequiredSelectionsComplete: areRequiredSelectionsComplete(),
+                changePlayerType,
+                isOverCompleted,
+                isWaitingForNewBatsman,
+                striker,
+                nonStriker,
+                bowler,
+                getDialogContext: getDialogContext()
+              });
+
               if (areRequiredSelectionsComplete()) {
+                console.log('🔍 DEBUG Selections are complete, proceeding...');
+                setUserDismissedDialog(false); // Reset flag when players are properly selected
                 setIsPlayerSelectionDialogOpen(false);
                 
                 // Handle different contexts
                 if (changePlayerType) {
+                  console.log('🔍 DEBUG Handling player change context');
                   // Player change - reset the change state and continue
                   setChangePlayerType(null);
                   setChangePlayerReason('');
                 } else if (isOverCompleted) {
+                  console.log('🔍 DEBUG Handling over completion context');
                   // Over completion - reset the over completion state and clear current over
                   setIsOverCompleted(false);
                   setOverCompletionMessage('');
@@ -4051,14 +4141,18 @@ const LiveScoring: React.FC<Props> = () => {
                   localStorage.setItem(matchStorageKey, JSON.stringify([]));
                   console.log('Cleared currentOverBalls from localStorage for new over:', matchStorageKey);
                 } else if (isWaitingForNewBatsman) {
+                  console.log('🔍 DEBUG Handling wicket context');
                   // Wicket - reset the waiting state and continue
                   setIsWaitingForNewBatsman(false);
                 } else {
+                  console.log('🔍 DEBUG Handling match start/continue context');
                   // Match start/continue - start the match
                   setIsOverInProgress(true);
                   setIsOverCompleted(false);
                   setOverCompletionMessage('');
                 }
+              } else {
+                console.log('🔍 DEBUG Selections are NOT complete, button should be disabled');
               }
             }}
             disabled={!areRequiredSelectionsComplete()}
