@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { Match, Player, BallOutcome } from '../types';
+import { Match, Player, BallOutcome, PlayerRef } from '../types';
 import { matchService, playerService } from '../services/api.service';
 import MatchDetails from '../components/MatchDetails';
 import {
@@ -36,8 +36,53 @@ import {
 } from '@mui/material';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import ChangeCircleIcon from '@mui/icons-material/ChangeCircle';
+import UndoIcon from '@mui/icons-material/Undo';
 
 interface Props {}
+
+// Undo action types
+interface UndoAction {
+  id: string;
+  type: 'ball_outcome' | 'wicket' | 'extra' | 'player_change';
+  timestamp: number;
+  data: any;
+  matchState: {
+    totalRuns: number;
+    wickets: number;
+    balls: number;
+    overs: number;
+    striker: string;
+    nonStriker: string;
+    bowler: string;
+    strikerStats: {
+      runs: number;
+      balls: number;
+      fours?: number;
+      sixes?: number;
+      isOut?: boolean;
+      dismissalType?: string;
+      howOut?: string;
+      dismissedBy?: string | PlayerRef;
+      strikeRate?: number;
+      isOnStrike?: boolean;
+    };
+    nonStrikerStats: {
+      runs: number;
+      balls: number;
+      fours?: number;
+      sixes?: number;
+      isOut?: boolean;
+      dismissalType?: string;
+      howOut?: string;
+      dismissedBy?: string | PlayerRef;
+      strikeRate?: number;
+      isOnStrike?: boolean;
+    };
+    bowlerStats: { overs: number; runs: number; wickets: number; balls: number };
+    currentOverBalls: BallOutcome[];
+    extras: { wides: number; noBalls: number; byes: number; legByes: number; total: number };
+  };
+}
 
 interface DialogContext {
   title: string;
@@ -82,8 +127,30 @@ const LiveScoring: React.FC<Props> = () => {
   const [extraType, setExtraType] = useState<'bye' | 'leg-bye' | 'wide' | 'no-ball' | null>(null);
   const [extraRuns, setExtraRuns] = useState<number>(1);
 
-  const [strikerStats, setStrikerStats] = useState<{ runs: number; balls: number }>({ runs: 0, balls: 0 });
-  const [nonStrikerStats, setNonStrikerStats] = useState<{ runs: number; balls: number }>({ runs: 0, balls: 0 });
+  const [strikerStats, setStrikerStats] = useState<{
+    runs: number;
+    balls: number;
+    fours?: number;
+    sixes?: number;
+    isOut?: boolean;
+    dismissalType?: string;
+    howOut?: string;
+    dismissedBy?: string | PlayerRef;
+    strikeRate?: number;
+    isOnStrike?: boolean;
+  }>({ runs: 0, balls: 0 });
+  const [nonStrikerStats, setNonStrikerStats] = useState<{
+    runs: number;
+    balls: number;
+    fours?: number;
+    sixes?: number;
+    isOut?: boolean;
+    dismissalType?: string;
+    howOut?: string;
+    dismissedBy?: string | PlayerRef;
+    strikeRate?: number;
+    isOnStrike?: boolean;
+  }>({ runs: 0, balls: 0 });
   const [bowlerStats, setBowlerStats] = useState<{ overs: number; runs: number; wickets: number; balls: number }>({ overs: 0, runs: 0, wickets: 0, balls: 0 });
   const [allowBowlerChange, setAllowBowlerChange] = useState(false);
   const [bowlerChangeReason, setBowlerChangeReason] = useState('');
@@ -110,6 +177,10 @@ const LiveScoring: React.FC<Props> = () => {
   const [showBowlerChangeAlert, setShowBowlerChangeAlert] = useState(true);
   const [showBowlerRotationAlert, setShowBowlerRotationAlert] = useState(true);
   const [showInsufficientBatsmenAlert, setShowInsufficientBatsmenAlert] = useState(true);
+
+  // Undo functionality state
+  const [undoHistory, setUndoHistory] = useState<UndoAction[]>([]);
+  const [canUndo, setCanUndo] = useState(false);
 
   // Helper function to check if all required players are selected
   const arePlayersSelected = useCallback(() => {
@@ -974,6 +1045,57 @@ const LiveScoring: React.FC<Props> = () => {
       };
     }
 
+    // Save undo state BEFORE making any changes
+    const preBallStrikerStats = currentInning.battingStats && Array.isArray(currentInning.battingStats)
+      ? currentInning.battingStats.find((stat) => (typeof stat.player === 'string' ? stat.player : stat.player._id) === striker)
+      : null;
+    const preBallNonStrikerStats = currentInning.battingStats && Array.isArray(currentInning.battingStats)
+      ? currentInning.battingStats.find((stat) => (typeof stat.player === 'string' ? stat.player : stat.player._id) === nonStriker)
+      : null;
+
+    const undoAction: UndoAction = {
+      id: `ball_${Date.now()}`,
+      type: 'ball_outcome',
+      timestamp: Date.now(),
+      data: { runs, isExtra },
+      matchState: {
+        totalRuns: currentInning.totalRuns,
+        wickets: currentInning.wickets,
+        balls: currentInning.balls || 0,
+        overs: currentInning.overs,
+        striker,
+        nonStriker,
+        bowler,
+        strikerStats: preBallStrikerStats ? {
+          runs: preBallStrikerStats.runs,
+          balls: preBallStrikerStats.balls,
+          fours: preBallStrikerStats.fours || 0,
+          sixes: preBallStrikerStats.sixes || 0,
+          isOut: preBallStrikerStats.isOut || false,
+          dismissalType: preBallStrikerStats.dismissalType,
+          howOut: preBallStrikerStats.howOut,
+          dismissedBy: preBallStrikerStats.dismissedBy,
+          strikeRate: preBallStrikerStats.strikeRate || 0,
+          isOnStrike: preBallStrikerStats.isOnStrike || false
+        } : { runs: 0, balls: 0 },
+        nonStrikerStats: preBallNonStrikerStats ? {
+          runs: preBallNonStrikerStats.runs,
+          balls: preBallNonStrikerStats.balls,
+          fours: preBallNonStrikerStats.fours || 0,
+          sixes: preBallNonStrikerStats.sixes || 0,
+          isOut: preBallNonStrikerStats.isOut || false,
+          dismissalType: preBallNonStrikerStats.dismissalType,
+          howOut: preBallNonStrikerStats.howOut,
+          dismissedBy: preBallNonStrikerStats.dismissedBy,
+          strikeRate: preBallNonStrikerStats.strikeRate || 0,
+          isOnStrike: preBallNonStrikerStats.isOnStrike || false
+        } : { runs: 0, balls: 0 },
+        bowlerStats: { ...bowlerStats },
+        currentOverBalls: [...currentOverBalls],
+        extras: { ...currentInning.extras }
+      }
+    };
+
     if (!isExtra) {
       // Ensure battingStats array exists
       if (!currentInning.battingStats) {
@@ -1398,6 +1520,9 @@ const LiveScoring: React.FC<Props> = () => {
       
       // Update local state with the response data to keep in sync
       setMatch(data);
+
+      // Track action for undo
+      addToUndoHistory(undoAction);
     } catch (error: any) {
       setError('Error updating match');
       console.error('Error updating match:', error?.response?.data || error?.message || error);
@@ -1436,6 +1561,58 @@ const LiveScoring: React.FC<Props> = () => {
         lastBallRuns: runs
       };
     }
+
+    // CRITICAL FIX: Create undo action BEFORE making any changes
+    const preExtraStrikerStats = currentInning.battingStats && Array.isArray(currentInning.battingStats)
+      ? currentInning.battingStats.find((stat) => (typeof stat.player === 'string' ? stat.player : stat.player._id) === striker)
+      : null;
+    const preExtraNonStrikerStats = currentInning.battingStats && Array.isArray(currentInning.battingStats)
+      ? currentInning.battingStats.find((stat) => (typeof stat.player === 'string' ? stat.player : stat.player._id) === nonStriker)
+      : null;
+
+    const undoAction: UndoAction = {
+      id: `extra_${Date.now()}`,
+      type: 'extra',
+      timestamp: Date.now(),
+      data: { type, runs },
+      matchState: {
+        totalRuns: currentInning.totalRuns,
+        wickets: currentInning.wickets,
+        balls: currentInning.balls,
+        overs: currentInning.overs,
+        currentOverBalls: [...(currentInning.currentOverBalls || [])],
+        extras: { ...currentInning.extras },
+        striker,
+        nonStriker,
+        bowler,
+        strikerStats: preExtraStrikerStats ? {
+          runs: preExtraStrikerStats.runs,
+          balls: preExtraStrikerStats.balls,
+          fours: preExtraStrikerStats.fours || 0,
+          sixes: preExtraStrikerStats.sixes || 0,
+          isOut: preExtraStrikerStats.isOut || false,
+          dismissalType: preExtraStrikerStats.dismissalType,
+          howOut: preExtraStrikerStats.howOut,
+          dismissedBy: preExtraStrikerStats.dismissedBy,
+          strikeRate: preExtraStrikerStats.strikeRate || 0,
+          isOnStrike: preExtraStrikerStats.isOnStrike || false
+        } : { runs: 0, balls: 0 },
+        nonStrikerStats: preExtraNonStrikerStats ? {
+          runs: preExtraNonStrikerStats.runs,
+          balls: preExtraNonStrikerStats.balls,
+          fours: preExtraNonStrikerStats.fours || 0,
+          sixes: preExtraNonStrikerStats.sixes || 0,
+          isOut: preExtraNonStrikerStats.isOut || false,
+          dismissalType: preExtraNonStrikerStats.dismissalType,
+          howOut: preExtraNonStrikerStats.howOut,
+          dismissedBy: preExtraNonStrikerStats.dismissedBy,
+          strikeRate: preExtraNonStrikerStats.strikeRate || 0,
+          isOnStrike: preExtraNonStrikerStats.isOnStrike || false
+        } : { runs: 0, balls: 0 },
+        bowlerStats: { ...bowlerStats }
+      }
+    };
+    addToUndoHistory(undoAction);
 
     let ballsToAdd = 0;
     
@@ -1693,6 +1870,58 @@ const LiveScoring: React.FC<Props> = () => {
         lastBallRuns: 0
       };
     }
+
+    // CRITICAL FIX: Create undo action BEFORE making any changes
+    const preWicketStrikerStats = currentInning.battingStats && Array.isArray(currentInning.battingStats)
+      ? currentInning.battingStats.find((stat) => (typeof stat.player === 'string' ? stat.player : stat.player._id) === striker)
+      : null;
+    const preWicketNonStrikerStats = currentInning.battingStats && Array.isArray(currentInning.battingStats)
+      ? currentInning.battingStats.find((stat) => (typeof stat.player === 'string' ? stat.player : stat.player._id) === nonStriker)
+      : null;
+
+    const undoAction: UndoAction = {
+      id: `wicket_${Date.now()}`,
+      type: 'wicket',
+      timestamp: Date.now(),
+      data: { type, howOut, dismissedBy },
+      matchState: {
+        totalRuns: currentInning.totalRuns,
+        wickets: currentInning.wickets,
+        balls: currentInning.balls,
+        overs: currentInning.overs,
+        currentOverBalls: [...(currentInning.currentOverBalls || [])],
+        extras: { ...currentInning.extras },
+        striker,
+        nonStriker,
+        bowler,
+        strikerStats: preWicketStrikerStats ? {
+          runs: preWicketStrikerStats.runs,
+          balls: preWicketStrikerStats.balls,
+          fours: preWicketStrikerStats.fours || 0,
+          sixes: preWicketStrikerStats.sixes || 0,
+          isOut: preWicketStrikerStats.isOut || false,
+          dismissalType: preWicketStrikerStats.dismissalType,
+          howOut: preWicketStrikerStats.howOut,
+          dismissedBy: preWicketStrikerStats.dismissedBy,
+          strikeRate: preWicketStrikerStats.strikeRate || 0,
+          isOnStrike: preWicketStrikerStats.isOnStrike || false
+        } : { runs: 0, balls: 0 },
+        nonStrikerStats: preWicketNonStrikerStats ? {
+          runs: preWicketNonStrikerStats.runs,
+          balls: preWicketNonStrikerStats.balls,
+          fours: preWicketNonStrikerStats.fours || 0,
+          sixes: preWicketNonStrikerStats.sixes || 0,
+          isOut: preWicketNonStrikerStats.isOut || false,
+          dismissalType: preWicketNonStrikerStats.dismissalType,
+          howOut: preWicketNonStrikerStats.howOut,
+          dismissedBy: preWicketNonStrikerStats.dismissedBy,
+          strikeRate: preWicketNonStrikerStats.strikeRate || 0,
+          isOnStrike: preWicketNonStrikerStats.isOnStrike || false
+        } : { runs: 0, balls: 0 },
+        bowlerStats: { ...bowlerStats }
+      }
+    };
+    addToUndoHistory(undoAction);
 
     // Update batting stats - mark striker as out
     const strikerBattingStats = currentInning.battingStats && Array.isArray(currentInning.battingStats)
@@ -2017,6 +2246,209 @@ const LiveScoring: React.FC<Props> = () => {
     } catch (error: any) {
       setError('Error recording wicket');
       console.error('Error recording wicket:', error?.response?.data || error?.message || error);
+    }
+  };
+
+  // Undo functionality
+  const addToUndoHistory = useCallback((action: UndoAction) => {
+    setUndoHistory(prev => {
+      const newHistory = [...prev, action];
+      // Keep only last 10 actions to prevent memory issues
+      if (newHistory.length > 10) {
+        newHistory.shift();
+      }
+      setCanUndo(newHistory.length > 0);
+      return newHistory;
+    });
+  }, []);
+
+  const handleUndo = async () => {
+    if (!match || !matchId || undoHistory.length === 0) return;
+
+    const lastAction = undoHistory[undoHistory.length - 1];
+    const updatedMatch = { ...match };
+    updatedMatch.currentInnings = currentInnings;
+    const currentInning = updatedMatch.innings[currentInnings];
+
+    // Restore the match state from the action
+    const previousState = lastAction.matchState;
+    currentInning.totalRuns = previousState.totalRuns;
+    currentInning.wickets = previousState.wickets;
+    currentInning.currentOverBalls = previousState.currentOverBalls;
+    currentInning.extras = previousState.extras;
+
+    // Recalculate balls and overs based on the restored currentOverBalls array
+    // Count legal deliveries (exclude wides and no-balls from ball count)
+    const legalDeliveries = previousState.currentOverBalls.filter(ball =>
+      !ball.extras || (ball.extras.type !== 'wide' && ball.extras.type !== 'no-ball')
+    ).length;
+    currentInning.balls = previousState.balls - (previousState.currentOverBalls.length - legalDeliveries);
+
+    // Recalculate overs based on the corrected ball count
+    const totalInningsBalls = currentInning.balls;
+    const completeInningsOvers = Math.floor(totalInningsBalls / 6);
+    const remainingInningsBalls = totalInningsBalls % 6;
+    currentInning.overs = completeInningsOvers + (remainingInningsBalls / 10);
+
+    // Restore local state for current over balls
+    setCurrentOverBalls(previousState.currentOverBalls);
+
+    // Restore player states
+    setStriker(previousState.striker);
+    setNonStriker(previousState.nonStriker);
+    setBowler(previousState.bowler);
+
+    // Restore player stats
+    setStrikerStats(previousState.strikerStats);
+    setNonStrikerStats(previousState.nonStrikerStats);
+    setBowlerStats(previousState.bowlerStats);
+
+    // Restore batting stats
+    if (currentInning.battingStats) {
+      currentInning.battingStats.forEach(stat => {
+        if (typeof stat.player === 'string') {
+          if (stat.player === previousState.striker) {
+            stat.runs = previousState.strikerStats.runs;
+            stat.balls = previousState.strikerStats.balls;
+            stat.fours = previousState.strikerStats.fours || 0;
+            stat.sixes = previousState.strikerStats.sixes || 0;
+            stat.isOut = previousState.strikerStats.isOut || false;
+            stat.dismissalType = previousState.strikerStats.dismissalType;
+            stat.howOut = previousState.strikerStats.howOut;
+            stat.dismissedBy = previousState.strikerStats.dismissedBy;
+            stat.strikeRate = previousState.strikerStats.strikeRate || 0;
+            stat.isOnStrike = true;
+          } else if (stat.player === previousState.nonStriker) {
+            stat.runs = previousState.nonStrikerStats.runs;
+            stat.balls = previousState.nonStrikerStats.balls;
+            stat.fours = previousState.nonStrikerStats.fours || 0;
+            stat.sixes = previousState.nonStrikerStats.sixes || 0;
+            stat.isOut = previousState.nonStrikerStats.isOut || false;
+            stat.dismissalType = previousState.nonStrikerStats.dismissalType;
+            stat.howOut = previousState.nonStrikerStats.howOut;
+            stat.dismissedBy = previousState.nonStrikerStats.dismissedBy;
+            stat.strikeRate = previousState.nonStrikerStats.strikeRate || 0;
+            stat.isOnStrike = false;
+          }
+        } else {
+          if (stat.player._id === previousState.striker) {
+            stat.runs = previousState.strikerStats.runs;
+            stat.balls = previousState.strikerStats.balls;
+            stat.fours = previousState.strikerStats.fours || 0;
+            stat.sixes = previousState.strikerStats.sixes || 0;
+            stat.isOut = previousState.strikerStats.isOut || false;
+            stat.dismissalType = previousState.strikerStats.dismissalType;
+            stat.howOut = previousState.strikerStats.howOut;
+            stat.dismissedBy = previousState.strikerStats.dismissedBy;
+            stat.strikeRate = previousState.strikerStats.strikeRate || 0;
+            stat.isOnStrike = true;
+          } else if (stat.player._id === previousState.nonStriker) {
+            stat.runs = previousState.nonStrikerStats.runs;
+            stat.balls = previousState.nonStrikerStats.balls;
+            stat.fours = previousState.nonStrikerStats.fours || 0;
+            stat.sixes = previousState.nonStrikerStats.sixes || 0;
+            stat.isOut = previousState.nonStrikerStats.isOut || false;
+            stat.dismissalType = previousState.nonStrikerStats.dismissalType;
+            stat.howOut = previousState.nonStrikerStats.howOut;
+            stat.dismissedBy = previousState.nonStrikerStats.dismissedBy;
+            stat.strikeRate = previousState.nonStrikerStats.strikeRate || 0;
+            stat.isOnStrike = false;
+          }
+        }
+      });
+    }
+
+    // Restore bowling stats
+    if (currentInning.bowlingStats) {
+      currentInning.bowlingStats.forEach(stat => {
+        if (typeof stat.player === 'string') {
+          if (stat.player === previousState.bowler) {
+            stat.overs = previousState.bowlerStats.overs;
+            stat.runs = previousState.bowlerStats.runs;
+            stat.wickets = previousState.bowlerStats.wickets;
+            stat.balls = previousState.bowlerStats.balls;
+          }
+        } else {
+          if (stat.player._id === previousState.bowler) {
+            stat.overs = previousState.bowlerStats.overs;
+            stat.runs = previousState.bowlerStats.runs;
+            stat.wickets = previousState.bowlerStats.wickets;
+            stat.balls = previousState.bowlerStats.balls;
+          }
+        }
+      });
+    }
+
+    // Remove the undone action from history
+    setUndoHistory(prev => {
+      const newHistory = prev.slice(0, -1);
+      setCanUndo(newHistory.length > 0);
+      return newHistory;
+    });
+
+    // Save the restored state
+    try {
+      const cleanMatchData = (match: Match): Match => {
+        return {
+          ...match,
+          team1: typeof match.team1 === 'object' ? match.team1._id : match.team1,
+          team2: typeof match.team2 === 'object' ? match.team2._id : match.team2,
+          currentInnings: match.currentInnings || 0,
+          innings: match.innings.map(inning => ({
+            battingTeam: typeof inning.battingTeam === 'object' ? inning.battingTeam._id : inning.battingTeam,
+            bowlingTeam: typeof inning.bowlingTeam === 'object' ? inning.bowlingTeam._id : inning.bowlingTeam,
+            totalRuns: inning.totalRuns,
+            wickets: inning.wickets,
+            overs: inning.overs,
+            balls: inning.balls || 0,
+            isCompleted: inning.isCompleted || false,
+            battingStats: inning.battingStats.map(stat => ({
+              player: typeof stat.player === 'object' ? stat.player._id : stat.player,
+              runs: stat.runs,
+              balls: stat.balls,
+              fours: stat.fours,
+              sixes: stat.sixes,
+              isOut: stat.isOut,
+              dismissalType: stat.dismissalType,
+              howOut: stat.howOut,
+              dismissedBy: stat.dismissedBy,
+              strikeRate: stat.strikeRate || 0,
+              isOnStrike: stat.isOnStrike || false
+            })),
+            bowlingStats: inning.bowlingStats.map(stat => ({
+              player: typeof stat.player === 'object' ? stat.player._id : stat.player,
+              overs: stat.overs,
+              balls: stat.balls || 0,
+              runs: stat.runs,
+              wickets: stat.wickets,
+              wides: stat.wides || 0,
+              noBalls: stat.noBalls || 0,
+              economy: stat.economy || 0,
+              lastBowledOver: stat.lastBowledOver
+            })),
+            currentState: inning.currentState || {
+              currentOver: 0,
+              currentBall: 0,
+              lastBallRuns: 0
+            },
+            extras: {
+              ...inning.extras,
+              total: inning.extras.total || 0
+            },
+            runRate: inning.runRate || 0,
+            requiredRunRate: inning.requiredRunRate,
+            currentOverBalls: inning.currentOverBalls || [],
+            recentBalls: inning.recentBalls || []
+          }))
+        };
+      };
+
+      const cleanedMatch = cleanMatchData(updatedMatch);
+      const { data } = await matchService.updateScore(matchId, cleanedMatch);
+      setMatch(data);
+    } catch (error: any) {
+      setError('Error undoing action');
+      console.error('Error undoing action:', error?.response?.data || error?.message || error);
     }
   };
 
@@ -2895,7 +3327,7 @@ const LiveScoring: React.FC<Props> = () => {
         <Box 
           sx={{ 
             display: 'grid',
-            gridTemplateColumns: isMobile ? 'repeat(4, 1fr)' : 'repeat(6, 1fr)',
+            gridTemplateColumns: isMobile ? 'repeat(4, 1fr)' : 'repeat(8, 1fr)',
             gap: isMobile ? 0.5 : 2
           }}
         >
@@ -2958,6 +3390,36 @@ const LiveScoring: React.FC<Props> = () => {
           >
             W
           </Button>
+          <Tooltip title={canUndo ? "Undo last action" : "No actions to undo"}>
+            <span>
+              <IconButton
+                onClick={handleUndo}
+                disabled={!canUndo || !isAdmin || isMatchCompleted}
+                sx={{
+                  minWidth: isMobile ? '35px' : '60px',
+                  minHeight: isMobile ? '35px' : '60px',
+                  borderRadius: isMobile ? '6px' : '12px',
+                  background: canUndo ? 'linear-gradient(45deg, #FF9800 30%, #F57C00 90%)' : 'rgba(255, 255, 255, 0.1)',
+                  color: canUndo ? '#fff' : '#ccc',
+                  border: canUndo ? '2px solid #FF9800' : '2px solid #ccc',
+                  boxShadow: canUndo ? '0 4px 12px rgba(255, 152, 0, 0.4)' : 'none',
+                  transition: 'all 0.3s ease',
+                  '&:hover': canUndo ? {
+                    background: 'linear-gradient(45deg, #F57C00 30%, #EF6C00 90%)',
+                    transform: isMobile ? 'scale(0.98)' : 'translateY(-2px)',
+                    boxShadow: isMobile ? '0 2px 6px rgba(255, 152, 0, 0.5)' : '0 6px 16px rgba(255, 152, 0, 0.5)',
+                  } : {},
+                  '&:disabled': {
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    color: '#ccc',
+                    border: '2px solid #ccc',
+                  }
+                }}
+              >
+                <UndoIcon sx={{ fontSize: isMobile ? '1.2rem' : '1.8rem' }} />
+              </IconButton>
+            </span>
+          </Tooltip>
         </Box>
       </Box>
 
