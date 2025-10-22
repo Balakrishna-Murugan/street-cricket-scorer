@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Paper,
@@ -8,7 +8,11 @@ import {
   useTheme,
   useMediaQuery,
   Chip,
-  Stack
+  Stack,
+  IconButton,
+  Tooltip,
+  Switch,
+  FormControlLabel
 } from '@mui/material';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Match, Team } from '../types';
@@ -16,6 +20,7 @@ import { matchService, teamService } from '../services/api.service';
 import MatchCommentary from '../components/MatchCommentary';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SummarizeIcon from '@mui/icons-material/Summarize';
+import RefreshIcon from '@mui/icons-material/Refresh';
 
 const MatchCommentaryPage: React.FC = () => {
   const { matchId } = useParams();
@@ -27,34 +32,61 @@ const MatchCommentaryPage: React.FC = () => {
   const [teams, setTeams] = useState<{ [key: string]: Team }>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+  const fetchData = useCallback(async (showLoading = true) => {
+    try {
+      if (showLoading) setLoading(true);
+      setError(null);
+      setRefreshing(true);
 
-        // Fetch match details
-        const matchResponse = await matchService.getById(matchId!);
-        setMatch(matchResponse.data);
+      // Fetch match details
+      const matchResponse = await matchService.getById(matchId!);
+      setMatch(matchResponse.data);
+      setLastRefresh(new Date());
 
-        // Fetch all teams
+      // Fetch all teams (only if not already fetched)
+      if (Object.keys(teams).length === 0) {
         const teamsResponse = await teamService.getAll();
         const teamsMap = teamsResponse.data.reduce((acc: any, team: Team) => {
           acc[team._id!] = team;
           return acc;
         }, {});
         setTeams(teamsMap);
-      } catch (err) {
-        console.error('Error fetching match data:', err);
-        setError('Failed to load match data');
-      } finally {
-        setLoading(false);
       }
-    };
+    } catch (err) {
+      console.error('Error fetching match data:', err);
+      setError('Failed to load match data');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [matchId, teams]);
 
+  useEffect(() => {
     fetchData();
-  }, [matchId]);
+  }, [fetchData]);
+
+  // Auto-refresh effect
+  useEffect(() => {
+    if (!autoRefresh) return;
+
+    const interval = setInterval(() => {
+      fetchData(false); // Don't show loading spinner for auto-refresh
+    }, 10000); // Refresh every 10 seconds
+
+    return () => clearInterval(interval);
+  }, [autoRefresh, fetchData]);
+
+  const handleManualRefresh = () => {
+    fetchData(false);
+  };
+
+  const handleToggleAutoRefresh = () => {
+    setAutoRefresh(!autoRefresh);
+  };
 
   const getTeamName = (team: string | { _id: string; name: string }): string => {
     if (typeof team === 'object' && team.name) {
@@ -202,6 +234,68 @@ const MatchCommentaryPage: React.FC = () => {
             >
               📺 Live Commentary
             </Typography>
+            
+            {/* Auto-refresh controls */}
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Tooltip title="Refresh commentary">
+                <IconButton
+                  onClick={handleManualRefresh}
+                  disabled={refreshing}
+                  sx={{ 
+                    color: 'white',
+                    '&:hover': { 
+                      backgroundColor: 'rgba(255,255,255,0.15)',
+                      transform: 'scale(1.1)'
+                    },
+                    transition: 'all 0.2s ease',
+                    '& .MuiSvgIcon-root': {
+                      animation: refreshing ? 'spin 1s linear infinite' : 'none'
+                    },
+                    '@keyframes spin': {
+                      '0%': { transform: 'rotate(0deg)' },
+                      '100%': { transform: 'rotate(360deg)' }
+                    }
+                  }}
+                >
+                  {refreshing ? <RefreshIcon sx={{ animation: 'spin 1s linear infinite' }} /> : <RefreshIcon />}
+                </IconButton>
+              </Tooltip>
+              
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={autoRefresh}
+                    onChange={handleToggleAutoRefresh}
+                    color="secondary"
+                    size="small"
+                  />
+                }
+                label={
+                  <Typography variant="caption" sx={{ color: 'white', fontWeight: 'medium' }}>
+                    Auto-refresh
+                  </Typography>
+                }
+                sx={{ 
+                  '& .MuiFormControlLabel-label': { 
+                    fontSize: '0.75rem',
+                    userSelect: 'none'
+                  }
+                }}
+              />
+              
+              {lastRefresh && (
+                <Typography 
+                  variant="caption" 
+                  sx={{ 
+                    color: 'rgba(255,255,255,0.8)',
+                    fontSize: '0.7rem',
+                    ml: 1
+                  }}
+                >
+                  Last updated: {lastRefresh.toLocaleTimeString()}
+                </Typography>
+              )}
+            </Stack>
           </Stack>
         </Box>
       </Paper>
