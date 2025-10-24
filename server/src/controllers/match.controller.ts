@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import { Match } from '../models/match.model';
+import { Team } from '../models/team.model';
 import { LiveScoringService, BallData } from '../services/liveScoringService';
 
 export const matchController = {
@@ -125,6 +127,27 @@ export const matchController = {
   // Update match
   update: async (req: Request, res: Response) => {
     try {
+      const { id } = req.params;
+      const updateData = req.body;
+
+      // Validate required fields
+      if (!updateData.team1 || !updateData.team2) {
+        return res.status(400).json({ message: 'Both teams must be selected' });
+      }
+
+      if (!updateData.overs || updateData.overs <= 0) {
+        return res.status(400).json({ message: 'Number of overs must be greater than 0' });
+      }
+
+      // Validate ObjectId format
+      if (!mongoose.Types.ObjectId.isValid(updateData.team1) || !mongoose.Types.ObjectId.isValid(updateData.team2)) {
+        return res.status(400).json({ message: 'Invalid team ID format' });
+      }
+
+      if (updateData.tossWinner && !mongoose.Types.ObjectId.isValid(updateData.tossWinner)) {
+        return res.status(400).json({ message: 'Invalid toss winner ID format' });
+      }
+
       const match = await Match.findByIdAndUpdate(
         req.params.id,
         { $set: req.body },
@@ -132,16 +155,21 @@ export const matchController = {
       )
         .populate('team1', 'name')
         .populate('team2', 'name')
-        .populate('innings.battingTeam')
-        .populate('innings.bowlingTeam')
-        .populate('innings.battingStats.playerId', 'name')
-        .populate('innings.bowlingStats.playerId', 'name');
+        .populate('tossWinner', 'name')
+        .populate('innings.battingTeam', 'name')
+        .populate('innings.bowlingTeam', 'name')
+        .populate('innings.battingStats.player', 'name')
+        .populate('innings.bowlingStats.player', 'name')
+        .populate('innings.currentState.onStrikeBatsman', 'name')
+        .populate('innings.currentState.offStrikeBatsman', 'name')
+        .populate('innings.currentState.currentBowler', 'name');
 
       if (!match) {
         return res.status(404).json({ message: 'Match not found' });
       }
       res.json(match);
     } catch (error: any) {
+      console.error('Error updating match:', error);
       res.status(400).json({ message: error.message || 'Error updating match' });
     }
   },

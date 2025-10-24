@@ -143,8 +143,16 @@ const MatchOverview: React.FC = () => {
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 3 }}>
-      <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
+    <Container maxWidth="lg" sx={{ py: isMobile ? 1 : 3 }}>
+      <Paper 
+        elevation={3} 
+        sx={{ 
+          p: isMobile ? 1 : 3, 
+          mb: 3,
+          background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
+          color: 'white'
+        }}
+      >
         {/* Match Header */}
         <Box sx={{ textAlign: 'center', mb: 4 }}>
           <Typography 
@@ -222,9 +230,6 @@ const MatchOverview: React.FC = () => {
 
         {/* Navigation Buttons */}
         <Box sx={{ textAlign: 'center' }}>
-          <Typography variant="h6" gutterBottom sx={{ mb: 3 }}>
-            Choose what you want to do:
-          </Typography>
           
           <Stack 
             direction={isMobile ? "column" : "row"} 
@@ -232,53 +237,11 @@ const MatchOverview: React.FC = () => {
             justifyContent="center"
             alignItems="center"
           >
-            {/* View Options - Always Available */}
-            <Stack 
-              direction={isMobile ? "column" : "row"} 
-              spacing={2}
-            >
-              <Button
-                variant="contained"
-                size="large"
-                startIcon={<SummarizeIcon />}
-                onClick={() => navigate(`/matches/${matchId}/summary`)}
-                sx={{ 
-                  minWidth: isMobile ? '100%' : '180px',
-                  py: 2,
-                  fontSize: '1rem'
-                }}
-              >
-                View Summary
-              </Button>
-              
-              <Button
-                variant="outlined"
-                size="large"
-                startIcon={<CommentIcon />}
-                onClick={() => navigate(`/matches/${matchId}/commentary`)}
-                sx={{ 
-                  minWidth: isMobile ? '100%' : '180px',
-                  py: 2,
-                  fontSize: '1rem'
-                }}
-              >
-                Live Commentary
-              </Button>
-            </Stack>
-
-            {/* Admin Actions - Only for Admins and SuperAdmins */}
+            {/* Admin Actions - Only for Admins and SuperAdmins */}  
             {(isAdmin || isSuperAdmin) && (
               <Stack 
                 direction={isMobile ? "column" : "row"} 
                 spacing={2}
-                sx={{ 
-                  borderLeft: !isMobile ? '2px solid #e0e0e0' : 'none',
-                  borderTop: isMobile ? '2px solid #e0e0e0' : 'none',
-                  pl: !isMobile ? 3 : 0,
-                  pt: isMobile ? 3 : 0,
-                  ml: !isMobile ? 3 : 0,
-                  mt: isMobile ? 3 : 0
-                }}
               >
                 {match.status === 'upcoming' && (
                   <Button
@@ -290,7 +253,11 @@ const MatchOverview: React.FC = () => {
                     sx={{ 
                       minWidth: isMobile ? '100%' : '180px',
                       py: 2,
-                      fontSize: '1rem'
+                      fontSize: '1rem',
+                      background: 'linear-gradient(45deg, #4CAF50 30%, #8BC34A 90%)',
+                      '&:hover': {
+                        background: 'linear-gradient(45deg, #388E3C 30%, #689F38 90%)',
+                      }
                     }}
                   >
                     Start Match
@@ -307,7 +274,11 @@ const MatchOverview: React.FC = () => {
                     sx={{ 
                       minWidth: isMobile ? '100%' : '180px',
                       py: 2,
-                      fontSize: '1rem'
+                      fontSize: '1rem',
+                      background: 'linear-gradient(45deg, #FF9800 30%, #FFB74D 90%)',
+                      '&:hover': {
+                        background: 'linear-gradient(45deg, #F57C00 30%, #FFA726 90%)',
+                      }
                     }}
                   >
                     Continue Match
@@ -315,14 +286,62 @@ const MatchOverview: React.FC = () => {
                 )}
               </Stack>
             )}
+
+            {/* View Options - Always Available */}
+            <Stack 
+              direction={isMobile ? "column" : "row"} 
+              spacing={2}
+              sx={{ 
+                borderLeft: !isMobile && (isAdmin || isSuperAdmin) ? '2px solid rgba(255,255,255,0.3)' : 'none',
+                borderTop: isMobile && (isAdmin || isSuperAdmin) ? '2px solid rgba(255,255,255,0.3)' : 'none',
+                pl: !isMobile && (isAdmin || isSuperAdmin) ? 3 : 0,
+                pt: isMobile && (isAdmin || isSuperAdmin) ? 3 : 0,
+                ml: !isMobile && (isAdmin || isSuperAdmin) ? 3 : 0,
+                mt: isMobile && (isAdmin || isSuperAdmin) ? 3 : 0
+              }}
+            >
+              <Button
+                variant="outlined"
+                size="large"
+                startIcon={<CommentIcon />}
+                onClick={() => navigate(`/matches/${matchId}/commentary`)}
+                sx={{ 
+                  minWidth: isMobile ? '100%' : '180px',
+                  py: 2,
+                  fontSize: '1rem',
+                  color: 'white',
+                  borderColor: 'rgba(255,255,255,0.5)',
+                  '&:hover': {
+                    borderColor: 'white',
+                    backgroundColor: 'rgba(255,255,255,0.1)',
+                  }
+                }}
+              >
+                Live Commentary
+              </Button>
+              
+              <Button
+                variant="outlined"
+                size="large"
+                startIcon={<SummarizeIcon />}
+                onClick={() => navigate(`/matches/${matchId}/summary`)}
+                sx={{ 
+                  minWidth: isMobile ? '100%' : '180px',
+                  py: 2,
+                  fontSize: '1rem',
+                  color: 'white',
+                  borderColor: 'rgba(255,255,255,0.5)',
+                  '&:hover': {
+                    borderColor: 'white',
+                    backgroundColor: 'rgba(255,255,255,0.1)',
+                  }
+                }}
+              >
+                View Summary
+              </Button>
+            </Stack>
           </Stack>
           
-          <Typography variant="body2" color="textSecondary" sx={{ mt: 3 }}>
-            {(isAdmin || isSuperAdmin) 
-              ? "View match details, commentary, or manage the match"
-              : "View detailed statistics and scores, or watch the ball-by-ball commentary"
-            }
-          </Typography>
         </Box>
       </Paper>
     </Container>

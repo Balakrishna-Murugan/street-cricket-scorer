@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Paper,
@@ -7,17 +7,48 @@ import {
   Stack,
   useMediaQuery,
   useTheme,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
 import { Match, BallOutcome } from '../types';
 import BallCommentary from './BallCommentary';
+import RefreshIcon from '@mui/icons-material/Refresh';
 
 interface MatchCommentaryProps {
   match: Match;
+  onRefresh?: () => void;
 }
 
-const MatchCommentary: React.FC<MatchCommentaryProps> = ({ match }) => {
+const MatchCommentary: React.FC<MatchCommentaryProps> = ({ match, onRefresh }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState(new Date());
+
+  const handleRefresh = useCallback(async () => {
+    if (onRefresh && !isRefreshing) {
+      setIsRefreshing(true);
+      try {
+        await onRefresh();
+        setLastRefresh(new Date());
+      } catch (error) {
+        console.error('Failed to refresh commentary:', error);
+      } finally {
+        setIsRefreshing(false);
+      }
+    }
+  }, [onRefresh, isRefreshing]);
+
+  // Auto-refresh every 30 seconds for live matches
+  useEffect(() => {
+    if (match?.status === 'in-progress' && onRefresh) {
+      const interval = setInterval(() => {
+        handleRefresh();
+      }, 30000); // 30 seconds
+
+      return () => clearInterval(interval);
+    }
+  }, [match?.status, onRefresh, handleRefresh]);
 
   // Only show live commentary for matches that are currently in progress
   if (!match || match.status !== 'in-progress') {
@@ -26,7 +57,9 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({ match }) => {
         p: isMobile ? 2 : 3, 
         borderRadius: 2, 
         background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
-        boxShadow: '0 8px 32px rgba(2, 14, 67, 0.3)'
+        boxShadow: '0 8px 32px rgba(2, 14, 67, 0.3)',
+        mx: isMobile ? 1 : 0,
+        mb: isMobile ? 2 : 0
       }}>
         <Typography 
           variant={isMobile ? 'subtitle1' : 'h6'} 
@@ -58,7 +91,9 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({ match }) => {
         p: isMobile ? 2 : 3, 
         borderRadius: 2, 
         background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
-        boxShadow: '0 8px 32px rgba(2, 14, 67, 0.3)'
+        boxShadow: '0 8px 32px rgba(2, 14, 67, 0.3)',
+        mx: isMobile ? 1 : 0,
+        mb: isMobile ? 2 : 0
       }}>
         <Typography 
           variant={isMobile ? 'subtitle1' : 'h6'} 
@@ -92,7 +127,9 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({ match }) => {
         p: isMobile ? 2 : 3, 
         borderRadius: 2, 
         background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
-        boxShadow: '0 8px 32px rgba(2, 14, 67, 0.3)'
+        boxShadow: '0 8px 32px rgba(2, 14, 67, 0.3)',
+        mx: isMobile ? 1 : 0,
+        mb: isMobile ? 2 : 0
       }}>
         <Typography 
           variant={isMobile ? 'subtitle1' : 'h6'} 
@@ -158,24 +195,75 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({ match }) => {
 
   return (
     <Paper sx={{ 
-      p: isMobile ? 2 : 3, 
+      p: isMobile ? 2 : 3, // Increased padding on mobile since we have more space
       borderRadius: 2, 
       background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
-      boxShadow: '0 8px 32px rgba(2, 14, 67, 0.3)'
+      boxShadow: '0 8px 32px rgba(2, 14, 67, 0.3)',
+      mx: isMobile ? 1 : 0, // Add small margins on mobile for better spacing
+      mb: isMobile ? 2 : 0 // Add bottom margin on mobile
     }}>
-      <Typography 
-        variant={isMobile ? 'subtitle1' : 'h6'} 
-        gutterBottom 
-        sx={{ 
-          color: 'white', 
-          fontWeight: 'bold', 
-          mb: isMobile ? 2 : 3,
-          fontSize: isMobile ? '1rem' : '1.25rem',
-          textShadow: '2px 2px 4px rgba(0,0,0,0.3)'
-        }}
-      >
-        🏏 Live Commentary
-      </Typography>
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        mb: isMobile ? 2 : 3
+      }}>
+        <Typography 
+          variant={isMobile ? 'subtitle1' : 'h6'} 
+          sx={{ 
+            color: 'white', 
+            fontWeight: 'bold',
+            fontSize: isMobile ? '1rem' : '1.25rem',
+            textShadow: '2px 2px 4px rgba(0,0,0,0.3)'
+          }}
+        >
+          🏏 Live Commentary
+        </Typography>
+        
+        {/* Refresh Button - Only show for live matches */}
+        {match?.status === 'in-progress' && onRefresh && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {isMobile && (
+              <Typography variant="caption" sx={{ 
+                color: 'rgba(255, 255, 255, 0.7)',
+                fontSize: '0.65rem'
+              }}>
+                Auto-refresh
+              </Typography>
+            )}
+            <Tooltip title={`Last updated: ${lastRefresh.toLocaleTimeString()}`}>
+              <IconButton
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                size="small"
+                sx={{
+                  color: 'white',
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  '&:hover': {
+                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                    transform: 'scale(1.1)'
+                  },
+                  '&:disabled': {
+                    opacity: 0.5
+                  }
+                }}
+              >
+                <RefreshIcon 
+                  sx={{ 
+                    fontSize: isMobile ? '1rem' : '1.2rem',
+                    animation: isRefreshing ? 'spin 1s linear infinite' : 'none',
+                    '@keyframes spin': {
+                      '0%': { transform: 'rotate(0deg)' },
+                      '100%': { transform: 'rotate(360deg)' }
+                    }
+                  }} 
+                />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        )}
+      </Box>
 
       <Box sx={{ mb: isMobile ? 2 : 3 }}>
         {/* Innings Header */}
@@ -230,15 +318,17 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({ match }) => {
               boxShadow: '0 2px 8px rgba(255,255,255,0.3)'
             }}
           />
-          <Chip 
-            label={`${Math.floor(currentInnings.balls / 6)}${currentInnings.balls % 6 > 0 ? `.${currentInnings.balls % 6}` : ''} overs`}
-            sx={{
-              fontSize: isMobile ? '0.75rem' : '0.875rem',
-              backgroundColor: 'rgba(255, 255, 255, 0.2)',
-              color: 'white',
-              border: '1px solid rgba(255, 255, 255, 0.3)'
-            }}
-          />
+          {currentInnings.balls > 0 && (
+            <Chip 
+              label={`${Math.floor(currentInnings.balls / 6)}${currentInnings.balls % 6 > 0 ? `.${currentInnings.balls % 6}` : ''} overs`}
+              sx={{
+                fontSize: isMobile ? '0.75rem' : '0.875rem',
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                color: 'white',
+                border: '1px solid rgba(255, 255, 255, 0.3)'
+              }}
+            />
+          )}
           {currentInnings.runRate && (
             <Chip 
               label={`RR: ${currentInnings.runRate.toFixed(2)}`}
@@ -251,109 +341,6 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({ match }) => {
             />
           )}
         </Stack>
-        
-        {/* Fall of Wickets */}
-        {(() => {
-          const fallOfWickets = currentInnings.battingStats
-            .filter(stat => stat.isOut)
-            .map((stat, index) => {
-              const playerName = typeof stat.player === 'object' ? 
-                stat.player.name : 
-                'Player';
-              
-              // Calculate runs at this wicket
-              let runsAtWicket = 0;
-              for (let i = 0; i <= currentInnings.battingStats.indexOf(stat); i++) {
-                runsAtWicket += currentInnings.battingStats[i].runs || 0;
-              }
-              
-              return {
-                wicketNumber: index + 1,
-                playerName,
-                runs: stat.runs,
-                totalRuns: runsAtWicket,
-                dismissalType: stat.dismissalType || 'out'
-              };
-            });
-
-          if (fallOfWickets.length > 0) {
-            return (
-              <Box sx={{ 
-                mb: 2, 
-                p: 2, 
-                bgcolor: 'rgba(255,255,255,0.95)', 
-                borderRadius: 2,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                border: '1px solid rgba(255,255,255,0.3)'
-              }}>
-                <Typography 
-                  variant="subtitle2" 
-                  sx={{ 
-                    color: '#020e43', 
-                    fontWeight: 'bold', 
-                    mb: 1.5, 
-                    fontSize: isMobile ? '0.85rem' : '0.95rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1
-                  }}
-                >
-                  📉 Fall of Wickets
-                </Typography>
-                <Stack spacing={1}>
-                  {fallOfWickets.map((wicket: { wicketNumber: number; playerName: string; runs: number; totalRuns: number; dismissalType: string }) => (
-                    <Box
-                      key={wicket.wicketNumber}
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 1.5,
-                        p: 1,
-                        bgcolor: wicket.wicketNumber % 2 === 0 ? 'rgba(240, 240, 240, 0.5)' : 'transparent',
-                        borderRadius: 1,
-                        borderLeft: '3px solid #d32f2f',
-                      }}
-                    >
-                      <Chip
-                        label={`${wicket.totalRuns}/${wicket.wicketNumber}`}
-                        size="small"
-                        sx={{
-                          bgcolor: '#d32f2f',
-                          color: 'white',
-                          fontWeight: 'bold',
-                          fontSize: isMobile ? '0.7rem' : '0.75rem',
-                          minWidth: '50px'
-                        }}
-                      />
-                      <Box>
-                        <Typography 
-                          variant="body2" 
-                          sx={{ 
-                            fontWeight: 600,
-                            fontSize: isMobile ? '0.75rem' : '0.85rem',
-                            color: '#1a1a2e'
-                          }}
-                        >
-                          {wicket.playerName}
-                        </Typography>
-                        <Typography 
-                          variant="caption" 
-                          sx={{ 
-                            color: '#666',
-                            fontSize: isMobile ? '0.65rem' : '0.7rem'
-                          }}
-                        >
-                          {wicket.runs} runs • {wicket.dismissalType}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  ))}
-                </Stack>
-              </Box>
-            );
-          }
-          return null;
-        })()}
         
         {/* Ball Commentary */}
         {allBalls.length > 0 ? (
@@ -371,7 +358,7 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({ match }) => {
               fontStyle: 'italic', 
               color: 'rgba(255, 255, 255, 0.9)',
               textAlign: 'center',
-              py: 3,
+              py: isMobile ? 2 : 3,
               bgcolor: 'rgba(255,255,255,0.1)',
               borderRadius: 2,
               mb: 2,
@@ -403,7 +390,7 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({ match }) => {
       {match.result && (
         <Box sx={{ 
           mt: 3, 
-          p: 2, 
+          p: isMobile ? 1.5 : 2, 
           background: 'linear-gradient(135deg, rgba(76, 175, 80, 0.2) 0%, rgba(139, 195, 74, 0.2) 100%)', 
           borderRadius: 2,
           border: '2px solid rgba(76, 175, 80, 0.5)',

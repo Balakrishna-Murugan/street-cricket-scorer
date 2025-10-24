@@ -184,23 +184,51 @@ const PlayerList: React.FC = () => {
 
   return (
     <Container maxWidth="lg" sx={{ py: isMobile ? 2 : 3, px: { xs: 1, sm: 3 } }}>
+      {/* Header with Navy Gradient Theme */}
       {!isMobile && (
-        <Box sx={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          mb: 3
-        }}>
-          <Typography variant="h5">Players</Typography>
-          <Button 
-            variant="contained" 
-            color="primary" 
-            onClick={handleOpen}
-            startIcon={<AddIcon />}
-          >
-            Add Player
-          </Button>
-        </Box>
+        <Paper 
+          elevation={3}
+          sx={{ 
+            p: 3,
+            background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
+            borderRadius: 3,
+            color: 'white',
+            mb: 3
+          }}
+        >
+          <Box sx={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center'
+          }}>
+            <Typography 
+              variant="h5" 
+              sx={{ 
+                fontWeight: 'bold',
+                textShadow: '2px 2px 4px rgba(0,0,0,0.3)'
+              }}
+            >
+              Players
+            </Typography>
+            <Button 
+              variant="contained" 
+              onClick={handleOpen}
+              startIcon={<AddIcon />}
+              sx={{ 
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                color: 'white',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                '&:hover': { 
+                  backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                  transform: 'translateY(-1px)'
+                },
+                transition: 'all 0.2s ease'
+              }}
+            >
+              Add Player
+            </Button>
+          </Box>
+        </Paper>
       )}
 
       {/* Floating Action Button for Mobile */}
@@ -478,7 +506,7 @@ const PlayerList: React.FC = () => {
             />
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ p: { xs: 2, sm: 1 } }}>
+        <DialogActions sx={{ p: isMobile ? 1 : 3 }}>
           <Button 
             onClick={handleClose}
             size={isMobile ? "small" : "medium"}
@@ -541,8 +569,8 @@ const PlayerList: React.FC = () => {
           )}
         </DialogContent>
         <DialogActions sx={{ 
-          px: isMobile ? 2 : 3,
-          py: isMobile ? 1.5 : 2,
+          px: isMobile ? 1 : 3,
+          py: isMobile ? 1 : 2,
           gap: isMobile ? 1 : 2
         }}>
           <Button 

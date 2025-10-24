@@ -26,15 +26,15 @@ const HomePage: React.FC = () => {
     <Box
       sx={{
         minHeight: 'calc(100vh - 120px)', // Adjusted for header height
-        background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
-        padding: { xs: 1, sm: 2 },
+        background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
+        padding: { xs: 1, sm: 2 }, // 8px padding on mobile for consistent spacing
       }}
     >
-      <Container maxWidth="lg">
+      <Container maxWidth="lg" sx={{ py: isMobile ? 0.5 : 3, px: 0 }}>
         <Paper
           elevation={8}
           sx={{
-            padding: isMobile ? 3 : 4,
+            padding: isMobile ? 2 : 4,
             borderRadius: 3,
             background: '#ffffff',
             border: '1px solid rgba(0,0,0,0.1)',
@@ -48,25 +48,25 @@ const HomePage: React.FC = () => {
             sx={{ 
               fontWeight: 'bold',
               color: '#2c3e50',
-              mb: 2,
+              mb: isMobile ? 1 : 2,
               textShadow: '2px 2px 4px rgba(0,0,0,0.1)'
             }}
           >
-            🏏 Welcome to Street Cricket Scorecard
+            🏏 Welcome to Cricket Scorecard
           </Typography>
           <Typography 
             variant={isMobile ? "body1" : "h6"} 
             color="text.secondary" 
             paragraph
-            sx={{ mb: 4, fontWeight: 500 }}
+            sx={{ mb: isMobile ? 2 : 4, fontWeight: 500 }}
           >
-            Track your street cricket matches with professional scoring and statistics
+            Track your cricket matches with professional scoring and statistics
           </Typography>
 
           <Stack 
             direction={isMobile ? "column" : "row"} 
-            spacing={3} 
-            sx={{ mt: 4 }} 
+            spacing={isMobile ? 2 : 3} 
+            sx={{ mt: isMobile ? 2 : 4 }} 
             useFlexGap 
             flexWrap="wrap"
           >
@@ -76,7 +76,7 @@ const HomePage: React.FC = () => {
                   <Paper
                     onClick={() => navigate('/teams')}
                 sx={{
-                  p: 3,
+                  p: isMobile ? 2 : 3,
                   textAlign: 'center',
                   height: '100%',
                   display: 'flex',
@@ -87,7 +87,7 @@ const HomePage: React.FC = () => {
                   borderRadius: '12px',
                   background: 'linear-gradient(45deg, #e3f2fd 30%, #bbdefb 90%)',
                   border: '1px solid #2196F3',
-                  minHeight: isMobile ? '120px' : '140px',
+                  minHeight: isMobile ? '100px' : '140px',
                   '&:hover': {
                     transform: 'translateY(-4px)',
                     boxShadow: '0 8px 16px rgba(33, 150, 243, 0.3)'
@@ -106,7 +106,7 @@ const HomePage: React.FC = () => {
               <Paper
                 onClick={() => navigate('/players')}
                 sx={{
-                  p: 3,
+                  p: isMobile ? 2 : 3,
                   textAlign: 'center',
                   height: '100%',
                   display: 'flex',
@@ -117,7 +117,7 @@ const HomePage: React.FC = () => {
                   borderRadius: '12px',
                   background: 'linear-gradient(45deg, #e8f5e8 30%, #c8e6c9 90%)',
                   border: '1px solid #4CAF50',
-                  minHeight: isMobile ? '120px' : '140px',
+                  minHeight: isMobile ? '100px' : '140px',
                   '&:hover': {
                     transform: 'translateY(-4px)',
                     boxShadow: '0 8px 16px rgba(76, 175, 80, 0.3)'
@@ -138,7 +138,7 @@ const HomePage: React.FC = () => {
               <Paper
                 onClick={() => navigate('/matches')}
                 sx={{
-                  p: 3,
+                  p: isMobile ? 2 : 3,
                   textAlign: 'center',
                   height: '100%',
                   display: 'flex',
@@ -149,7 +149,7 @@ const HomePage: React.FC = () => {
                   borderRadius: '12px',
                   background: 'linear-gradient(45deg, #fff3e0 30%, #ffcc02 90%)',
                   border: '1px solid #FF9800',
-                  minHeight: isMobile ? '120px' : '140px',
+                  minHeight: isMobile ? '100px' : '140px',
                   '&:hover': {
                     transform: 'translateY(-4px)',
                     boxShadow: '0 8px 16px rgba(255, 152, 0, 0.3)'

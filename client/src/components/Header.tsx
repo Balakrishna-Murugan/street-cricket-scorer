@@ -207,7 +207,7 @@ const Header: React.FC = () => {
               justifyContent: isMobile ? 'center' : 'flex-start'
             }}
           >
-            {isMobile ? 'Cricket' : 'Street Cricket'} {!isAdmin && !isSuperAdmin && !isMobile && '(Viewer Mode)'}
+            {isMobile ? 'Cricket' : 'Cricket'} {!isAdmin && !isSuperAdmin && !isMobile && '(Viewer Mode)'}
           </Typography>
 
           {/* Desktop Navigation */}

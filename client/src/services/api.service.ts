@@ -38,7 +38,7 @@ export const matchService = {
   getAll: () => api.get<Match[]>('/matches'),
   getById: (id: string) => api.get<Match>(`/matches/${id}`),
   create: (data: Omit<Match, '_id'>) => api.post<Match>('/matches', data),
-  update: (id: string, data: Match) => api.put<Match>(`/matches/${id}`, data),
+  update: (id: string, data: Partial<Match>) => api.put<Match>(`/matches/${id}`, data),
   updateScore: (matchId: string, data: Match) => api.put<Match>(`/matches/${matchId}/score`, data),
   delete: (id: string) => api.delete(`/matches/${id}`),
   
