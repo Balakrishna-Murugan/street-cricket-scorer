@@ -34,9 +34,9 @@ import {
   IconButton,
   Tooltip,
 } from '@mui/material';
-import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import ChangeCircleIcon from '@mui/icons-material/ChangeCircle';
 import UndoIcon from '@mui/icons-material/Undo';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 
 interface Props {}
 
@@ -2803,8 +2803,8 @@ const LiveScoring: React.FC<Props> = () => {
       : 'Team 2';
 
     return (
-      <Container maxWidth="lg">
-        <Box sx={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)', p: 3 }}>
+      <Container maxWidth="lg" sx={{ py: isMobile ? 1 : 3 }}>
+        <Box sx={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)', p: isMobile ? 1 : 3 }}>
           <Paper elevation={6} sx={{ p: 4, borderRadius: 3, textAlign: 'center' }}>
             <Typography variant="h3" sx={{ mb: 3, color: '#2c3e50', fontWeight: 'bold' }}>
               🏏 First Innings Complete!
@@ -2873,11 +2873,13 @@ const LiveScoring: React.FC<Props> = () => {
     <Container 
       maxWidth="lg" 
       sx={{ 
-        px: isMobile ? 0 : 3, // Remove padding on mobile for full screen usage
-        py: isMobile ? 0 : 2,
+        px: isMobile ? 1 : 3, // 8px padding on mobile for consistent spacing
+        py: isMobile ? 1 : 2,
         margin: isMobile ? 0 : 'auto' // Remove auto margins on mobile
       }}
     >
+
+
       <Box 
         sx={{ 
           minHeight: '100vh',
@@ -3616,7 +3618,6 @@ const LiveScoring: React.FC<Props> = () => {
                 <TableCell align="right">4s</TableCell>
                 <TableCell align="right">6s</TableCell>
                 <TableCell align="right">{isMobile ? 'SR' : 'S/R'}</TableCell>
-                <TableCell align="center">{isMobile ? 'Sts' : 'Status'}</TableCell>
               </TableRow>
             </TableHead>
           <TableBody>
@@ -3631,23 +3632,6 @@ const LiveScoring: React.FC<Props> = () => {
                   ? ((stat.runs / stat.balls) * 100).toFixed(2)
                   : '0.00';
 
-              let statusDisplay = '';
-              let statusColor = 'inherit';
-              
-              if (stat.isOut) {
-                statusDisplay = `${stat.dismissalType || 'Out'}${stat.howOut ? ` (${stat.howOut})` : ''}`;
-                statusColor = 'error.main';
-              } else if (playerId === striker) {
-                statusDisplay = isMobile ? '' : 'Batting*';
-                statusColor = 'success.main';
-              } else if (playerId === nonStriker) {
-                statusDisplay = isMobile ? '' : 'Batting';
-                statusColor = 'primary.main';
-              } else {
-                statusDisplay = isMobile ? '✓' : 'Not Out';
-                statusColor = 'text.secondary';
-              }
-
               return (
                 <TableRow 
                   key={playerId} 
@@ -3660,42 +3644,56 @@ const LiveScoring: React.FC<Props> = () => {
                                (playerId === nonStriker ? '4px solid #2196f3' : '4px solid transparent'))
                   }}
                 >
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      {playerName}
-                      {playerId === striker && !stat.isOut && <Box component="span" sx={{ color: 'success.main', fontWeight: 'bold' }}>*</Box>}
-                      {playerId === nonStriker && !stat.isOut && <Box component="span" sx={{ color: 'primary.main' }}>†</Box>}
-                      {stat.isOut && <Box component="span" sx={{ color: 'error.main', fontWeight: 'bold', fontSize: '0.75rem' }}>(OUT)</Box>}
+                  <TableCell sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
+                    <Box>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <strong>{playerName}</strong>
+                        {isAdmin && !stat.isOut && (
+                          <Tooltip title="Change Batsman">
+                            <IconButton
+                              size="small"
+                              onClick={() => handlePlayerChange(playerId === striker ? 'striker' : 'nonStriker')}
+                              sx={{ 
+                                minWidth: 20, 
+                                minHeight: 20, 
+                                padding: 0.25,
+                                color: 'secondary.main',
+                                '&:hover': { backgroundColor: 'secondary.light', color: 'secondary.dark' }
+                              }}
+                            >
+                              <SwapHorizIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        {playerId === striker && !stat.isOut && ' *'}
+                      </Box>
+                      <Typography 
+                        variant="caption" 
+                        color={stat.isOut ? "error" : "success"} 
+                        sx={{ 
+                          display: 'block',
+                          fontSize: isMobile ? '0.65rem' : '0.7rem',
+                          mt: 0.5
+                        }}
+                      >
+                        {stat.isOut ? (stat.dismissalType || 'out') : 'not out'}
+                      </Typography>
                     </Box>
                   </TableCell>
-                  <TableCell align="right" sx={{ fontWeight: playerId === striker && !stat.isOut ? 'bold' : 'normal' }}>{stat.runs}</TableCell>
-                  <TableCell align="right">{stat.balls}</TableCell>
-                  <TableCell align="right">{stat.fours}</TableCell>
-                  <TableCell align="right">{stat.sixes}</TableCell>
-                  <TableCell align="right">{strikeRate}</TableCell>
-                  <TableCell align="center">
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
-                      <Typography variant="body2" sx={{ color: statusColor, fontSize: '0.75rem' }}>
-                        {statusDisplay}
-                      </Typography>
-                      {isAdmin && !stat.isOut && (playerId === striker || playerId === nonStriker) && (
-                        <Tooltip title={`Change ${playerId === striker ? 'Striker' : 'Non-Striker'}`}>
-                          <IconButton
-                            size="small"
-                            onClick={() => handlePlayerChange(playerId === striker ? 'striker' : 'nonStriker')}
-                            sx={{ 
-                              minWidth: 20, 
-                              minHeight: 20, 
-                              padding: 0.25,
-                              color: 'primary.main',
-                              '&:hover': { backgroundColor: 'primary.light', color: 'primary.dark' }
-                            }}
-                          >
-                            <SwapHorizIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                    </Box>
+                  <TableCell align="right" sx={{ fontWeight: playerId === striker && !stat.isOut ? 'bold' : 'normal', fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
+                    {stat.runs}
+                  </TableCell>
+                  <TableCell align="right" sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
+                    {stat.balls}
+                  </TableCell>
+                  <TableCell align="right" sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
+                    {stat.fours}
+                  </TableCell>
+                  <TableCell align="right" sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
+                    {stat.sixes}
+                  </TableCell>
+                  <TableCell align="right" sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
+                    {strikeRate}
                   </TableCell>
                 </TableRow>
               );
@@ -3744,7 +3742,6 @@ const LiveScoring: React.FC<Props> = () => {
                 <TableCell align="right">{isMobile ? 'R' : 'Runs'}</TableCell>
                 <TableCell align="right">{isMobile ? 'W' : 'Wickets'}</TableCell>
                 <TableCell align="right">{isMobile ? 'Eco' : 'Economy'}</TableCell>
-                <TableCell align="center">{isMobile ? 'Sts' : 'Status'}</TableCell>
               </TableRow>
             </TableHead>
           <TableBody>
@@ -3779,8 +3776,32 @@ const LiveScoring: React.FC<Props> = () => {
                 <TableRow key={playerId} sx={{ backgroundColor: playerId === bowler ? 'action.selected' : 'inherit' }}>
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      {playerName}
-                      {playerId === bowler && <Box component="span" sx={{ color: 'success.main', fontWeight: 'bold' }}>*</Box>}
+                      <Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          {playerName}
+                          {playerId === bowler && <Box component="span" sx={{ color: 'success.main', fontWeight: 'bold' }}>*</Box>}
+                          {isAdmin && playerId === bowler && (
+                            <Tooltip title="Change Bowler">
+                              <IconButton
+                                size="small"
+                                onClick={() => handlePlayerChange('bowler')}
+                                sx={{ 
+                                  minWidth: 20, 
+                                  minHeight: 20, 
+                                  padding: 0.25,
+                                  color: 'secondary.main',
+                                  '&:hover': { backgroundColor: 'secondary.light', color: 'secondary.dark' }
+                                }}
+                              >
+                                <ChangeCircleIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                        </Box>
+                        <Typography variant="caption" sx={{ color: statusColor, fontSize: '0.7rem', display: 'block', mt: 0.5 }}>
+                          {statusDisplay}
+                        </Typography>
+                      </Box>
                     </Box>
                   </TableCell>
                   <TableCell align="right" sx={{ fontWeight: playerId === bowler ? 'bold' : 'normal' }}>{oversDisplay}</TableCell>
@@ -3788,30 +3809,6 @@ const LiveScoring: React.FC<Props> = () => {
                   <TableCell align="right">{stat.runs}</TableCell>
                   <TableCell align="right">{stat.wickets}</TableCell>
                   <TableCell align="right">{economy}</TableCell>
-                  <TableCell align="center">
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
-                      <Typography variant="body2" sx={{ color: statusColor, fontSize: '0.75rem' }}>
-                        {statusDisplay}
-                      </Typography>
-                      {isAdmin && playerId === bowler && (
-                        <Tooltip title="Change Bowler">
-                          <IconButton
-                            size="small"
-                            onClick={() => handlePlayerChange('bowler')}
-                            sx={{ 
-                              minWidth: 20, 
-                              minHeight: 20, 
-                              padding: 0.25,
-                              color: 'secondary.main',
-                              '&:hover': { backgroundColor: 'secondary.light', color: 'secondary.dark' }
-                            }}
-                          >
-                            <ChangeCircleIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                    </Box>
-                  </TableCell>
                 </TableRow>
               );
             })}
@@ -4237,7 +4234,7 @@ const LiveScoring: React.FC<Props> = () => {
             </Stack>
           )}
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ p: isMobile ? 1 : 3 }}>
           <Button onClick={() => {
             setIsWicketDialogOpen(false);
             setWicketDetails(null);
@@ -4338,7 +4335,7 @@ const LiveScoring: React.FC<Props> = () => {
             </Typography>
           </Stack>
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ p: isMobile ? 1 : 3 }}>
           <Button 
             onClick={() => setIsExtraRunsDialogOpen(false)}
             sx={{
@@ -4501,7 +4498,7 @@ const LiveScoring: React.FC<Props> = () => {
             </Button>
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
+        <DialogActions sx={{ p: isMobile ? 1 : 3 }}>
           <Button 
             onClick={handleCancelBowlerChange}
             sx={{
@@ -4580,7 +4577,7 @@ const LiveScoring: React.FC<Props> = () => {
             </FormControl>
           </Box>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
+        <DialogActions sx={{ p: isMobile ? 1 : 3 }}>
           <Button 
             onClick={handlePlayerChangeCancel}
             sx={{
@@ -4811,7 +4808,7 @@ const LiveScoring: React.FC<Props> = () => {
           </Box>
         </DialogContent>
         <DialogActions sx={{ 
-          p: isMobile ? 2 : 3,
+          p: isMobile ? 1 : 3,
           flexDirection: isMobile ? 'column' : 'row',
           gap: isMobile ? 1 : 0,
           '& > button': {

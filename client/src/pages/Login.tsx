@@ -114,7 +114,7 @@ const Login: React.FC = () => {
                 textAlign: 'center',
               }}
             >
-              Street Cricket
+              Cricket
             </Typography>
             <Typography
               variant="subtitle1"
@@ -132,7 +132,7 @@ const Login: React.FC = () => {
           <Paper
             elevation={10}
             sx={{
-              p: isMobile ? 3 : 4,
+              p: isMobile ? 1 : 4,
               width: '100%',
               borderRadius: 3,
               background: 'rgba(255, 255, 255, 0.98)',
@@ -275,7 +275,7 @@ const Login: React.FC = () => {
               textAlign: 'center',
             }}
           >
-            © {new Date().getFullYear()} Street Cricket Scorer. All rights reserved.
+            © {new Date().getFullYear()} Cricket Scorer. All rights reserved.
           </Typography>
         </Box>
       </Container>

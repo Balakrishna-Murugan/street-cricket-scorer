@@ -90,6 +90,8 @@ const MatchList: React.FC = () => {
   const [editOpen, setEditOpen] = useState(false);
   const [newMatch, setNewMatch] = useState<Omit<Match, '_id'>>(defaultMatch);
   const [editMatch, setEditMatch] = useState<Match | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   // Get user role for permissions
   const userRole = localStorage.getItem('userRole') || 'viewer';
@@ -102,25 +104,51 @@ const MatchList: React.FC = () => {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   useEffect(() => {
+    console.log('MatchList: Component mounted, calling fetchMatches and fetchTeams');
     fetchMatches();
     fetchTeams();
   }, []);
 
   const fetchMatches = async () => {
+    console.log('MatchList: fetchMatches called');
+    console.log('MatchList: Authentication state:', {
+      isAuthenticated: localStorage.getItem('isAuthenticated'),
+      userRole: localStorage.getItem('userRole')
+    });
+    
     try {
+      console.log('MatchList: Making API call to matchService.getAll()');
       const response = await matchService.getAll();
+      console.log('MatchList: API response received:', response);
+      console.log('MatchList: Setting matches state with', response.data?.length || 0, 'matches');
       setMatches(response.data);
-    } catch (error) {
-      console.error('Error fetching matches:', error);
+    } catch (error: any) {
+      console.error('MatchList: Error fetching matches:', error);
+      console.error('MatchList: Error details:', {
+        message: error?.message,
+        response: error?.response,
+        status: error?.response?.status,
+        data: error?.response?.data
+      });
     }
   };
 
   const fetchTeams = async () => {
+    console.log('MatchList: fetchTeams called');
     try {
+      console.log('MatchList: Making API call to teamService.getAll()');
       const response = await teamService.getAll();
+      console.log('MatchList: Teams API response received:', response);
+      console.log('MatchList: Setting teams state with', response.data?.length || 0, 'teams');
       setTeams(response.data);
-    } catch (error) {
-      console.error('Error fetching teams:', error);
+    } catch (error: any) {
+      console.error('MatchList: Error fetching teams:', error);
+      console.error('MatchList: Teams error details:', {
+        message: error?.message,
+        response: error?.response,
+        status: error?.response?.status,
+        data: error?.response?.data
+      });
     }
   };
 
@@ -135,6 +163,8 @@ const MatchList: React.FC = () => {
   const handleEditClose = () => {
     setEditOpen(false);
     setEditMatch(null);
+    setEditError(null);
+    setEditLoading(false);
   };
 
   const handleSubmit = async () => {
@@ -205,21 +235,42 @@ const MatchList: React.FC = () => {
   };
 
   const handleEditSubmit = async () => {
+    if (!editMatch) return;
+
+    setEditLoading(true);
+    setEditError(null);
+
     try {
-      if (!editMatch) return;
-      
+      console.log('Starting match edit with data:', editMatch);
+
+      // Validate required fields
+      if (!editMatch.team1 || !editMatch.team2) {
+        throw new Error('Both teams must be selected');
+      }
+
+      if (!editMatch.overs || editMatch.overs <= 0) {
+        throw new Error('Number of overs must be greater than 0');
+      }
+
       // Update match with edited values
       const updatedMatch = { ...editMatch };
-      
-      // Reconfigure innings if toss info changed
-      if (updatedMatch.tossWinner && updatedMatch.tossDecision) {
+
+      // Ensure team IDs are strings (not objects)
+      updatedMatch.team1 = typeof updatedMatch.team1 === 'string' ? updatedMatch.team1 : updatedMatch.team1._id;
+      updatedMatch.team2 = typeof updatedMatch.team2 === 'string' ? updatedMatch.team2 : updatedMatch.team2._id;
+      if (updatedMatch.tossWinner) {
+        updatedMatch.tossWinner = typeof updatedMatch.tossWinner === 'string' ? updatedMatch.tossWinner : updatedMatch.tossWinner._id;
+      }
+
+      // Reconfigure innings if toss info changed and innings exist
+      if (updatedMatch.tossWinner && updatedMatch.tossDecision && updatedMatch.innings && updatedMatch.innings.length > 0) {
         let battingTeam: string;
         let bowlingTeam: string;
-        
-        const tossWinnerId = typeof updatedMatch.tossWinner === 'string' ? updatedMatch.tossWinner : updatedMatch.tossWinner._id;
-        const team1Id = typeof updatedMatch.team1 === 'string' ? updatedMatch.team1 : updatedMatch.team1._id;
-        const team2Id = typeof updatedMatch.team2 === 'string' ? updatedMatch.team2 : updatedMatch.team2._id;
-        
+
+        const tossWinnerId = updatedMatch.tossWinner;
+        const team1Id = updatedMatch.team1;
+        const team2Id = updatedMatch.team2;
+
         if (updatedMatch.tossDecision === 'bat') {
           battingTeam = tossWinnerId;
           bowlingTeam = tossWinnerId === team1Id ? team2Id : team1Id;
@@ -227,24 +278,42 @@ const MatchList: React.FC = () => {
           bowlingTeam = tossWinnerId;
           battingTeam = tossWinnerId === team1Id ? team2Id : team1Id;
         }
-        
+
         // Update innings team assignments
-        if (updatedMatch.innings && updatedMatch.innings.length > 0) {
+        if (updatedMatch.innings[0]) {
           updatedMatch.innings[0].battingTeam = battingTeam;
           updatedMatch.innings[0].bowlingTeam = bowlingTeam;
-          
-          if (updatedMatch.innings.length > 1) {
-            updatedMatch.innings[1].battingTeam = bowlingTeam;
-            updatedMatch.innings[1].bowlingTeam = battingTeam;
-          }
+        }
+
+        if (updatedMatch.innings.length > 1 && updatedMatch.innings[1]) {
+          updatedMatch.innings[1].battingTeam = bowlingTeam;
+          updatedMatch.innings[1].bowlingTeam = battingTeam;
         }
       }
-      
-      await matchService.update(editMatch._id!, updatedMatch);
+
+      // Prepare data to send - only include fields that can be edited for upcoming matches
+      const updateData = {
+        team1: updatedMatch.team1,
+        team2: updatedMatch.team2,
+        date: updatedMatch.date,
+        venue: updatedMatch.venue,
+        overs: updatedMatch.overs,
+        tossWinner: updatedMatch.tossWinner,
+        tossDecision: updatedMatch.tossDecision,
+      };
+
+      console.log('Sending update data:', updateData);
+
+      await matchService.update(editMatch._id!, updateData as any);
+
+      console.log('Match updated successfully');
       handleEditClose();
       fetchMatches();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating match:', error);
+      setEditError(error.message || 'Failed to update match. Please try again.');
+    } finally {
+      setEditLoading(false);
     }
   };
 
@@ -320,7 +389,7 @@ const MatchList: React.FC = () => {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: isMobile ? 2 : 3 }}>
+    <Container maxWidth="lg" sx={{ py: isMobile ? 1 : 3 }}>
       {!isMobile && (
         <Box sx={{ 
           display: 'flex', 
@@ -725,7 +794,7 @@ const MatchList: React.FC = () => {
             )}
           />
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ p: isMobile ? 1 : 3 }}>
           <Button onClick={handleClose}>Cancel</Button>
           <Button onClick={handleSubmit} variant="contained" color="primary">
             Create
@@ -743,21 +812,33 @@ const MatchList: React.FC = () => {
       >
         <DialogTitle>Edit Match</DialogTitle>
         <DialogContent sx={{ pb: 1 }}>
+          {editError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {editError}
+            </Alert>
+          )}
+          
           {editMatch && (
             <>
               <Autocomplete
                 fullWidth
                 options={teams}
                 getOptionLabel={(option) => option.name}
-                value={teams.find(team => team._id === (typeof editMatch.team1 === 'string' ? editMatch.team1 : editMatch.team1._id)) || null}
+                value={teams.find(team => team._id === (typeof editMatch.team1 === 'string' ? editMatch.team1 : editMatch.team1._id)) || undefined}
                 onChange={(event, newValue) => {
-                  setEditMatch({ ...editMatch, team1: newValue?._id || '' });
+                  if (newValue && newValue._id) {
+                    setEditMatch({ ...editMatch, team1: newValue._id });
+                    setEditError(null); // Clear error when user makes changes
+                  }
                 }}
+                disableClearable
                 renderInput={(params) => (
                   <TextField 
                     {...params} 
                     label="Team 1"
                     margin="dense"
+                    error={!editMatch.team1}
+                    helperText={!editMatch.team1 ? 'Team 1 is required' : ''}
                   />
                 )}
                 renderOption={(props, option) => (
@@ -770,15 +851,21 @@ const MatchList: React.FC = () => {
                 fullWidth
                 options={teams}
                 getOptionLabel={(option) => option.name}
-                value={teams.find(team => team._id === (typeof editMatch.team2 === 'string' ? editMatch.team2 : editMatch.team2._id)) || null}
+                value={teams.find(team => team._id === (typeof editMatch.team2 === 'string' ? editMatch.team2 : editMatch.team2._id)) || undefined}
                 onChange={(event, newValue) => {
-                  setEditMatch({ ...editMatch, team2: newValue?._id || '' });
+                  if (newValue && newValue._id) {
+                    setEditMatch({ ...editMatch, team2: newValue._id });
+                    setEditError(null); // Clear error when user makes changes
+                  }
                 }}
+                disableClearable
                 renderInput={(params) => (
                   <TextField 
                     {...params} 
                     label="Team 2"
                     margin="dense"
+                    error={!editMatch.team2}
+                    helperText={!editMatch.team2 ? 'Team 2 is required' : ''}
                   />
                 )}
                 renderOption={(props, option) => (
@@ -793,7 +880,12 @@ const MatchList: React.FC = () => {
                 type="number"
                 fullWidth
                 value={editMatch.overs}
-                onChange={(e) => setEditMatch({ ...editMatch, overs: Number(e.target.value) })}
+                onChange={(e) => {
+                  setEditMatch({ ...editMatch, overs: Number(e.target.value) });
+                  setEditError(null); // Clear error when user makes changes
+                }}
+                error={!editMatch.overs || editMatch.overs <= 0}
+                helperText={!editMatch.overs || editMatch.overs <= 0 ? 'Overs must be greater than 0' : ''}
               />
               <TextField
                 margin="dense"
@@ -802,14 +894,20 @@ const MatchList: React.FC = () => {
                 fullWidth
                 InputLabelProps={{ shrink: true }}
                 value={new Date(editMatch.date).toISOString().split('T')[0]}
-                onChange={(e) => setEditMatch({ ...editMatch, date: new Date(e.target.value).toISOString() })}
+                onChange={(e) => {
+                  setEditMatch({ ...editMatch, date: new Date(e.target.value).toISOString() });
+                  setEditError(null); // Clear error when user makes changes
+                }}
               />
               <TextField
                 margin="dense"
                 label="Venue"
                 fullWidth
                 value={editMatch.venue}
-                onChange={(e) => setEditMatch({ ...editMatch, venue: e.target.value })}
+                onChange={(e) => {
+                  setEditMatch({ ...editMatch, venue: e.target.value });
+                  setEditError(null); // Clear error when user makes changes
+                }}
               />
               
               <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>
@@ -827,9 +925,10 @@ const MatchList: React.FC = () => {
                   const team1Id = typeof editMatch.team1 === 'string' ? editMatch.team1 : editMatch.team1._id;
                   return `${option.name} ${option._id === team1Id ? '(Team 1)' : '(Team 2)'}`;
                 }}
-                value={teams.find(team => team._id === editMatch.tossWinner) || null}
+                value={teams.find(team => team._id === editMatch.tossWinner) || undefined}
                 onChange={(event, newValue) => {
-                  setEditMatch({ ...editMatch, tossWinner: newValue?._id || '' });
+                  setEditMatch({ ...editMatch, tossWinner: newValue && newValue._id ? newValue._id : undefined });
+                  setEditError(null); // Clear error when user makes changes
                 }}
                 renderInput={(params) => (
                   <TextField 
@@ -858,6 +957,7 @@ const MatchList: React.FC = () => {
                 value={editMatch.tossDecision ? { value: editMatch.tossDecision, label: editMatch.tossDecision === 'bat' ? 'Chose to Bat First' : 'Chose to Bowl First' } : null}
                 onChange={(event, newValue) => {
                   setEditMatch({ ...editMatch, tossDecision: (newValue?.value as 'bat' | 'bowl') || '' });
+                  setEditError(null); // Clear error when user makes changes
                 }}
                 disabled={!editMatch.tossWinner}
                 renderInput={(params) => (
@@ -876,10 +976,17 @@ const MatchList: React.FC = () => {
             </>
           )}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleEditClose}>Cancel</Button>
-          <Button onClick={handleEditSubmit} variant="contained" color="primary">
-            Save Changes
+        <DialogActions sx={{ p: isMobile ? 1 : 3 }}>
+          <Button onClick={handleEditClose} disabled={editLoading}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleEditSubmit} 
+            variant="contained" 
+            color="primary"
+            disabled={editLoading || !editMatch?.team1 || !editMatch?.team2 || !editMatch?.overs || editMatch.overs <= 0}
+          >
+            {editLoading ? 'Saving...' : 'Save Changes'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -962,8 +1069,8 @@ const MatchList: React.FC = () => {
           )}
         </DialogContent>
         <DialogActions sx={{ 
-          px: isMobile ? 2 : 3,
-          py: isMobile ? 1.5 : 2,
+          px: isMobile ? 1 : 3,
+          py: isMobile ? 1 : 2,
           gap: isMobile ? 1 : 2
         }}>
           <Button 
