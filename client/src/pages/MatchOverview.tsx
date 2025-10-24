@@ -4,7 +4,6 @@ import {
   Paper,
   Typography,
   Button,
-  Container,
   Card,
   CardContent,
   Chip,
@@ -128,22 +127,22 @@ const MatchOverview: React.FC = () => {
 
   if (loading) {
     return (
-      <Container>
+      <Box>
         <Typography>Loading match details...</Typography>
-      </Container>
+      </Box>
     );
   }
 
   if (error || !match) {
     return (
-      <Container>
+      <Box>
         <Typography color="error">{error || 'Match not found'}</Typography>
-      </Container>
+      </Box>
     );
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: isMobile ? 1 : 3 }}>
+    <Box maxWidth="lg" sx={{ py: isMobile ? 1 : 3, px: isMobile ? 1 : 3, mx: 'auto' }}>
       <Paper 
         elevation={3} 
         sx={{ 
@@ -344,7 +343,7 @@ const MatchOverview: React.FC = () => {
           
         </Box>
       </Paper>
-    </Container>
+    </Box>
   );
 };
 

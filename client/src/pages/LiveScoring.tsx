@@ -27,7 +27,6 @@ import {
   Alert,
   AlertTitle,
   TextField,
-  Container,
   Autocomplete,
   useTheme,
   useMediaQuery,
@@ -2803,7 +2802,7 @@ const LiveScoring: React.FC<Props> = () => {
       : 'Team 2';
 
     return (
-      <Container maxWidth="lg" sx={{ py: isMobile ? 1 : 3 }}>
+      <Box sx={{ maxWidth: 'lg', py: isMobile ? 1 : 3, px: isMobile ? 1 : 3, mx: 'auto' }}>
         <Box sx={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)', p: isMobile ? 1 : 3 }}>
           <Paper elevation={6} sx={{ p: 4, borderRadius: 3, textAlign: 'center' }}>
             <Typography variant="h3" sx={{ mb: 3, color: '#2c3e50', fontWeight: 'bold' }}>
@@ -2847,7 +2846,7 @@ const LiveScoring: React.FC<Props> = () => {
             </Button>
           </Paper>
         </Box>
-      </Container>
+      </Box>
     );
   }
 
@@ -2856,9 +2855,9 @@ const LiveScoring: React.FC<Props> = () => {
   // If currentInning is undefined (during innings transition), show loading or return early
   if (!currentInning) {
     return (
-      <Container>
+      <Box sx={{ px: isMobile ? 1 : 3, mx: 'auto' }}>
         <Typography>Loading innings data...</Typography>
-      </Container>
+      </Box>
     );
   }
   
@@ -2870,12 +2869,12 @@ const LiveScoring: React.FC<Props> = () => {
     : currentInning?.bowlingTeam?._id;
 
   return (
-    <Container 
-      maxWidth="lg" 
+    <Box 
       sx={{ 
-        px: isMobile ? 1 : 3, // 8px padding on mobile for consistent spacing
+        maxWidth: 'lg',
+        px: isMobile ? 1 : 3,
         py: isMobile ? 1 : 2,
-        margin: isMobile ? 0 : 'auto' // Remove auto margins on mobile
+        mx: 'auto'
       }}
     >
 
@@ -4954,7 +4953,7 @@ const LiveScoring: React.FC<Props> = () => {
       </Dialog>
       </Paper>
     </Box>
-    </Container>
+    </Box>
   );
 };
 

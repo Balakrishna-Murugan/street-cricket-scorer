@@ -20,7 +20,6 @@ import {
   Card,
   CardContent,
   CardActions,
-  Container,
   useTheme,
   useMediaQuery,
   Autocomplete,
@@ -389,7 +388,7 @@ const MatchList: React.FC = () => {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: isMobile ? 1 : 3 }}>
+    <Box maxWidth="lg" sx={{ py: isMobile ? 1 : 3, px: isMobile ? 1 : 3, mx: 'auto' }}>
       {!isMobile && (
         <Box sx={{ 
           display: 'flex', 
@@ -1101,7 +1100,7 @@ const MatchList: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Container>
+    </Box>
   );
 };
 

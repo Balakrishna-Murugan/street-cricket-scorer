@@ -2,7 +2,6 @@ import React from 'react';
 import { 
   Typography, 
   Paper, 
-  Container, 
   Stack, 
   Box, 
   useTheme, 
@@ -30,7 +29,14 @@ const HomePage: React.FC = () => {
         padding: { xs: 1, sm: 2 }, // 8px padding on mobile for consistent spacing
       }}
     >
-      <Container maxWidth="lg" sx={{ py: isMobile ? 0.5 : 3, px: 0 }}>
+      <Box 
+        maxWidth="lg" 
+        sx={{ 
+          mx: 'auto',
+          py: isMobile ? 0.5 : 3, 
+          px: isMobile ? 1 : 3 
+        }}
+      >
         <Paper
           elevation={8}
           sx={{
@@ -165,7 +171,7 @@ const HomePage: React.FC = () => {
             </Box>
           </Stack>
         </Paper>
-      </Container>
+      </Box>
     </Box>
   );
 };

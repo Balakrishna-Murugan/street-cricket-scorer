@@ -13,7 +13,6 @@ import {
   Tabs,
   Tab,
   Stack,
-  Container,
   useTheme,
   useMediaQuery,
   Accordion,
@@ -1085,13 +1084,14 @@ const MatchSummary: React.FC = () => {
   };
 
   return (
-    <Container 
+    <Box 
       maxWidth="lg" 
       sx={{
         minHeight: 'calc(100vh - 120px)', // Adjusted for header height
         background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
         padding: { xs: 1, sm: 2 }, // 8px padding on mobile (xs: 1 = 8px)
         margin: { xs: 0, sm: 'auto' }, // Remove auto margins on mobile
+        px: isMobile ? 1 : 3 // 8px padding on mobile, 24px on desktop
       }}
     >
 
@@ -1170,7 +1170,7 @@ const MatchSummary: React.FC = () => {
 
         {tabValue === 1 && renderTopPerformers()}
       </Paper>
-    </Container>
+    </Box>
   );
 };
 
