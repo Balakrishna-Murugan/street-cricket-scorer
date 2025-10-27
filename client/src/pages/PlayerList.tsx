@@ -33,6 +33,8 @@ import {
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import PersonRemoveIcon from '@mui/icons-material/PersonRemove';
 import { Player, Team } from '../types';
 import { playerService, teamService } from '../services/api.service';
 
@@ -61,10 +63,26 @@ const PlayerList: React.FC = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [playerToDelete, setPlayerToDelete] = useState<Player | null>(null);
 
+  // Current user state
+  const [currentUser, setCurrentUser] = useState<Player | null>(null);
+
   useEffect(() => {
     fetchPlayers();
     fetchTeams();
+    loadCurrentUser();
   }, []);
+
+  const loadCurrentUser = () => {
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      try {
+        const user = JSON.parse(userData);
+        setCurrentUser(user);
+      } catch (error) {
+        console.error('Error parsing user data:', error);
+      }
+    }
+  };
 
   const fetchTeams = async () => {
     try {
@@ -147,6 +165,62 @@ const PlayerList: React.FC = () => {
   const handleDeleteCancel = () => {
     setDeleteDialogOpen(false);
     setPlayerToDelete(null);
+  };
+
+  // Promote player to admin
+  const handlePromoteToAdmin = async (playerId: string) => {
+    if (!currentUser?._id) {
+      setError('User not authenticated');
+      return;
+    }
+
+    if (currentUser.userRole !== 'superadmin') {
+      setError('Only superadmins can promote players');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      console.log('Promoting player:', playerId, 'by user:', currentUser._id);
+      await playerService.promoteToAdmin(playerId, currentUser._id);
+      fetchPlayers(); // Refresh the list to show updated roles
+      setError('Player promoted to admin successfully');
+    } catch (error: any) {
+      console.error('Error promoting player:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to promote player to admin';
+      setError(`Failed to promote player: ${errorMessage}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Demote admin to player
+  const handleDemoteFromAdmin = async (playerId: string) => {
+    if (!currentUser?._id) {
+      setError('User not authenticated');
+      return;
+    }
+
+    if (currentUser.userRole !== 'superadmin') {
+      setError('Only superadmins can demote admins');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      console.log('Demoting player:', playerId, 'by user:', currentUser._id);
+      await playerService.demoteFromAdmin(playerId, currentUser._id);
+      fetchPlayers(); // Refresh the list to show updated roles
+      setError('Admin demoted to player successfully');
+    } catch (error: any) {
+      console.error('Error demoting admin:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to demote admin';
+      setError(`Failed to demote admin: ${errorMessage}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -293,10 +367,25 @@ const PlayerList: React.FC = () => {
                     <Typography variant="body2" color="text.secondary">Team:</Typography>
                     <Typography variant="body2">
                       {player.teams && player.teams.length > 0 ? (
-                        typeof player.teams[0] === 'object' ? player.teams[0].name : 
-                        teams.find(t => t._id === player.teams![0])?.name || 'Unknown'
+                        player.teams.map(team => 
+                          typeof team === 'object' && team.name ? team.name : 
+                          typeof team === 'string' ? teams.find(t => t._id === team)?.name || 'Unknown' : 'Unknown'
+                        ).join(', ')
                       ) : 'No Team'}
                     </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="body2" color="text.secondary">User Role:</Typography>
+                    <Chip 
+                      label={player.userRole || 'player'} 
+                      color={
+                        player.userRole === 'superadmin' ? 'error' :
+                        player.userRole === 'admin' ? 'warning' :
+                        player.userRole === 'viewer' ? 'info' : 'default'
+                      }
+                      size="small"
+                      variant="outlined"
+                    />
                   </Box>
                 </Stack>
               </CardContent>
@@ -333,6 +422,42 @@ const PlayerList: React.FC = () => {
                     </>
                   )}
                 </Button>
+                {currentUser?.userRole === 'superadmin' && player.userRole === 'player' && (
+                  <Button
+                    onClick={() => handlePromoteToAdmin(player._id!)}
+                    color="success"
+                    size="small"
+                    sx={{ 
+                      minWidth: isMobile ? '40px' : 'auto',
+                      px: isMobile ? 1 : 2 
+                    }}
+                  >
+                    {isMobile ? <PersonAddIcon /> : (
+                      <>
+                        <PersonAddIcon sx={{ mr: 1 }} />
+                        Promote
+                      </>
+                    )}
+                  </Button>
+                )}
+                {currentUser?.userRole === 'superadmin' && player.userRole === 'admin' && (
+                  <Button
+                    onClick={() => handleDemoteFromAdmin(player._id!)}
+                    color="warning"
+                    size="small"
+                    sx={{ 
+                      minWidth: isMobile ? '40px' : 'auto',
+                      px: isMobile ? 1 : 2 
+                    }}
+                  >
+                    {isMobile ? <PersonRemoveIcon /> : (
+                      <>
+                        <PersonRemoveIcon sx={{ mr: 1 }} />
+                        Demote
+                      </>
+                    )}
+                  </Button>
+                )}
               </CardActions>
             </Card>
           ))}
@@ -349,6 +474,7 @@ const PlayerList: React.FC = () => {
                 <TableCell>Batting Style</TableCell>
                 <TableCell>Bowling Style</TableCell>
                 <TableCell>Team</TableCell>
+                <TableCell>User Role</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -362,9 +488,23 @@ const PlayerList: React.FC = () => {
                   <TableCell>{player.bowlingStyle}</TableCell>
                   <TableCell>
                     {player.teams && player.teams.length > 0 ? (
-                      typeof player.teams[0] === 'object' ? player.teams[0].name : 
-                      teams.find(t => t._id === player.teams![0])?.name || 'Unknown'
+                      player.teams.map(team => 
+                        typeof team === 'object' && team.name ? team.name : 
+                        typeof team === 'string' ? teams.find(t => t._id === team)?.name || 'Unknown' : 'Unknown'
+                      ).join(', ')
                     ) : 'No Team'}
+                  </TableCell>
+                  <TableCell>
+                    <Chip 
+                      label={player.userRole || 'player'} 
+                      color={
+                        player.userRole === 'superadmin' ? 'error' :
+                        player.userRole === 'admin' ? 'warning' :
+                        player.userRole === 'viewer' ? 'info' : 'default'
+                      }
+                      size="small"
+                      variant="outlined"
+                    />
                   </TableCell>
                   <TableCell>
                     <IconButton
@@ -381,6 +521,26 @@ const PlayerList: React.FC = () => {
                     >
                       <DeleteIcon />
                     </IconButton>
+                    {currentUser?.userRole === 'superadmin' && player.userRole === 'player' && (
+                      <IconButton
+                        onClick={() => handlePromoteToAdmin(player._id!)}
+                        color="success"
+                        size="small"
+                        title="Promote to Admin"
+                      >
+                        <PersonAddIcon />
+                      </IconButton>
+                    )}
+                    {currentUser?.userRole === 'superadmin' && player.userRole === 'admin' && (
+                      <IconButton
+                        onClick={() => handleDemoteFromAdmin(player._id!)}
+                        color="warning"
+                        size="small"
+                        title="Demote to Player"
+                      >
+                        <PersonRemoveIcon />
+                      </IconButton>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -395,9 +555,23 @@ const PlayerList: React.FC = () => {
         fullScreen={isMobile}
         maxWidth="sm"
         fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '16px',
+            background: 'white',
+            color: 'black',
+          }
+        }}
       >
-        <DialogTitle>{editingPlayer ? 'Edit Player' : 'Create New Player'}</DialogTitle>
-        <DialogContent>
+        <DialogTitle sx={{ 
+          background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
+          color: 'white',
+          fontWeight: 'bold',
+          borderRadius: '16px 16px 0 0'
+        }}>
+          {editingPlayer ? 'Edit Player' : 'Create New Player'}
+        </DialogTitle>
+        <DialogContent sx={{ p: 3 }}>
           <Stack spacing={2} sx={{ mt: 2, minWidth: { xs: 'auto', sm: 400 } }}>
             <TextField
               label="Name"
@@ -407,6 +581,14 @@ const PlayerList: React.FC = () => {
               required
               error={!newPlayer.name && error != null}
               size={isMobile ? "small" : "medium"}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                  '&:hover fieldset': {
+                    borderColor: theme.palette.primary.main,
+                  },
+                },
+              }}
             />
             <TextField
               label="Age"
@@ -417,6 +599,14 @@ const PlayerList: React.FC = () => {
               required
               error={newPlayer.age <= 0 && error != null}
               size={isMobile ? "small" : "medium"}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                  '&:hover fieldset': {
+                    borderColor: theme.palette.primary.main,
+                  },
+                },
+              }}
             />
             <Autocomplete
               fullWidth
@@ -437,6 +627,14 @@ const PlayerList: React.FC = () => {
                   {...params} 
                   label="Role"
                   size={isMobile ? "small" : "medium"}
+                  sx={{ 
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                      '&:hover fieldset': {
+                        borderColor: theme.palette.primary.main,
+                      },
+                    },
+                  }}
                 />
               )}
               renderOption={(props, option) => (
@@ -463,6 +661,14 @@ const PlayerList: React.FC = () => {
                   {...params} 
                   label="Batting Style"
                   size={isMobile ? "small" : "medium"}
+                  sx={{ 
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                      '&:hover fieldset': {
+                        borderColor: theme.palette.primary.main,
+                      },
+                    },
+                  }}
                 />
               )}
               renderOption={(props, option) => (
@@ -477,6 +683,14 @@ const PlayerList: React.FC = () => {
               onChange={(e) => setNewPlayer({ ...newPlayer, bowlingStyle: e.target.value })}
               fullWidth
               size={isMobile ? "small" : "medium"}
+              sx={{ 
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                  '&:hover fieldset': {
+                    borderColor: theme.palette.primary.main,
+                  },
+                },
+              }}
             />
             <Autocomplete
               fullWidth
@@ -496,6 +710,14 @@ const PlayerList: React.FC = () => {
                   {...params} 
                   label="Team"
                   size={isMobile ? "small" : "medium"}
+                  sx={{ 
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                      '&:hover fieldset': {
+                        borderColor: theme.palette.primary.main,
+                      },
+                    },
+                  }}
                 />
               )}
               renderOption={(props, option) => (
@@ -506,19 +728,50 @@ const PlayerList: React.FC = () => {
             />
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ p: isMobile ? 1 : 3 }}>
+        <DialogActions sx={{ p: 3, pt: 0 }}>
           <Button 
             onClick={handleClose}
             size={isMobile ? "small" : "medium"}
+            sx={{ 
+              py: 1.5,
+              borderRadius: 2,
+              textTransform: 'none',
+              fontSize: '1.1rem',
+              fontWeight: 600,
+              borderColor: theme.palette.primary.main,
+              color: theme.palette.primary.main,
+              '&:hover': {
+                borderColor: theme.palette.primary.main,
+                backgroundColor: 'rgba(2, 14, 67, 0.04)',
+                transform: 'translateY(-1px)',
+                boxShadow: '0 4px 8px rgba(2, 14, 67, 0.2)',
+              },
+              transition: 'all 0.3s ease',
+            }}
+            variant="outlined"
           >
             Cancel
           </Button>
           <Button 
             onClick={handleSubmit} 
             variant="contained" 
-            color="primary"
             disabled={loading || !newPlayer.name || newPlayer.age <= 0}
             size={isMobile ? "small" : "medium"}
+            sx={{
+              py: 1.5,
+              borderRadius: 2,
+              textTransform: 'none',
+              fontSize: '1.1rem',
+              fontWeight: 600,
+              background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
+              boxShadow: '0 4px 12px rgba(2, 14, 67, 0.4)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #764ba2 0%, #020e43 100%)',
+                boxShadow: '0 6px 16px rgba(118, 75, 162, 0.6)',
+                transform: 'translateY(-2px)',
+              },
+              transition: 'all 0.3s ease',
+            }}
           >
             {loading ? <CircularProgress size={24} /> : (editingPlayer ? 'Save' : 'Create')}
           </Button>

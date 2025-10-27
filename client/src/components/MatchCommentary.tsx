@@ -54,12 +54,12 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({ match, onRefresh }) =
   if (!match || match.status !== 'in-progress') {
     return (
       <Paper sx={{ 
-        p: isMobile ? 2 : 3, 
+        p: isMobile ? 1 : 3, 
         borderRadius: 2, 
         background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
         boxShadow: '0 8px 32px rgba(2, 14, 67, 0.3)',
         mx: isMobile ? 1 : 0,
-        mb: isMobile ? 2 : 0
+        mb: isMobile ? 1 : 0
       }}>
         <Typography 
           variant={isMobile ? 'subtitle1' : 'h6'} 
@@ -88,12 +88,12 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({ match, onRefresh }) =
   if (!match.innings || match.innings.length === 0) {
     return (
       <Paper sx={{ 
-        p: isMobile ? 2 : 3, 
+        p: isMobile ? 1 : 3, 
         borderRadius: 2, 
         background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
         boxShadow: '0 8px 32px rgba(2, 14, 67, 0.3)',
         mx: isMobile ? 1 : 0,
-        mb: isMobile ? 2 : 0
+        mb: isMobile ? 1 : 0
       }}>
         <Typography 
           variant={isMobile ? 'subtitle1' : 'h6'} 
@@ -124,12 +124,12 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({ match, onRefresh }) =
   if (!currentInnings) {
     return (
       <Paper sx={{ 
-        p: isMobile ? 2 : 3, 
+        p: isMobile ? 1 : 3, 
         borderRadius: 2, 
         background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
         boxShadow: '0 8px 32px rgba(2, 14, 67, 0.3)',
         mx: isMobile ? 1 : 0,
-        mb: isMobile ? 2 : 0
+        mb: isMobile ? 1 : 0
       }}>
         <Typography 
           variant={isMobile ? 'subtitle1' : 'h6'} 
@@ -195,12 +195,12 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({ match, onRefresh }) =
 
   return (
     <Paper sx={{ 
-      p: isMobile ? 2 : 3, // Increased padding on mobile since we have more space
+      p: isMobile ? 0.5 : 3, // Reduced mobile padding from 8px to 4px for better mobile UI
       borderRadius: 2, 
       background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
       boxShadow: '0 8px 32px rgba(2, 14, 67, 0.3)',
       mx: isMobile ? 1 : 0, // Add small margins on mobile for better spacing
-      mb: isMobile ? 2 : 0 // Add bottom margin on mobile
+      mb: isMobile ? 1 : 0 // Reduced bottom margin on mobile from 16px to 8px
     }}>
       <Box sx={{ 
         display: 'flex', 

@@ -10,12 +10,71 @@ const api = axios.create({
   },
 });
 
+// Authentication interfaces
+export interface LoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface RegisterRequest {
+  name: string;
+  email: string;
+  username: string;
+  password: string;
+  age?: number;
+  role?: 'batsman' | 'bowler' | 'all-rounder';
+  userRole?: 'player' | 'admin' | 'superadmin' | 'viewer';
+}
+
+export interface GuestLoginRequest {
+  name: string;
+}
+
+export interface AuthResponse {
+  message: string;
+  user: Player & {
+    username?: string;
+    email?: string;
+    userRole?: string;
+    isGuest?: boolean;
+    guestLimitations?: {
+      maxMatches: number;
+      basicScoringOnly: boolean;
+      expiresAt: string;
+    };
+  };
+}
+
+export interface CheckEmailResponse {
+  exists: boolean;
+  user?: Player & {
+    username?: string;
+    email?: string;
+    userRole?: string;
+    isGuest?: boolean;
+  };
+}
+
+// Authentication service
+export const authService = {
+  login: (data: LoginRequest) => api.post<AuthResponse>('/auth/login', data),
+  register: (data: RegisterRequest) => api.post<AuthResponse>('/auth/register', data),
+  guestLogin: (data: GuestLoginRequest) => api.post<AuthResponse>('/auth/guest-login', data),
+  checkEmail: (email: string) => api.post<CheckEmailResponse>('/auth/check-email', { email }),
+};
+
 export const playerService = {
   getAll: () => api.get<Player[]>('/players'),
   getById: (id: string) => api.get<Player>(`/players/${id}`),
   create: (data: Omit<Player, '_id'>) => api.post<Player>('/players', data),
   update: (id: string, data: Player) => api.put<Player>(`/players/${id}`, data),
   delete: (id: string) => api.delete(`/players/${id}`),
+  promoteToAdmin: (playerId: string, userId: string) => 
+    api.put(`/players/${playerId}/promote`, {}, { headers: { 'user-id': userId } }),
+  demoteFromAdmin: (playerId: string, userId: string) => 
+    api.put(`/players/${playerId}/demote`, {}, { headers: { 'user-id': userId } }),
+  updatePlayerTeams: (playerUpdates: { playerId: string; teams: string[] }[]) => 
+    api.put('/players/update-teams', { playerUpdates }),
 };
 
 export const teamService = {
@@ -35,7 +94,10 @@ export const overService = {
 };
 
 export const matchService = {
-  getAll: () => api.get<Match[]>('/matches'),
+  getAll: (userId?: string) => {
+    const params = userId ? { userId } : {};
+    return api.get<Match[]>('/matches', { params });
+  },
   getById: (id: string) => api.get<Match>(`/matches/${id}`),
   create: (data: Omit<Match, '_id'>) => api.post<Match>('/matches', data),
   update: (id: string, data: Partial<Match>) => api.put<Match>(`/matches/${id}`, data),

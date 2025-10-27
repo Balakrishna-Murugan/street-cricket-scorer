@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Typography,
   Paper,
@@ -28,6 +28,11 @@ import {
   useMediaQuery,
   Chip,
   Autocomplete,
+  FormControl,
+  FormLabel,
+  FormGroup,
+  FormControlLabel,
+  Checkbox,
   Fab
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
@@ -64,22 +69,48 @@ const TeamList: React.FC = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [teamToDelete, setTeamToDelete] = useState<Team | null>(null);
 
-  useEffect(() => {
-    fetchTeams();
-    fetchPlayers();
-  }, []);
-
-  const fetchPlayers = async () => {
+  const fetchPlayers = useCallback(async (currentEditingTeam?: Team | null) => {
     try {
       const response = await playerService.getAll();
       // Filter out players without _id to ensure type safety
       const validPlayers = response.data.filter((player: Player) => player._id);
-      setPlayers(validPlayers);
+
+      // Use the provided currentEditingTeam or fall back to state
+      const effectiveEditingTeam = currentEditingTeam !== undefined ? currentEditingTeam : editingTeam;
+
+      // Filter out players who are already assigned to teams (excluding current editing team)
+      const assignedPlayerIds = teams
+        .filter(team => effectiveEditingTeam ? team._id !== effectiveEditingTeam._id : true)
+        .flatMap(team => team.members.map(member => typeof member === 'object' ? member._id : member));
+
+      const availablePlayers = validPlayers.filter(player => !assignedPlayerIds.includes(player._id || ''));
+
+      // If editing a team, include the players that are already in that team
+      if (effectiveEditingTeam) {
+        const editingTeamPlayerIds = effectiveEditingTeam.members.map(member => 
+          typeof member === 'object' ? member._id : member
+        ).filter(Boolean);
+        
+        const editingTeamPlayers = validPlayers.filter(player => 
+          editingTeamPlayerIds.includes(player._id || '')
+        );
+        
+        // Combine available players with editing team players
+        const combinedPlayers = [...availablePlayers, ...editingTeamPlayers];
+        // Remove duplicates
+        const uniquePlayers = combinedPlayers.filter((player, index, self) => 
+          index === self.findIndex(p => p._id === player._id)
+        );
+        
+        setPlayers(uniquePlayers);
+      } else {
+        setPlayers(availablePlayers);
+      }
     } catch (error) {
       console.error('Error fetching players:', error);
       setError('Failed to fetch players');
     }
-  };
+  }, [teams, editingTeam]);
 
   const fetchTeams = async () => {
     setLoading(true);
@@ -95,6 +126,18 @@ const TeamList: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    fetchTeams();
+    fetchPlayers();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch players whenever teams data changes (but not when editingTeam changes to avoid loops)
+  useEffect(() => {
+    if (teams.length >= 0) { // teams is initialized as empty array
+      fetchPlayers();
+    }
+  }, [teams.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleOpen = () => {
     setEditingTeam(null);
     setNewTeam(defaultTeam);
@@ -106,11 +149,13 @@ const TeamList: React.FC = () => {
     setNewTeam(defaultTeam);
     setEditingTeam(null);
     setError(null);
+    // Refresh players list when closing dialog
+    fetchPlayers();
   };
 
   const handleEdit = (team: Team) => {
     setEditingTeam(team);
-    
+
     // Handle captain value properly
     let captainValue = '';
     if (team.captain) {
@@ -120,13 +165,15 @@ const TeamList: React.FC = () => {
         captainValue = team.captain;
       }
     }
-    
+
     setNewTeam({
       name: team.name,
       captain: captainValue,
       members: team.members.map(member => typeof member === 'object' ? member._id : member)
     });
     setOpen(true);
+    // Refresh players list to include players from current team
+    fetchPlayers(team);
   };
 
   // Delete dialog handlers
@@ -189,11 +236,25 @@ const TeamList: React.FC = () => {
       
       console.log('Sending team data:', JSON.stringify(teamData, null, 2)); // Better debug log
       
+      let savedTeam: Team;
       if (editingTeam?._id) {
-        await teamService.update(editingTeam._id, teamData);
+        // Update existing team
+        const updateResponse = await teamService.update(editingTeam._id, teamData);
+        savedTeam = updateResponse.data;
+        
+        // Update players' teams array
+        if (savedTeam._id) {
+          const memberIds = (teamData.members || []).map(member => 
+            typeof member === 'string' ? member : member._id
+          ).filter(Boolean);
+          await updatePlayerTeams(savedTeam._id, memberIds);
+        }
       } else {
-        await teamService.create(teamData);
+        // Create new team (no members initially)
+        const createResponse = await teamService.create({ name: newTeam.name.trim() });
+        savedTeam = createResponse.data;
       }
+      
       handleClose();
       fetchTeams();
     } catch (error: any) {
@@ -202,6 +263,71 @@ const TeamList: React.FC = () => {
       setError(editingTeam ? `Failed to update team: ${errorMessage}` : `Failed to create team: ${errorMessage}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Helper function to update players' teams array
+  const updatePlayerTeams = async (teamId: string, memberIds: string[]) => {
+    try {
+      // Get all players to see their current team assignments
+      const allPlayers = await playerService.getAll();
+      
+      // Find players who are currently in this team
+      const currentTeamMembers = allPlayers.data.filter(player => 
+        player.teams && player.teams.some(team => 
+          (typeof team === 'string' ? team : team._id) === teamId
+        )
+      );
+      
+      // Find players who should be in this team (selected members)
+      const selectedPlayers = allPlayers.data.filter(player => 
+        memberIds.includes(player._id || '')
+      );
+      
+      // Players to add to this team
+      const playersToAdd = selectedPlayers.filter(player => 
+        !currentTeamMembers.some(current => current._id === player._id)
+      );
+      
+      // Players to remove from this team
+      const playersToRemove = currentTeamMembers.filter(player => 
+        !memberIds.includes(player._id || '')
+      );
+      
+      // Prepare updates
+      const playerUpdates: { playerId: string; teams: string[] }[] = [];
+      
+      // Add team to players who were added
+      playersToAdd.forEach(player => {
+        const currentTeams = player.teams ? player.teams.map(team => 
+          typeof team === 'string' ? team : team._id
+        ).filter(Boolean) : [];
+        playerUpdates.push({
+          playerId: player._id!,
+          teams: [...currentTeams, teamId]
+        });
+      });
+      
+      // Remove team from players who were removed
+      playersToRemove.forEach(player => {
+        const currentTeams = player.teams ? player.teams.map(team => 
+          typeof team === 'string' ? team : team._id
+        ).filter(Boolean) : [];
+        playerUpdates.push({
+          playerId: player._id!,
+          teams: currentTeams.filter(teamIdFromArray => teamIdFromArray !== teamId)
+        });
+      });
+      
+      // Update players if there are changes
+      if (playerUpdates.length > 0) {
+        console.log('Updating player teams:', playerUpdates);
+        await playerService.updatePlayerTeams(playerUpdates);
+        console.log(`Updated ${playerUpdates.length} players' team assignments`);
+      }
+    } catch (error) {
+      console.error('Error updating player teams:', error);
+      throw new Error('Failed to update player team assignments');
     }
   };
 
@@ -400,9 +526,23 @@ const TeamList: React.FC = () => {
         fullScreen={isMobile}
         maxWidth="sm"
         fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '16px',
+            background: 'white',
+            color: 'black',
+          }
+        }}
       >
-        <DialogTitle>{editingTeam ? 'Edit Team' : 'Create New Team'}</DialogTitle>
-        <DialogContent>
+        <DialogTitle sx={{ 
+          background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
+          color: 'white',
+          fontWeight: 'bold',
+          borderRadius: '16px 16px 0 0'
+        }}>
+          {editingTeam ? 'Edit Team' : 'Create New Team'}
+        </DialogTitle>
+        <DialogContent sx={{ p: 3 }}>
           <Stack spacing={2} sx={{ mt: 2, minWidth: { xs: 'auto', sm: 400 } }}>
             <TextField
               label="Team Name"
@@ -412,83 +552,183 @@ const TeamList: React.FC = () => {
               required
               error={!newTeam.name && error != null}
               size={isMobile ? "small" : "medium"}
-            />
-            <Autocomplete
-              fullWidth
-              options={[{ _id: '', name: 'No Captain' }, ...players]}
-              getOptionLabel={(option) => option.name}
-              value={players.find(p => p._id === newTeam.captain) || { _id: '', name: 'No Captain' }}
-              onChange={(event, newValue) => {
-                const value = newValue?._id || '';
-                console.log('Captain selection changed to:', value); // Debug log
-                setNewTeam({ ...newTeam, captain: value });
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                  '&:hover fieldset': {
+                    borderColor: theme.palette.primary.main,
+                  },
+                },
               }}
-              renderInput={(params) => (
-                <TextField 
-                  {...params} 
-                  label="Captain (Optional)"
-                  size={isMobile ? "small" : "medium"}
-                />
-              )}
-              renderOption={(props, option) => (
-                <Box component="li" {...props}>
-                  <Typography>{option.name}</Typography>
-                </Box>
-              )}
             />
             
-            <Autocomplete
-              multiple
-              fullWidth
-              options={players}
-              getOptionLabel={(option) => `${option.name} - ${option.role}`}
-              value={players.filter(player => newTeam.members.includes(player._id || ''))}
-              onChange={(event, newValue) => {
-                const memberIds = newValue.map(player => player._id || '').filter(id => id);
-                setNewTeam({ ...newTeam, members: memberIds });
-              }}
-              renderInput={(params) => (
-                <TextField 
-                  {...params} 
-                  label="Team Members (Optional)"
-                  placeholder={newTeam.members.length === 0 ? "Select Team Members" : ""}
-                  size={isMobile ? "small" : "medium"}
+            {/* Only show team members and captain fields when editing */}
+            {editingTeam && (
+              <>
+                <FormControl component="fieldset" sx={{ width: '100%' }}>
+                  <FormLabel component="legend" sx={{ mb: 1, fontWeight: 600 }}>
+                    Team Members (Optional)
+                  </FormLabel>
+                  <FormGroup sx={{
+                    maxHeight: isMobile ? 250 : 300, // Increased height for mobile
+                    overflow: 'auto',
+                    border: '1px solid #e0e0e0',
+                    borderRadius: 1,
+                    p: 1,
+                    '&::-webkit-scrollbar': {
+                      width: '6px',
+                    },
+                    '&::-webkit-scrollbar-track': {
+                      backgroundColor: '#f1f1f1',
+                      borderRadius: '3px',
+                    },
+                    '&::-webkit-scrollbar-thumb': {
+                      backgroundColor: '#c1c1c1',
+                      borderRadius: '3px',
+                      '&:hover': {
+                        backgroundColor: '#a8a8a8',
+                      },
+                    },
+                  }}>
+                    {players.map((player) => (
+                      <FormControlLabel
+                        key={player._id}
+                        control={
+                          <Checkbox
+                            checked={newTeam.members.includes(player._id || '')}
+                            onChange={(event) => {
+                              const playerId = player._id || '';
+                              if (event.target.checked) {
+                                setNewTeam({
+                                  ...newTeam,
+                                  members: [...newTeam.members, playerId]
+                                });
+                              } else {
+                                setNewTeam({
+                                  ...newTeam,
+                                  members: newTeam.members.filter(id => id !== playerId)
+                                });
+                              }
+                            }}
+                            size={isMobile ? "small" : "medium"}
+                          />
+                        }
+                        label={
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Typography variant="body2">
+                              {player.name}
+                            </Typography>
+                            <Chip
+                              label={player.role}
+                              size="small"
+                              color="primary"
+                              variant="outlined"
+                              sx={{ fontSize: '0.7rem', height: '18px' }}
+                            />
+                          </Box>
+                        }
+                        sx={{
+                          mb: 0.5,
+                          '& .MuiFormControlLabel-label': {
+                            width: '100%',
+                          }
+                        }}
+                      />
+                    ))}
+                    {players.length === 0 && (
+                      <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
+                        No available players. All players are already assigned to teams.
+                      </Typography>
+                    )}
+                  </FormGroup>
+                </FormControl>
+                
+                <Autocomplete
+                  fullWidth
+                  options={[{ _id: '', name: 'No Captain' }, ...players.filter(p => newTeam.members.includes(p._id || ''))]}
+                  getOptionLabel={(option) => option.name}
+                  value={newTeam.captain ? players.find(p => p._id === newTeam.captain) || null : null}
+                  onChange={(event, newValue) => {
+                    const value = newValue?._id || '';
+                    console.log('Captain selection changed to:', value); // Debug log
+                    setNewTeam({ ...newTeam, captain: value });
+                  }}
+                  renderInput={(params) => (
+                    <TextField 
+                      {...params} 
+                      label="Captain (Optional)"
+                      size={isMobile ? "small" : "medium"}
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: 2,
+                          '&:hover fieldset': {
+                            borderColor: theme.palette.primary.main,
+                          },
+                        },
+                      }}
+                    />
+                  )}
+                  renderOption={(props, option) => (
+                    <Box component="li" {...props}>
+                      <Typography>{option.name}</Typography>
+                    </Box>
+                  )}
                 />
-              )}
-              renderOption={(props, option) => (
-                <Box component="li" {...props}>
-                  <Typography>{option.name} - {option.role}</Typography>
-                </Box>
-              )}
-              renderTags={(value, getTagProps) =>
-                value.map((option, index) => (
-                  <Chip
-                    variant="outlined"
-                    label={option.name}
-                    size="small"
-                    {...getTagProps({ index })}
-                    key={option._id}
-                  />
-                ))
-              }
-            />
+              </>
+            )}
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ p: isMobile ? 1 : 3 }}>
+        <DialogActions sx={{ p: 3, pt: 0 }}>
           <Button 
             onClick={handleClose}
             size={isMobile ? "small" : "medium"}
+            sx={{
+              py: 1.5,
+              borderRadius: 2,
+              textTransform: 'none',
+              fontSize: '1.1rem',
+              fontWeight: 600,
+              borderColor: theme.palette.primary.main,
+              color: theme.palette.primary.main,
+              '&:hover': {
+                borderColor: theme.palette.primary.main,
+                backgroundColor: 'rgba(2, 14, 67, 0.04)',
+                transform: 'translateY(-1px)',
+                boxShadow: '0 4px 8px rgba(2, 14, 67, 0.2)',
+              },
+              transition: 'all 0.3s ease',
+            }}
+            variant="outlined"
           >
             Cancel
           </Button>
           <Button 
             onClick={handleSubmit} 
             variant="contained" 
-            color="primary"
             disabled={loading || !newTeam.name}
             size={isMobile ? "small" : "medium"}
+            sx={{
+              py: 1.5,
+              borderRadius: 2,
+              textTransform: 'none',
+              fontSize: '1.1rem',
+              fontWeight: 600,
+              background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
+              boxShadow: '0 4px 12px rgba(2, 14, 67, 0.4)',
+              color: 'white !important', // Ensure text is white
+              '&:hover': {
+                background: 'linear-gradient(135deg, #764ba2 0%, #020e43 100%)',
+                boxShadow: '0 6px 16px rgba(118, 75, 162, 0.6)',
+                transform: 'translateY(-2px)',
+              },
+              '&:disabled': {
+                background: 'rgba(0, 0, 0, 0.12)',
+                color: 'rgba(0, 0, 0, 0.26) !important',
+              },
+              transition: 'all 0.3s ease',
+            }}
           >
-            {loading ? <CircularProgress size={24} /> : editingTeam ? 'Save' : 'Create'}
+            {loading ? <CircularProgress size={24} color="inherit" /> : editingTeam ? 'Save' : 'Create'}
           </Button>
         </DialogActions>
       </Dialog>

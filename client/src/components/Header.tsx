@@ -257,7 +257,7 @@ const Header: React.FC = () => {
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             {!isMobile && (
               <Typography variant="body2" sx={{ mr: 1, fontWeight: 500 }}>
-                {username} ({userRole})
+                {username}
               </Typography>
             )}
             <IconButton color="inherit" onClick={handleProfileClick}>
@@ -407,7 +407,7 @@ const Header: React.FC = () => {
         {isMobile && (
           <MenuItem disabled>
             <Typography variant="body2" color="textSecondary">
-              {username} ({userRole})
+              {username}
             </Typography>
           </MenuItem>
         )}

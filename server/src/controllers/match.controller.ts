@@ -64,9 +64,16 @@ export const matchController = {
   },
 
   // Get all matches
-  getAll: async (_req: Request, res: Response) => {
+  getAll: async (req: Request, res: Response) => {
     try {
-      const matches = await Match.find()
+      const { userId } = req.query;
+      
+      let query = {};
+      if (userId) {
+        query = { createdBy: userId };
+      }
+      
+      const matches = await Match.find(query)
         .populate('team1', 'name')
         .populate('team2', 'name')
         .sort({ date: -1 });
