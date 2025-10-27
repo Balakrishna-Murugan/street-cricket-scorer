@@ -211,15 +211,20 @@ const LiveScoring: React.FC<Props> = () => {
       
       if (!hasTeam) return false;
       
-      // Check if player is out
-      const isPlayerOut = currentInning.battingStats && Array.isArray(currentInning.battingStats) 
-        ? currentInning.battingStats.some(stat => {
+      // Check if player is out - but only if they have batting stats
+      // If a player has no batting stats, they're available
+      const playerBattingStats = currentInning.battingStats && Array.isArray(currentInning.battingStats) 
+        ? currentInning.battingStats.find(stat => {
             const playerId = typeof stat.player === 'string' ? stat.player : stat.player._id;
-            return playerId === player._id && stat.isOut;
+            return playerId === player._id;
           })
-        : false;
+        : null;
       
-      return !isPlayerOut;
+      // If player has no batting stats, they're available
+      if (!playerBattingStats) return true;
+      
+      // If player has batting stats, check if they're out
+      return !playerBattingStats.isOut;
     });
   }, [match, players, currentInnings]);
 
@@ -639,6 +644,9 @@ const LiveScoring: React.FC<Props> = () => {
         setCurrentInnings(0);
       }
       
+      // Refresh players data to ensure team membership is up to date
+      await fetchPlayers();
+      
       // Initialize striker, non-striker, and bowler if not set
       if (data && data.innings && data.innings.length > 0) {
         const actualCurrentInnings = data.currentInnings || 0;
@@ -816,6 +824,15 @@ const LiveScoring: React.FC<Props> = () => {
     fetchMatch();
     fetchPlayers();
   }, [fetchMatch, fetchPlayers]);
+
+  // Refresh players data periodically to catch team assignment changes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchPlayers();
+    }, 5000); // Refresh every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [fetchPlayers]);
 
   // Reset dropdown selections when innings changes, but preserve score displays
   useEffect(() => {
@@ -1352,7 +1369,10 @@ const LiveScoring: React.FC<Props> = () => {
                       legByes: 0,
                       total: 0
                     },
-                    runRate: inning.runRate || 0
+                    runRate: inning.runRate || 0,
+                    requiredRunRate: inning.requiredRunRate,
+                    currentOverBalls: inning.currentOverBalls || [],
+                    recentBalls: inning.recentBalls || []
                   }))
                 };
               };
@@ -1498,9 +1518,12 @@ const LiveScoring: React.FC<Props> = () => {
               currentBall: 0,
               lastBallRuns: 0
             },
-            extras: {
-              ...inning.extras,
-              total: inning.extras.total || 0
+            extras: inning.extras || {
+              wides: 0,
+              noBalls: 0,
+              byes: 0,
+              legByes: 0,
+              total: 0
             },
             runRate: inning.runRate || 0,
             requiredRunRate: inning.requiredRunRate,
@@ -2540,13 +2563,12 @@ const LiveScoring: React.FC<Props> = () => {
             // Just over completed, continue with same innings
             setIsOverCompleted(true);
             setOverCompletionMessage(`Over ${completeInningsOvers} completed! Please select a new bowler and start the next over.`);
-            
             // CRITICAL FIX: Clear current over balls when over completes after wicket
-            // This prevents old over information from persisting into the new over
             setCurrentOverBalls([]);
             if (match && match.innings && match.innings[currentInnings]) {
               match.innings[currentInnings].currentOverBalls = [];
             }
+            console.log('Over completed - cleared currentOverBalls');
           }
         }
         
@@ -2673,7 +2695,7 @@ const LiveScoring: React.FC<Props> = () => {
       
       return player.teams.some(team => {
         const teamId = typeof team === 'string' ? team : team._id;
-        return teamId === secondInningsBattingTeamId;
+        return teamId === String(secondInningsBattingTeamId);
       });
     });
     
@@ -2757,7 +2779,10 @@ const LiveScoring: React.FC<Props> = () => {
               legByes: 0,
               total: 0
             },
-            runRate: inning.runRate || 0
+            runRate: inning.runRate || 0,
+            requiredRunRate: inning.requiredRunRate,
+            currentOverBalls: inning.currentOverBalls || [],
+            recentBalls: inning.recentBalls || []
           }))
         };
       };
@@ -2811,10 +2836,10 @@ const LiveScoring: React.FC<Props> = () => {
             
             <Box sx={{ mb: 4, p: 3, backgroundColor: '#e8f5e8', borderRadius: 2 }}>
               <Typography variant="h4" sx={{ mb: 2, color: '#2e7d32' }}>
-                {firstInningBattingTeam}: {firstInning?.totalRuns}/{firstInning?.wickets}
+                {firstInningBattingTeam}: {firstInning?.totalRuns || 0}/{firstInning?.wickets || 0}
               </Typography>
               <Typography variant="h6" sx={{ color: '#4caf50' }}>
-                Overs: {firstInning?.overs} | Run Rate: {(firstInning?.runRate || 0).toFixed(2)}
+                Overs: {firstInning?.overs || 0} | Run Rate: {(firstInning?.runRate || 0).toFixed(2)}
               </Typography>
             </Box>
 
@@ -2958,9 +2983,10 @@ const LiveScoring: React.FC<Props> = () => {
           }}
         >
           <AlertTitle sx={{ fontWeight: 'bold', color: 'info.main' }}>
-            👀 Viewer Mode
+            👀 Guest User Mode
           </AlertTitle>
-          You are in viewer mode. You can watch the live scoring but cannot make any changes to the match.
+          You can score <strong>1-6 runs</strong> and record <strong>caught wickets</strong> for demo purposes. 
+          The 0-runs button and other wicket types are disabled. For full scoring features, please contact an admin.
         </Alert>
       )}
 
@@ -2990,54 +3016,45 @@ const LiveScoring: React.FC<Props> = () => {
 
       {/* Waiting for New Batsman Alert */}
       {isWaitingForNewBatsman && showWicketAlert && (
-        <Alert 
+        <Alert
           severity="info"
           onClose={() => setShowWicketAlert(false)}
-          sx={{ 
-            mb: 3, 
+          sx={{
+            mb: 3,
             borderRadius: 2,
             boxShadow: '0 4px 12px rgba(33, 150, 243, 0.3)',
             border: '1px solid',
             borderColor: 'info.main',
             background: 'linear-gradient(135deg, rgba(33, 150, 243, 0.1) 0%, rgba(21, 101, 192, 0.1) 100%)',
-            '& .MuiAlert-message': { width: '100%' },
-            '& .MuiAlert-icon': { fontSize: '1.5rem' }
+            '& .MuiAlert-message': { width: '100%' }
           }}
+          action={
+            <Button
+              size="large"
+              onClick={handleStartOrContinueMatch}
+              sx={{
+                px: 4,
+                py: 1.5,
+                fontSize: '1.1rem',
+                fontWeight: 'bold',
+                borderRadius: 3,
+                background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+                boxShadow: '0 4px 12px rgba(33, 150, 243, 0.4)',
+                '&:hover': {
+                  background: 'linear-gradient(45deg, #1976D2 30%, #2196F3 90%)',
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 6px 16px rgba(33, 150, 243, 0.5)',
+                },
+              }}
+            >
+              🏏 {match.innings.length > 1 && currentInnings === 1 ? 'Continue Match' : 'Start Match'}
+            </Button>
+          }
         >
-          <AlertTitle>Wicket Recorded!</AlertTitle>
-          A batsman is out. Please select a new striker from the dropdown below to continue.
-          <br />
-          <Typography variant="body2" sx={{ mt: 1, fontWeight: 'bold' }}>
-            All scoring options are disabled until new batsman is selected.
+          <Typography sx={{ mb: 2, fontWeight: 'bold' }}>
+            Waiting for new batsman to be selected.
           </Typography>
         </Alert>
-      )}
-
-      {/* Start/Continue Match Button - Show when players not selected or match needs to start */}
-      {isAdmin && !arePlayersSelected() && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
-          <Button
-            variant="contained"
-            size="large"
-            onClick={handleStartOrContinueMatch}
-            sx={{
-              px: 4,
-              py: 1.5,
-              fontSize: '1.1rem',
-              fontWeight: 'bold',
-              borderRadius: 3,
-              background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
-              boxShadow: '0 4px 12px rgba(33, 150, 243, 0.4)',
-              '&:hover': {
-                background: 'linear-gradient(45deg, #1976D2 30%, #2196F3 90%)',
-                transform: 'translateY(-2px)',
-                boxShadow: '0 6px 16px rgba(33, 150, 243, 0.5)',
-              },
-            }}
-          >
-            🏏 {match.innings.length > 1 && currentInnings === 1 ? 'Continue Match' : 'Start Match'}
-          </Button>
-        </Box>
       )}
 
       {/* Score Summary */}
@@ -3337,7 +3354,7 @@ const LiveScoring: React.FC<Props> = () => {
               key={runs}
               variant="contained" 
               onClick={() => handleBallOutcome(runs)}
-              disabled={!isAdmin || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
+              disabled={!isAdmin || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted || (!isAdmin && runs === 0)}
               sx={{
                 minHeight: isMobile ? '35px' : '60px',
                 borderRadius: isMobile ? '6px' : '12px',
@@ -3898,7 +3915,7 @@ const LiveScoring: React.FC<Props> = () => {
         PaperProps={{
           sx: {
             borderRadius: '16px',
-            background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.9) 100%)',
+            background: 'white',
             backdropFilter: 'blur(20px)',
             border: '1px solid rgba(255,255,255,0.3)',
             boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
@@ -3920,126 +3937,171 @@ const LiveScoring: React.FC<Props> = () => {
               <Typography variant="body2" sx={{ mb: 2, color: 'text.primary', fontWeight: 500 }}>
                 Select dismissal type:
               </Typography>
-              <Button 
-                variant="outlined" 
-                onClick={() => setWicketDetails({ type: 'bowled' })}
-                fullWidth
-                sx={{
-                  borderRadius: '10px',
-                  fontWeight: 'bold',
-                  background: 'linear-gradient(45deg, rgba(76, 175, 80, 0.1) 30%, rgba(139, 195, 74, 0.1) 90%)',
-                  borderColor: '#4CAF50',
-                  color: '#4CAF50',
-                  '&:hover': {
-                    background: 'linear-gradient(45deg, #4CAF50 30%, #8BC34A 90%)',
-                    color: '#fff',
-                    transform: 'translateY(-1px)',
-                    boxShadow: '0 4px 8px rgba(76, 175, 80, 0.3)',
-                  }
-                }}
-              >
-                🎯 Bowled
-              </Button>
-              <Button 
-                variant="outlined" 
-                onClick={() => setWicketDetails({ type: 'caught' })}
-                fullWidth
-                sx={{
-                  borderRadius: '10px',
-                  fontWeight: 'bold',
-                  background: 'linear-gradient(45deg, rgba(33, 150, 243, 0.1) 30%, rgba(33, 203, 243, 0.1) 90%)',
-                  borderColor: '#2196F3',
-                  color: '#2196F3',
-                  '&:hover': {
-                    background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
-                    color: '#fff',
-                    transform: 'translateY(-1px)',
-                    boxShadow: '0 4px 8px rgba(33, 150, 243, 0.3)',
-                  }
-                }}
-              >
-                🤲 Caught
-              </Button>
-              <Button 
-                variant="outlined" 
-                onClick={() => setWicketDetails({ type: 'lbw' })}
-                fullWidth
-                sx={{
-                  borderRadius: '10px',
-                  fontWeight: 'bold',
-                  background: 'linear-gradient(45deg, rgba(255, 152, 0, 0.1) 30%, rgba(255, 183, 77, 0.1) 90%)',
-                  borderColor: '#FF9800',
-                  color: '#FF9800',
-                  '&:hover': {
-                    background: 'linear-gradient(45deg, #FF9800 30%, #FFB74D 90%)',
-                    color: '#fff',
-                    transform: 'translateY(-1px)',
-                    boxShadow: '0 4px 8px rgba(255, 152, 0, 0.3)',
-                  }
-                }}
-              >
-                🦵 LBW
-              </Button>
-              <Button 
-                variant="outlined" 
-                onClick={() => setWicketDetails({ type: 'run out' })}
-                fullWidth
-                sx={{
-                  borderRadius: '10px',
-                  fontWeight: 'bold',
-                  background: 'linear-gradient(45deg, rgba(244, 67, 54, 0.1) 30%, rgba(211, 47, 47, 0.1) 90%)',
-                  borderColor: '#f44336',
-                  color: '#f44336',
-                  '&:hover': {
-                    background: 'linear-gradient(45deg, #f44336 30%, #d32f2f 90%)',
-                    color: '#fff',
-                    transform: 'translateY(-1px)',
-                    boxShadow: '0 4px 8px rgba(244, 67, 54, 0.3)',
-                  }
-                }}
-              >
-                🏃 Run Out
-              </Button>
-              <Button 
-                variant="outlined" 
-                onClick={() => setWicketDetails({ type: 'stumped' })}
-                fullWidth
-                sx={{
-                  borderRadius: '10px',
-                  fontWeight: 'bold',
-                  background: 'linear-gradient(45deg, rgba(156, 39, 176, 0.1) 30%, rgba(142, 36, 170, 0.1) 90%)',
-                  borderColor: '#9C27B0',
-                  color: '#9C27B0',
-                  '&:hover': {
-                    background: 'linear-gradient(45deg, #9C27B0 30%, #8E24AA 90%)',
-                    color: '#fff',
-                    transform: 'translateY(-1px)',
-                    boxShadow: '0 4px 8px rgba(156, 39, 176, 0.3)',
-                  }
-                }}
-              >
-                🧤 Stumped
-              </Button>
-              <Button 
-                variant="outlined" 
-                onClick={() => setWicketDetails({ type: 'hit wicket' })}
-                fullWidth
-                sx={{
-                  borderRadius: '10px',
-                  fontWeight: 'bold',
-                  background: 'linear-gradient(45deg, rgba(121, 85, 72, 0.1) 30%, rgba(141, 110, 99, 0.1) 90%)',
-                  borderColor: '#795548',
-                  color: '#795548',
-                  '&:hover': {
-                    background: 'linear-gradient(45deg, #795548 30%, #8D6E63 90%)',
-                    color: '#fff',
-                    transform: 'translateY(-1px)',
-                    boxShadow: '0 4px 8px rgba(121, 85, 72, 0.3)',
-                  }
-                }}
-              >
-                💥 Hit Wicket
-              </Button>
+              {isAdmin ? (
+                <>
+                  <Button 
+                    variant="outlined" 
+                    onClick={() => setWicketDetails({ type: 'bowled' })}
+                    fullWidth
+                    sx={{
+                      borderRadius: '10px',
+                      fontWeight: 'bold',
+                      background: 'linear-gradient(45deg, rgba(76, 175, 80, 0.1) 30%, rgba(139, 195, 74, 0.1) 90%)',
+                      borderColor: '#4CAF50',
+                      color: '#4CAF50',
+                      '&:hover': {
+                        background: 'linear-gradient(45deg, #4CAF50 30%, #8BC34A 90%)',
+                        color: '#fff',
+                        transform: 'translateY(-1px)',
+                        boxShadow: '0 4px 8px rgba(76, 175, 80, 0.3)',
+                      }
+                    }}
+                  >
+                    🎯 Bowled
+                  </Button>
+                  <Button 
+                    variant="outlined" 
+                    onClick={() => setWicketDetails({ type: 'caught' })}
+                    fullWidth
+                    sx={{
+                      borderRadius: '10px',
+                      fontWeight: 'bold',
+                      background: 'linear-gradient(45deg, rgba(33, 150, 243, 0.1) 30%, rgba(33, 203, 243, 0.1) 90%)',
+                      borderColor: '#2196F3',
+                      color: '#2196F3',
+                      '&:hover': {
+                        background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+                        color: '#fff',
+                        transform: 'translateY(-1px)',
+                        boxShadow: '0 4px 8px rgba(33, 150, 243, 0.3)',
+                      }
+                    }}
+                  >
+                    🤲 Caught
+                  </Button>
+                  <Button 
+                    variant="outlined" 
+                    onClick={() => setWicketDetails({ type: 'lbw' })}
+                    fullWidth
+                    sx={{
+                      borderRadius: '10px',
+                      fontWeight: 'bold',
+                      background: 'linear-gradient(45deg, rgba(255, 152, 0, 0.1) 30%, rgba(255, 183, 77, 0.1) 90%)',
+                      borderColor: '#FF9800',
+                      color: '#FF9800',
+                      '&:hover': {
+                        background: 'linear-gradient(45deg, #FF9800 30%, #FFB74D 90%)',
+                        color: '#fff',
+                        transform: 'translateY(-1px)',
+                        boxShadow: '0 4px 8px rgba(255, 152, 0, 0.3)',
+                      }
+                    }}
+                  >
+                    🦵 LBW
+                  </Button>
+                  <Button 
+                    variant="outlined" 
+                    onClick={() => setWicketDetails({ type: 'run out' })}
+                    fullWidth
+                    sx={{
+                      borderRadius: '10px',
+                      fontWeight: 'bold',
+                      background: 'linear-gradient(45deg, rgba(244, 67, 54, 0.1) 30%, rgba(211, 47, 47, 0.1) 90%)',
+                      borderColor: '#f44336',
+                      color: '#f44336',
+                      '&:hover': {
+                        background: 'linear-gradient(45deg, #f44336 30%, #d32f2f 90%)',
+                        color: '#fff',
+                        transform: 'translateY(-1px)',
+                        boxShadow: '0 4px 8px rgba(244, 67, 54, 0.3)',
+                      }
+                    }}
+                  >
+                    🏃 Run Out
+                  </Button>
+                  <Button 
+                    variant="outlined" 
+                    onClick={() => setWicketDetails({ type: 'stumped' })}
+                    fullWidth
+                    sx={{
+                      borderRadius: '10px',
+                      fontWeight: 'bold',
+                      background: 'linear-gradient(45deg, rgba(156, 39, 176, 0.1) 30%, rgba(142, 36, 170, 0.1) 90%)',
+                      borderColor: '#9C27B0',
+                      color: '#9C27B0',
+                      '&:hover': {
+                        background: 'linear-gradient(45deg, #9C27B0 30%, #8E24AA 90%)',
+                        color: '#fff',
+                        transform: 'translateY(-1px)',
+                        boxShadow: '0 4px 8px rgba(156, 39, 176, 0.3)',
+                      }
+                    }}
+                  >
+                    🧤 Stumped
+                  </Button>
+                  <Button 
+                    variant="outlined" 
+                    onClick={() => setWicketDetails({ type: 'hit wicket' })}
+                    fullWidth
+                    sx={{
+                      borderRadius: '10px',
+                      fontWeight: 'bold',
+                      background: 'linear-gradient(45deg, rgba(121, 85, 72, 0.1) 30%, rgba(141, 110, 99, 0.1) 90%)',
+                      borderColor: '#795548',
+                      color: '#795548',
+                      '&:hover': {
+                        background: 'linear-gradient(45deg, #795548 30%, #8D6E63 90%)',
+                        color: '#fff',
+                        transform: 'translateY(-1px)',
+                        boxShadow: '0 4px 8px rgba(121, 85, 72, 0.3)',
+                      }
+                    }}
+                  >
+                    💥 Hit Wicket
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>
+                    <AlertTitle sx={{ fontWeight: 'bold' }}>🎯 Viewer Mode</AlertTitle>
+                    As a guest user, you can only record <strong>caught</strong> wickets. For other dismissal types, please contact an admin.
+                  </Alert>
+                  <Button 
+                    variant="outlined" 
+                    onClick={() => setWicketDetails({ type: 'caught' })}
+                    fullWidth
+                    sx={{
+                      borderRadius: '10px',
+                      fontWeight: 'bold',
+                      background: 'linear-gradient(45deg, rgba(33, 150, 243, 0.1) 30%, rgba(33, 203, 243, 0.1) 90%)',
+                      borderColor: '#2196F3',
+                      color: '#2196F3',
+                      '&:hover': {
+                        background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+                        color: '#fff',
+                        transform: 'translateY(-1px)',
+                        boxShadow: '0 4px 8px rgba(33, 150, 243, 0.3)',
+                      }
+                    }}
+                  >
+                    🤲 Caught
+                  </Button>
+                  <Button 
+                    variant="outlined" 
+                    disabled
+                    fullWidth
+                    sx={{
+                      borderRadius: '10px',
+                      fontWeight: 'bold',
+                      background: 'linear-gradient(45deg, rgba(158, 158, 158, 0.1) 30%, rgba(158, 158, 158, 0.1) 90%)',
+                      borderColor: '#9E9E9E',
+                      color: '#9E9E9E',
+                    }}
+                  >
+                    🔒 Other dismissal types (Admin only)
+                  </Button>
+                </>
+              )}
             </Stack>
           ) : (
             <Stack spacing={3} component="div">
@@ -4257,7 +4319,7 @@ const LiveScoring: React.FC<Props> = () => {
         PaperProps={{
           sx: {
             borderRadius: '16px',
-            background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.9) 100%)',
+            background: 'white',
             backdropFilter: 'blur(20px)',
             border: '1px solid rgba(255,255,255,0.3)',
             boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
@@ -4389,7 +4451,7 @@ const LiveScoring: React.FC<Props> = () => {
         PaperProps={{
           sx: {
             borderRadius: '16px',
-            background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.9) 100%)',
+            background: 'white',
             backdropFilter: 'blur(20px)',
             border: '1px solid rgba(255,255,255,0.3)',
             boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
@@ -4622,7 +4684,7 @@ const LiveScoring: React.FC<Props> = () => {
         sx={{
           '& .MuiDialog-paper': {
             borderRadius: '16px',
-            background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
+            background: 'white',
             boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
           }
         }}

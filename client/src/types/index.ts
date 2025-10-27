@@ -19,6 +19,18 @@ export interface Player {
   bowlingStyle?: string;
   team?: string | TeamRef; // Single team reference (singular)
   teams?: Array<string | TeamRef>; // Multiple teams reference (plural) - for backwards compatibility
+  // Authentication fields
+  username?: string;
+  password?: string;
+  email?: string;
+  isGuest?: boolean;
+  userRole?: 'player' | 'admin' | 'superadmin' | 'viewer';
+  // Guest limitations
+  guestLimitations?: {
+    maxMatches: number;
+    basicScoringOnly: boolean;
+    expiresAt: string;
+  };
 }
 
 export interface Team {
@@ -140,6 +152,7 @@ export interface Match {
     bowlerOversCount: Record<string, number>;
     availableBowlers: Array<string | PlayerRef>;
   };
+  createdBy?: string; // User who created the match
 }
 
 // Ball processing interface for API calls

@@ -35,8 +35,11 @@ const MatchOverview: React.FC = () => {
 
   // Get user role for admin buttons
   const userRole = localStorage.getItem('userRole') || 'viewer';
+  const currentUserId = localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')!)._id : null;
   const isAdmin = userRole === 'admin';
   const isSuperAdmin = userRole === 'superadmin';
+  const isPlayer = userRole === 'player';
+  const isViewer = userRole === 'viewer';
 
   useEffect(() => {
     const fetchData = async () => {
@@ -127,8 +130,10 @@ const MatchOverview: React.FC = () => {
 
   if (loading) {
     return (
-      <Box>
-        <Typography>Loading match details...</Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
+        <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          🏏 <span className="loading-spinner">⏳</span> Loading Match Details...
+        </Typography>
       </Box>
     );
   }
@@ -140,6 +145,9 @@ const MatchOverview: React.FC = () => {
       </Box>
     );
   }
+
+  // Calculate if user can manage this match (inside render where match data is available)
+  const canManageMatch = isAdmin || isSuperAdmin || ((isPlayer || isViewer) && match?.createdBy === currentUserId);
 
   return (
     <Box maxWidth="lg" sx={{ py: isMobile ? 1 : 3, px: isMobile ? 1 : 3, mx: 'auto' }}>
@@ -236,8 +244,8 @@ const MatchOverview: React.FC = () => {
             justifyContent="center"
             alignItems="center"
           >
-            {/* Admin Actions - Only for Admins and SuperAdmins */}  
-            {(isAdmin || isSuperAdmin) && (
+            {/* Admin/Player Actions - For Admins, SuperAdmins, and match creators */}  
+            {canManageMatch && (
               <Stack 
                 direction={isMobile ? "column" : "row"} 
                 spacing={2}

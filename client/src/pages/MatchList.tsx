@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Typography,
   Paper,
@@ -92,32 +92,33 @@ const MatchList: React.FC = () => {
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
-  // Get user role for permissions
-  const userRole = localStorage.getItem('userRole') || 'viewer';
+  // Get user ID from localStorage
+  const userData = localStorage.getItem('user');
+  const currentUserId = userData ? JSON.parse(userData)._id : null;
+  
+  // Get user role from localStorage
+  const userRole = localStorage.getItem('userRole') || '';
   const isAdmin = userRole === 'admin';
   const isSuperAdmin = userRole === 'superadmin';
+  const isViewer = userRole === 'viewer';
+  const isPlayer = userRole === 'player';
   
   // State for multi-select delete functionality
   const [selectedMatches, setSelectedMatches] = useState<string[]>([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
-  useEffect(() => {
-    console.log('MatchList: Component mounted, calling fetchMatches and fetchTeams');
-    fetchMatches();
-    fetchTeams();
-  }, []);
-
-  const fetchMatches = async () => {
+  const fetchMatches = useCallback(async () => {
     console.log('MatchList: fetchMatches called');
     console.log('MatchList: Authentication state:', {
       isAuthenticated: localStorage.getItem('isAuthenticated'),
-      userRole: localStorage.getItem('userRole')
+      userRole: localStorage.getItem('userRole'),
+      currentUserId
     });
     
     try {
-      console.log('MatchList: Making API call to matchService.getAll()');
-      const response = await matchService.getAll();
+      console.log('MatchList: Making API call to matchService.getAll() with userId:', currentUserId);
+      const response = await matchService.getAll(currentUserId || undefined);
       console.log('MatchList: API response received:', response);
       console.log('MatchList: Setting matches state with', response.data?.length || 0, 'matches');
       setMatches(response.data);
@@ -130,7 +131,7 @@ const MatchList: React.FC = () => {
         data: error?.response?.data
       });
     }
-  };
+  }, [currentUserId]);
 
   const fetchTeams = async () => {
     console.log('MatchList: fetchTeams called');
@@ -151,6 +152,12 @@ const MatchList: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    console.log('MatchList: Component mounted, calling fetchMatches and fetchTeams');
+    fetchMatches();
+    fetchTeams();
+  }, [fetchMatches]);
+
   const handleOpen = () => setOpen(true);
   const handleClose = () => setOpen(false);
   
@@ -168,8 +175,18 @@ const MatchList: React.FC = () => {
 
   const handleSubmit = async () => {
     try {
+      // Check if user is authenticated
+      if (!currentUserId) {
+        console.error('User not authenticated - currentUserId is null');
+        alert('You must be logged in to create a match. Please log in again.');
+        return;
+      }
+
       // Create match with properly configured innings based on toss
-      const matchToCreate = { ...newMatch };
+      const matchToCreate = { 
+        ...newMatch,
+        createdBy: currentUserId // Add createdBy field
+      };
       
       if (matchToCreate.tossWinner && matchToCreate.tossDecision) {
         // Determine batting and bowling teams based on toss
@@ -390,66 +407,100 @@ const MatchList: React.FC = () => {
   return (
     <Box maxWidth="lg" sx={{ py: isMobile ? 1 : 3, px: isMobile ? 1 : 3, mx: 'auto' }}>
       {!isMobile && (
-        <Box sx={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          mb: 3
-        }}>
-          <Typography variant="h5">
-            {(isAdmin || isSuperAdmin) ? 'Matches' : 'View Matches'}
-            {isSuperAdmin && selectedMatches.length > 0 && (
-              <Chip 
-                label={`${selectedMatches.length} selected`} 
-                color="secondary" 
-                size="small" 
-                sx={{ ml: 2 }}
-              />
-            )}
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            {(isAdmin || isSuperAdmin) && (
-              <Button 
-                variant="contained" 
-                color="primary" 
-                onClick={handleOpen}
-                startIcon={<AddIcon />}
-              >
-                Add Match
-              </Button>
-            )}
-            {isSuperAdmin && (
-              <>
-                <Button 
-                  variant="outlined" 
-                  color="secondary" 
-                  onClick={handleSelectAll}
-                  startIcon={selectedMatches.length === matches.length ? <DeselectIcon /> : <SelectAllIcon />}
-                  sx={{ ml: 1 }}
-                >
-                  {selectedMatches.length === matches.length ? 'Deselect All' : 'Select All'}
-                </Button>
+        <Paper 
+          elevation={3}
+          sx={{ 
+            p: 3,
+            background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
+            borderRadius: 3,
+            color: 'white',
+            mb: 3
+          }}
+        >
+          <Box sx={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center'
+          }}>
+            <Typography 
+              variant="h5" 
+              sx={{ 
+                fontWeight: 'bold',
+                textShadow: '2px 2px 4px rgba(0,0,0,0.3)'
+              }}
+            >
+              {(isAdmin || isSuperAdmin) ? 'Matches' : 'View Matches'}
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              {(isAdmin || isSuperAdmin || isPlayer || (isViewer && matches.length === 0)) && (
                 <Button 
                   variant="contained" 
-                  color="error" 
-                  onClick={handleDeleteSelectedOpen}
-                  startIcon={<DeleteForeverIcon />}
-                  disabled={selectedMatches.length === 0}
-                  sx={{ ml: 1 }}
+                  color="primary" 
+                  onClick={handleOpen}
+                  startIcon={<AddIcon />}
+                  disabled={isViewer && matches.length >= 1} // Viewer can create max 1 match
+                  sx={{ 
+                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                    color: 'white',
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    '&:hover': { 
+                      backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                      transform: 'translateY(-1px)'
+                    },
+                    transition: 'all 0.2s ease'
+                  }}
                 >
-                  Delete Selected ({selectedMatches.length})
+                  {isViewer ? 'Create Demo Match' : 'Add Match'}
                 </Button>
-              </>
-            )}
+              )}
+              {isSuperAdmin && (
+                <>
+                  <Button 
+                    variant="outlined" 
+                    color="secondary" 
+                    onClick={handleSelectAll}
+                    startIcon={selectedMatches.length === matches.length ? <DeselectIcon /> : <SelectAllIcon />}
+                    sx={{ 
+                      color: 'white',
+                      borderColor: 'rgba(255, 255, 255, 0.3)',
+                      '&:hover': { 
+                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                        borderColor: 'rgba(255, 255, 255, 0.5)'
+                      }
+                    }}
+                  >
+                    {selectedMatches.length === matches.length ? 'Deselect All' : 'Select All'}
+                  </Button>
+                  <Button 
+                    variant="contained" 
+                    color="error" 
+                    onClick={handleDeleteSelectedOpen}
+                    startIcon={<DeleteForeverIcon />}
+                    disabled={selectedMatches.length === 0}
+                    sx={{ 
+                      backgroundColor: 'rgba(244, 67, 54, 0.8)',
+                      '&:hover': { 
+                        backgroundColor: 'rgba(244, 67, 54, 1)',
+                        transform: 'translateY(-1px)'
+                      },
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    Delete Selected ({selectedMatches.length})
+                  </Button>
+                </>
+              )}
+            </Box>
           </Box>
-        </Box>
+        </Paper>
       )}
 
       {/* Floating Action Button for Mobile */}
-      {(isAdmin || isSuperAdmin) && isMobile && (
+      {(isAdmin || isSuperAdmin || isPlayer || (isViewer && matches.length === 0)) && isMobile && (
         <Fab 
           aria-label="add"
           onClick={handleOpen}
+          disabled={isViewer && matches.length >= 1} // Viewer can create max 1 match
           sx={{
             position: 'fixed',
             bottom: 24,
@@ -462,6 +513,10 @@ const MatchList: React.FC = () => {
               transform: 'scale(1.1)',
             },
             transition: 'all 0.3s ease',
+            '&:disabled': {
+              background: 'rgba(158, 158, 158, 0.5)',
+              color: 'rgba(255, 255, 255, 0.5)',
+            }
           }}
         >
           <AddIcon />
@@ -668,9 +723,23 @@ const MatchList: React.FC = () => {
         fullScreen={isMobile}
         maxWidth="sm"
         fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '16px',
+            background: 'white',
+            color: 'black',
+          }
+        }}
       >
-        <DialogTitle>Add New Match</DialogTitle>
-        <DialogContent sx={{ pb: 1 }}>
+        <DialogTitle sx={{ 
+          background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
+          color: 'white',
+          fontWeight: 'bold',
+          borderRadius: '16px 16px 0 0'
+        }}>
+          Add New Match
+        </DialogTitle>
+        <DialogContent sx={{ p: 3 }}>
           <Autocomplete
             fullWidth
             options={teams}
@@ -684,6 +753,14 @@ const MatchList: React.FC = () => {
                 {...params} 
                 label="Team 1"
                 margin="dense"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    '&:hover fieldset': {
+                      borderColor: theme.palette.primary.main,
+                    },
+                  },
+                }}
               />
             )}
             renderOption={(props, option) => (
@@ -705,6 +782,14 @@ const MatchList: React.FC = () => {
                 {...params} 
                 label="Team 2"
                 margin="dense"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    '&:hover fieldset': {
+                      borderColor: theme.palette.primary.main,
+                    },
+                  },
+                }}
               />
             )}
             renderOption={(props, option) => (
@@ -720,6 +805,14 @@ const MatchList: React.FC = () => {
             fullWidth
             value={newMatch.overs}
             onChange={(e) => setNewMatch({ ...newMatch, overs: Number(e.target.value) })}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 2,
+                '&:hover fieldset': {
+                  borderColor: theme.palette.primary.main,
+                },
+              },
+            }}
           />
           <TextField
             margin="dense"
@@ -729,6 +822,14 @@ const MatchList: React.FC = () => {
             InputLabelProps={{ shrink: true }}
             value={new Date(newMatch.date).toISOString().split('T')[0]}
             onChange={(e) => setNewMatch({ ...newMatch, date: new Date(e.target.value).toISOString() })}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 2,
+                '&:hover fieldset': {
+                  borderColor: theme.palette.primary.main,
+                },
+              },
+            }}
           />
           <TextField
             margin="dense"
@@ -736,6 +837,14 @@ const MatchList: React.FC = () => {
             fullWidth
             value={newMatch.venue}
             onChange={(e) => setNewMatch({ ...newMatch, venue: e.target.value })}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 2,
+                '&:hover fieldset': {
+                  borderColor: theme.palette.primary.main,
+                },
+              },
+            }}
           />
           
           <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>
@@ -758,6 +867,14 @@ const MatchList: React.FC = () => {
                 {...params} 
                 label="Toss Winner"
                 margin="dense"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    '&:hover fieldset': {
+                      borderColor: theme.palette.primary.main,
+                    },
+                  },
+                }}
               />
             )}
             renderOption={(props, option) => (
@@ -784,6 +901,14 @@ const MatchList: React.FC = () => {
                 {...params} 
                 label="Toss Decision"
                 margin="dense"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    '&:hover fieldset': {
+                      borderColor: theme.palette.primary.main,
+                    },
+                  },
+                }}
               />
             )}
             renderOption={(props, option) => (
@@ -793,9 +918,48 @@ const MatchList: React.FC = () => {
             )}
           />
         </DialogContent>
-        <DialogActions sx={{ p: isMobile ? 1 : 3 }}>
-          <Button onClick={handleClose}>Cancel</Button>
-          <Button onClick={handleSubmit} variant="contained" color="primary">
+        <DialogActions sx={{ p: 3, pt: 0 }}>
+          <Button 
+            onClick={handleClose}
+            sx={{
+              py: 1.5,
+              borderRadius: 2,
+              textTransform: 'none',
+              fontSize: '1.1rem',
+              fontWeight: 600,
+              borderColor: theme.palette.primary.main,
+              color: theme.palette.primary.main,
+              '&:hover': {
+                borderColor: theme.palette.primary.main,
+                backgroundColor: 'rgba(2, 14, 67, 0.04)',
+                transform: 'translateY(-1px)',
+                boxShadow: '0 4px 8px rgba(2, 14, 67, 0.2)',
+              },
+              transition: 'all 0.3s ease',
+            }}
+            variant="outlined"
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSubmit} 
+            variant="contained" 
+            sx={{
+              py: 1.5,
+              borderRadius: 2,
+              textTransform: 'none',
+              fontSize: '1.1rem',
+              fontWeight: 600,
+              background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
+              boxShadow: '0 4px 12px rgba(2, 14, 67, 0.4)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #764ba2 0%, #020e43 100%)',
+                boxShadow: '0 6px 16px rgba(118, 75, 162, 0.6)',
+                transform: 'translateY(-2px)',
+              },
+              transition: 'all 0.3s ease',
+            }}
+          >
             Create
           </Button>
         </DialogActions>
@@ -808,11 +972,25 @@ const MatchList: React.FC = () => {
         fullScreen={isMobile}
         maxWidth="sm"
         fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '16px',
+            background: 'white',
+            color: 'black',
+          }
+        }}
       >
-        <DialogTitle>Edit Match</DialogTitle>
-        <DialogContent sx={{ pb: 1 }}>
+        <DialogTitle sx={{ 
+          background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
+          color: 'white',
+          fontWeight: 'bold',
+          borderRadius: '16px 16px 0 0'
+        }}>
+          Edit Match
+        </DialogTitle>
+        <DialogContent sx={{ p: 3 }}>
           {editError && (
-            <Alert severity="error" sx={{ mb: 2 }}>
+            <Alert severity="error" sx={{ mb: 2, backgroundColor: 'rgba(255, 255, 255, 0.9)', color: '#d32f2f' }}>
               {editError}
             </Alert>
           )}
@@ -838,6 +1016,21 @@ const MatchList: React.FC = () => {
                     margin="dense"
                     error={!editMatch.team1}
                     helperText={!editMatch.team1 ? 'Team 1 is required' : ''}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                        '&:hover fieldset': {
+                          borderColor: theme.palette.primary.main,
+                        },
+                      },
+                      '& .MuiFormHelperText-root': {
+                        color: '#f44336',
+                        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                        margin: 0,
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                      }
+                    }}
                   />
                 )}
                 renderOption={(props, option) => (
@@ -865,6 +1058,21 @@ const MatchList: React.FC = () => {
                     margin="dense"
                     error={!editMatch.team2}
                     helperText={!editMatch.team2 ? 'Team 2 is required' : ''}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                        '&:hover fieldset': {
+                          borderColor: theme.palette.primary.main,
+                        },
+                      },
+                      '& .MuiFormHelperText-root': {
+                        color: '#f44336',
+                        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                        margin: 0,
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                      }
+                    }}
                   />
                 )}
                 renderOption={(props, option) => (
@@ -885,6 +1093,21 @@ const MatchList: React.FC = () => {
                 }}
                 error={!editMatch.overs || editMatch.overs <= 0}
                 helperText={!editMatch.overs || editMatch.overs <= 0 ? 'Overs must be greater than 0' : ''}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    '&:hover fieldset': {
+                      borderColor: theme.palette.primary.main,
+                    },
+                  },
+                  '& .MuiFormHelperText-root': {
+                    color: '#f44336',
+                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                    margin: 0,
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                  }
+                }}
               />
               <TextField
                 margin="dense"
@@ -897,6 +1120,14 @@ const MatchList: React.FC = () => {
                   setEditMatch({ ...editMatch, date: new Date(e.target.value).toISOString() });
                   setEditError(null); // Clear error when user makes changes
                 }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    '&:hover fieldset': {
+                      borderColor: theme.palette.primary.main,
+                    },
+                  },
+                }}
               />
               <TextField
                 margin="dense"
@@ -906,6 +1137,14 @@ const MatchList: React.FC = () => {
                 onChange={(e) => {
                   setEditMatch({ ...editMatch, venue: e.target.value });
                   setEditError(null); // Clear error when user makes changes
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    '&:hover fieldset': {
+                      borderColor: theme.palette.primary.main,
+                    },
+                  },
                 }}
               />
               
@@ -934,6 +1173,14 @@ const MatchList: React.FC = () => {
                     {...params} 
                     label="Toss Winner"
                     margin="dense"
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                        '&:hover fieldset': {
+                          borderColor: theme.palette.primary.main,
+                        },
+                      },
+                    }}
                   />
                 )}
                 renderOption={(props, option) => {
@@ -964,6 +1211,14 @@ const MatchList: React.FC = () => {
                     {...params} 
                     label="Toss Decision"
                     margin="dense"
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                        '&:hover fieldset': {
+                          borderColor: theme.palette.primary.main,
+                        },
+                      },
+                    }}
                   />
                 )}
                 renderOption={(props, option) => (
@@ -975,15 +1230,49 @@ const MatchList: React.FC = () => {
             </>
           )}
         </DialogContent>
-        <DialogActions sx={{ p: isMobile ? 1 : 3 }}>
-          <Button onClick={handleEditClose} disabled={editLoading}>
+        <DialogActions sx={{ p: 3, pt: 0 }}>
+          <Button 
+            onClick={handleEditClose} 
+            disabled={editLoading}
+            sx={{
+              py: 1.5,
+              borderRadius: 2,
+              textTransform: 'none',
+              fontSize: '1.1rem',
+              fontWeight: 600,
+              borderColor: theme.palette.primary.main,
+              color: theme.palette.primary.main,
+              '&:hover': {
+                borderColor: theme.palette.primary.main,
+                backgroundColor: 'rgba(2, 14, 67, 0.04)',
+                transform: 'translateY(-1px)',
+                boxShadow: '0 4px 8px rgba(2, 14, 67, 0.2)',
+              },
+              transition: 'all 0.3s ease',
+            }}
+            variant="outlined"
+          >
             Cancel
           </Button>
           <Button 
             onClick={handleEditSubmit} 
             variant="contained" 
-            color="primary"
             disabled={editLoading || !editMatch?.team1 || !editMatch?.team2 || !editMatch?.overs || editMatch.overs <= 0}
+            sx={{
+              py: 1.5,
+              borderRadius: 2,
+              textTransform: 'none',
+              fontSize: '1.1rem',
+              fontWeight: 600,
+              background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
+              boxShadow: '0 4px 12px rgba(2, 14, 67, 0.4)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #764ba2 0%, #020e43 100%)',
+                boxShadow: '0 6px 16px rgba(118, 75, 162, 0.6)',
+                transform: 'translateY(-2px)',
+              },
+              transition: 'all 0.3s ease',
+            }}
           >
             {editLoading ? 'Saving...' : 'Save Changes'}
           </Button>
