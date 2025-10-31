@@ -331,9 +331,18 @@ const PlayerList: React.FC = () => {
 
       // Refresh list after create/update
       fetchPlayers();
-    } catch (error) {
-      setError(editingPlayer ? 'Failed to update player' : 'Failed to create player');
+    } catch (error: any) {
       console.error('Error saving player:', error);
+      const server = error?.response?.data;
+      if (server && server.message) {
+        if (server.limit !== undefined) {
+          setError(`${server.message} (limit: ${server.limit}, you have: ${server.currentCount || 0})`);
+        } else {
+          setError(server.message);
+        }
+      } else {
+        setError(editingPlayer ? 'Failed to update player' : 'Failed to create player');
+      }
     } finally {
       setLoading(false);
     }

@@ -335,8 +335,17 @@ const TeamList: React.FC = () => {
       fetchPlayers();
     } catch (error: any) {
       console.error('Error saving team:', error); // Debug log
-      const errorMessage = error.response?.data?.message || error.message || 'Unknown error occurred';
-      setError(editingTeam ? `Failed to update team: ${errorMessage}` : `Failed to create team: ${errorMessage}`);
+      const server = error?.response?.data;
+      if (server && server.message) {
+        if (server.limit !== undefined) {
+          setError(`${server.message} (limit: ${server.limit}, you have: ${server.currentCount || 0})`);
+        } else {
+          setError(editingTeam ? `Failed to update team: ${server.message}` : `Failed to create team: ${server.message}`);
+        }
+      } else {
+        const errorMessage = error.response?.data?.message || error.message || 'Unknown error occurred';
+        setError(editingTeam ? `Failed to update team: ${errorMessage}` : `Failed to create team: ${errorMessage}`);
+      }
     } finally {
       setLoading(false);
     }
