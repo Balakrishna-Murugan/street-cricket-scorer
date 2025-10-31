@@ -23,15 +23,17 @@ api.interceptors.request.use((config) => {
         if (config.headers && typeof (config.headers as any).set === 'function') {
           // @ts-ignore
           (config.headers as any).set('user-id', user._id);
+          (config.headers as any).set('authorization', `Bearer ${user._id}`);
         } else if (config.headers) {
           // fallback for plain object
           // eslint-disable-next-line @typescript-eslint/ban-ts-comment
           // @ts-ignore
           config.headers['user-id'] = user._id;
+          config.headers['Authorization'] = `Bearer ${user._id}`;
         } else {
           // eslint-disable-next-line @typescript-eslint/ban-ts-comment
           // @ts-ignore
-          config.headers = { 'user-id': user._id };
+          config.headers = { 'user-id': user._id, 'Authorization': `Bearer ${user._id}` };
         }
       }
     }
@@ -106,9 +108,9 @@ export const playerService = {
   delete: (id: string) => api.delete(`/players/${id}`),
   getConflicts: (id: string) => api.get<{ conflicts: { _id: string; label: string }[] }>(`/players/${id}/conflicts`),
   promoteToAdmin: (playerId: string, userId: string) => 
-    api.put(`/players/${playerId}/promote`, {}, { headers: { 'user-id': userId } }),
+    api.put(`/players/${playerId}/promote`, {}, { headers: { Authorization: `Bearer ${userId}` } }),
   demoteFromAdmin: (playerId: string, userId: string) => 
-    api.put(`/players/${playerId}/demote`, {}, { headers: { 'user-id': userId } }),
+    api.put(`/players/${playerId}/demote`, {}, { headers: { Authorization: `Bearer ${userId}` } }),
   updatePlayerTeams: (playerUpdates: { playerId: string; teams: string[] }[]) => 
     api.put('/players/update-teams', { playerUpdates }),
 };
