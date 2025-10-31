@@ -5,25 +5,10 @@ import { matchService, playerService } from '../services/api.service';
 import MatchDetails from '../components/MatchDetails';
 import {
   Box,
-  Paper,
-  Typography,
-  Button,
-  Select,
-  MenuItem,
-  FormControl,
   InputLabel,
   Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Table,
-  TableBody,
-  TableCell,
   TableContainer,
   TableHead,
-  TableRow,
-  Stack,
-  SelectChangeEvent,
   Alert,
   AlertTitle,
   TextField,
@@ -32,7 +17,25 @@ import {
   useMediaQuery,
   IconButton,
   Tooltip,
+  Typography,
+  Paper,
+  Button,
+  Table,
+  TableBody,
+  TableRow,
+  TableCell,
+  Stack,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  FormControl,
+  Select,
+  MenuItem,
+  SelectChangeEvent,
 } from '@mui/material';
+// ...existing code...
+
+// ...existing code...
 import ChangeCircleIcon from '@mui/icons-material/ChangeCircle';
 import UndoIcon from '@mui/icons-material/Undo';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
@@ -97,9 +100,21 @@ const LiveScoring: React.FC<Props> = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   
-  // Check user role for permissions
+  // Check user info and role for permissions
   const userRole = localStorage.getItem('userRole') || 'viewer';
   const isAdmin = userRole === 'admin';
+  const isSuperAdmin = userRole === 'superadmin';
+  // parse current user id from localStorage 'user' object if present
+  let currentUserId: string | null = null;
+  try {
+    const u = localStorage.getItem('user');
+    if (u) {
+      const parsed = JSON.parse(u);
+      currentUserId = parsed && parsed._id ? parsed._id : null;
+    }
+  } catch (e) {
+    currentUserId = null;
+  }
   const [match, setMatch] = useState<Match | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -818,7 +833,7 @@ const LiveScoring: React.FC<Props> = () => {
     } finally {
       setLoading(false);
     }
-  }, [matchId, currentInnings]);
+  }, [matchId, currentInnings, fetchPlayers]);
 
   useEffect(() => {
     fetchMatch();
@@ -966,11 +981,28 @@ const LiveScoring: React.FC<Props> = () => {
     setChangePlayerReason('');
   };
 
+  // determine if the current user is the match creator (owner)
+  const isMatchCreator = match && currentUserId && (() => {
+    try {
+      if (!match) return false;
+      const cb = (match as any).createdBy;
+      if (!cb) return false;
+      if (typeof cb === 'string') return cb === currentUserId;
+      if (typeof cb === 'object') return (cb._id || cb.toString()) === currentUserId || cb === currentUserId;
+      return false;
+    } catch (e) {
+      return false;
+    }
+  })();
+
+  // whether the current user can edit/score this match
+  const canEdit = isAdmin || isSuperAdmin || isMatchCreator;
+
   // Auto-open player selection dialog when match loads if no players selected
   useEffect(() => {
     console.log('🔍 DEBUG Auto-open useEffect triggered:', {
       match: !!match,
-      isAdmin,
+      canEdit,
       arePlayersSelected: arePlayersSelected(),
       isPlayerSelectionDialogOpen,
       loading,
@@ -981,7 +1013,7 @@ const LiveScoring: React.FC<Props> = () => {
       bowler
     });
 
-    if (match && isAdmin && !isPlayerSelectionDialogOpen && !loading && !userDismissedDialog && 
+  if (match && canEdit && !isPlayerSelectionDialogOpen && !loading && !userDismissedDialog && 
         (!arePlayersSelected() || (arePlayersSelected() && !isOverInProgress))) {
       console.log('🔍 DEBUG Opening player selection dialog automatically');
       // Small delay to ensure UI has rendered
@@ -993,11 +1025,11 @@ const LiveScoring: React.FC<Props> = () => {
     } else {
       console.log('🔍 DEBUG NOT opening dialog - conditions not met');
     }
-  }, [match, isAdmin, arePlayersSelected, isPlayerSelectionDialogOpen, loading, userDismissedDialog, isOverInProgress, striker, nonStriker, bowler]);
+  }, [match, canEdit, arePlayersSelected, isPlayerSelectionDialogOpen, loading, userDismissedDialog, isOverInProgress, striker, nonStriker, bowler]);
 
   // Auto-open player selection dialog when over is completed and needs new bowler
   useEffect(() => {
-    if (isOverCompleted && isAdmin && !isPlayerSelectionDialogOpen) {
+    if (isOverCompleted && canEdit && !isPlayerSelectionDialogOpen) {
       // Reset dismissed flag for over completion - this is a required selection
       setUserDismissedDialog(false);
       
@@ -1008,11 +1040,11 @@ const LiveScoring: React.FC<Props> = () => {
       
       return () => clearTimeout(timer);
     }
-  }, [isOverCompleted, isAdmin, isPlayerSelectionDialogOpen]);
+  }, [isOverCompleted, canEdit, isPlayerSelectionDialogOpen]);
 
   // Auto-open player selection dialog when waiting for new batsman after wicket
   useEffect(() => {
-    if (isWaitingForNewBatsman && isAdmin && !isPlayerSelectionDialogOpen) {
+    if (isWaitingForNewBatsman && canEdit && !isPlayerSelectionDialogOpen) {
       // Reset dismissed flag for wicket situations - this is a required selection
       setUserDismissedDialog(false);
       
@@ -1023,7 +1055,7 @@ const LiveScoring: React.FC<Props> = () => {
       
       return () => clearTimeout(timer);
     }
-  }, [isWaitingForNewBatsman, isAdmin, isPlayerSelectionDialogOpen]);
+  }, [isWaitingForNewBatsman, canEdit, isPlayerSelectionDialogOpen]);
 
   const handleBallOutcome = async (runs: number, isExtra: boolean = false) => {
     if (!match || !matchId) return;
@@ -2812,7 +2844,7 @@ const LiveScoring: React.FC<Props> = () => {
     }
   };
 
-  if (loading) return <Typography>Loading...</Typography>;
+  if (loading) return <Typography sx={{ fontSize: '2.5rem', textAlign: 'center', py: 6 }}>⏳</Typography>;
   if (error) return <Typography color="error">{error}</Typography>;
   if (!match) return <Typography>Match not found</Typography>;
 
@@ -2880,8 +2912,10 @@ const LiveScoring: React.FC<Props> = () => {
   // If currentInning is undefined (during innings transition), show loading or return early
   if (!currentInning) {
     return (
-      <Box sx={{ px: isMobile ? 1 : 3, mx: 'auto' }}>
-        <Typography>Loading innings data...</Typography>
+      <Box sx={{ px: isMobile ? 1 : 3, mx: 'auto', textAlign: 'center', py: 6 }}>
+        <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#1976d2', mb: 2 }}>
+          ⏳ Loading innings data...
+        </Typography>
       </Box>
     );
   }
@@ -2897,30 +2931,29 @@ const LiveScoring: React.FC<Props> = () => {
     <Box 
       sx={{ 
         maxWidth: 'lg',
-        px: isMobile ? 1 : 3,
-        py: isMobile ? 1 : 2,
+        px: isMobile ? 1 : 3, // 8px for mobile, 24px for desktop
+        py: isMobile ? 1 : 3,
         mx: 'auto'
       }}
     >
-
 
       <Box 
         sx={{ 
           minHeight: '100vh',
           background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
-          p: isMobile ? 0 : 3, // Remove all padding on mobile
-          mx: isMobile ? 0 : 0 // No margin on mobile
+          p: 0,
+          mx: 0
         }}
       >
       <Paper 
         elevation={8}
         sx={{ 
-          p: isMobile ? 1 : 4, // Minimal padding for mobile
-          borderRadius: isMobile ? 0 : 3, // No border radius on mobile for full width
+          p: isMobile ? 1 : 3, // 8px for mobile, 24px for desktop
+          borderRadius: isMobile ? 0 : 3,
           background: '#ffffff',
           border: '1px solid rgba(0,0,0,0.1)',
           boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
-          margin: isMobile ? 0 : 'auto' // Remove margins on mobile
+          margin: 0
         }}
       >
         <Typography 
@@ -2968,7 +3001,7 @@ const LiveScoring: React.FC<Props> = () => {
         </Box>
 
       {/* Viewer Mode Alert */}
-      {!isAdmin && showViewerModeAlert && (
+  {!canEdit && showViewerModeAlert && (
         <Alert 
           severity="info"
           onClose={() => setShowViewerModeAlert(false)}
@@ -3058,7 +3091,7 @@ const LiveScoring: React.FC<Props> = () => {
       )}
 
       {/* Score Summary */}
-      <Paper sx={{ p: isMobile ? 1 : 2, mb: isMobile ? 2 : 3, mx: isMobile ? 0 : 'auto' }} component="div">
+  <Paper sx={{ p: isMobile ? 1 : 3, mb: isMobile ? 2 : 3, mx: isMobile ? 0 : 'auto' }} component="div">
         {/* Comprehensive Innings Display - Hidden on mobile */}
         {match.innings.length > 1 && !isMobile && (
           <Box sx={{ mb: 3 }}>
@@ -3067,7 +3100,7 @@ const LiveScoring: React.FC<Props> = () => {
             </Typography>
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
               {/* First Innings */}
-              <Paper sx={{ p: 2, backgroundColor: currentInnings === 0 ? '#e3f2fd' : '#f5f5f5' }}>
+              <Paper sx={{ p: isMobile ? 1 : 2, backgroundColor: currentInnings === 0 ? '#e3f2fd' : '#f5f5f5' }}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
                   1st Innings{currentInnings === 0 && ' (Current)'}
                 </Typography>
@@ -3080,7 +3113,7 @@ const LiveScoring: React.FC<Props> = () => {
               </Paper>
               
               {/* Second Innings */}
-              <Paper sx={{ p: 2, backgroundColor: currentInnings === 1 ? '#e8f5e8' : '#f5f5f5' }}>
+              <Paper sx={{ p: isMobile ? 1 : 2, backgroundColor: currentInnings === 1 ? '#e8f5e8' : '#f5f5f5' }}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
                   2nd Innings{currentInnings === 1 && ' (Current)'}
                 </Typography>
@@ -3170,7 +3203,7 @@ const LiveScoring: React.FC<Props> = () => {
               handleBatsmanChange({ target: { value: newValue._id } } as SelectChangeEvent);
             }
           }}
-          disabled={!isAdmin || (isOverCompleted && !isWaitingForNewBatsman)}
+          disabled={!canEdit || (isOverCompleted && !isWaitingForNewBatsman)}
           renderInput={(params) => (
             <TextField 
               {...params} 
@@ -3223,7 +3256,7 @@ const LiveScoring: React.FC<Props> = () => {
               handleNonStrikerChange({ target: { value: newValue._id } } as SelectChangeEvent);
             }
           }}
-          disabled={!isAdmin || isOverCompleted || isWaitingForNewBatsman}
+          disabled={!canEdit || isOverCompleted || isWaitingForNewBatsman}
           renderInput={(params) => (
             <TextField 
               {...params} 
@@ -3275,7 +3308,7 @@ const LiveScoring: React.FC<Props> = () => {
               handleBowlerChange({ target: { value: newValue._id } } as SelectChangeEvent);
             }
           }}
-          disabled={!isAdmin || isWaitingForNewBatsman}
+          disabled={!canEdit || isWaitingForNewBatsman}
           renderInput={(params) => (
             <TextField 
               {...params} 
@@ -3354,7 +3387,7 @@ const LiveScoring: React.FC<Props> = () => {
               key={runs}
               variant="contained" 
               onClick={() => handleBallOutcome(runs)}
-              disabled={!isAdmin || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted || (!isAdmin && runs === 0)}
+              disabled={!canEdit || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted || (!canEdit && runs === 0)}
               sx={{
                 minHeight: isMobile ? '35px' : '60px',
                 borderRadius: isMobile ? '6px' : '12px',
@@ -3387,7 +3420,7 @@ const LiveScoring: React.FC<Props> = () => {
             variant="contained"
             color="error"
             onClick={() => setIsWicketDialogOpen(true)}
-            disabled={!isAdmin || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
+            disabled={!canEdit || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
             sx={{
               minHeight: isMobile ? '35px' : '60px',
               borderRadius: isMobile ? '6px' : '12px',
@@ -3412,7 +3445,7 @@ const LiveScoring: React.FC<Props> = () => {
             <span>
               <IconButton
                 onClick={handleUndo}
-                disabled={!canUndo || !isAdmin || isMatchCompleted}
+                disabled={!canUndo || !canEdit || isMatchCompleted}
                 sx={{
                   minWidth: isMobile ? '35px' : '60px',
                   minHeight: isMobile ? '35px' : '60px',
@@ -3470,7 +3503,7 @@ const LiveScoring: React.FC<Props> = () => {
               setExtraRuns(1);
               setIsExtraRunsDialogOpen(true);
             }}
-            disabled={!isAdmin || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
+            disabled={!canEdit || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
             sx={{
               minHeight: isMobile ? '32px' : '50px',
               borderRadius: isMobile ? '6px' : '10px',
@@ -3503,7 +3536,7 @@ const LiveScoring: React.FC<Props> = () => {
               setExtraRuns(1);
               setIsExtraRunsDialogOpen(true);
             }}
-            disabled={!isAdmin || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
+            disabled={!canEdit || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
             sx={{
               minHeight: isMobile ? '32px' : '50px',
               borderRadius: isMobile ? '6px' : '10px',
@@ -3536,7 +3569,7 @@ const LiveScoring: React.FC<Props> = () => {
               setExtraRuns(1);
               setIsExtraRunsDialogOpen(true);
             }}
-            disabled={!isAdmin || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
+            disabled={!canEdit || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
             sx={{
               minHeight: isMobile ? '32px' : '50px',
               borderRadius: isMobile ? '6px' : '10px',
@@ -3569,7 +3602,7 @@ const LiveScoring: React.FC<Props> = () => {
               setExtraRuns(1);
               setIsExtraRunsDialogOpen(true);
             }}
-            disabled={!isAdmin || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
+            disabled={!canEdit || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
             sx={{
               minHeight: isMobile ? '32px' : '50px',
               borderRadius: isMobile ? '6px' : '10px',
@@ -3664,7 +3697,7 @@ const LiveScoring: React.FC<Props> = () => {
                     <Box>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <strong>{playerName}</strong>
-                        {isAdmin && !stat.isOut && (
+                        {canEdit && !stat.isOut && (
                           <Tooltip title="Change Batsman">
                             <IconButton
                               size="small"
@@ -3796,7 +3829,7 @@ const LiveScoring: React.FC<Props> = () => {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           {playerName}
                           {playerId === bowler && <Box component="span" sx={{ color: 'success.main', fontWeight: 'bold' }}>*</Box>}
-                          {isAdmin && playerId === bowler && (
+                          {canEdit && playerId === bowler && (
                             <Tooltip title="Change Bowler">
                               <IconButton
                                 size="small"
@@ -3937,7 +3970,7 @@ const LiveScoring: React.FC<Props> = () => {
               <Typography variant="body2" sx={{ mb: 2, color: 'text.primary', fontWeight: 500 }}>
                 Select dismissal type:
               </Typography>
-              {isAdmin ? (
+              {canEdit ? (
                 <>
                   <Button 
                     variant="outlined" 

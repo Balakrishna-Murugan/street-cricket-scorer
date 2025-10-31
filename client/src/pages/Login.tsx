@@ -24,6 +24,7 @@ import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import { authService, LoginRequest, RegisterRequest, GuestLoginRequest } from '../services/api.service';
+import internalLogo from '../assets/internal_logo_bala_saro.svg';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -232,7 +233,7 @@ const Login: React.FC = () => {
         py: 3,
       }}
     >
-      <Container maxWidth="sm">
+  <Container maxWidth="sm">
         <Box
           sx={{
             display: 'flex',
@@ -251,8 +252,8 @@ const Login: React.FC = () => {
           >
             <Box
               component="img"
-              src={require('../Image/TNCC.png')}
-              alt="Cricket Logo"
+              src={internalLogo}
+              alt="Internal Logo"
               sx={{
                 height: isMobile ? 80 : 100,
                 width: isMobile ? 80 : 100,

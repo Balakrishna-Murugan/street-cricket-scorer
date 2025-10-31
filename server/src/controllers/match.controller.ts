@@ -9,6 +9,26 @@ export const matchController = {
   create: async (req: Request, res: Response) => {
     try {
       // Initialize innings with teams and proper structure
+      // Attach createdBy from authenticated user if available
+      if (req.user && req.user._id) {
+        req.body.createdBy = req.user._id;
+      }
+
+      // Enforce guest/viewer creation limit: max 1 match
+      const creatorRole = req.user?.userRole;
+      if (creatorRole === 'guest' || creatorRole === 'viewer') {
+        const existingCount = await Match.countDocuments({ createdBy: req.user._id });
+        if (existingCount >= 1) {
+          return res.status(403).json({ message: 'Guest/viewer users can create only 1 match' });
+        }
+
+        // Enforce guest/viewer overs cap: maximum 2 overs per match
+        // Ensure req.body.overs is a number and cap it to 2 for guests/viewers
+        const requestedOvers = Number(req.body.overs) || 2;
+        const cappedOvers = Math.min(2, Math.max(1, Math.floor(requestedOvers)));
+        req.body.overs = cappedOvers;
+      }
+
       const match = new Match({
         ...req.body,
         currentInnings: 0,
@@ -67,9 +87,15 @@ export const matchController = {
   getAll: async (req: Request, res: Response) => {
     try {
       const { userId } = req.query;
-      
+
       let query = {};
-      if (userId) {
+      // If authenticated and admin, show all matches
+      if (req.user && (req.user.userRole === 'admin' || req.user.userRole === 'superadmin')) {
+        query = {};
+      } else if (req.user && req.user._id) {
+        // authenticated non-admins see only matches they created
+        query = { createdBy: req.user._id };
+      } else if (userId) {
         query = { createdBy: userId };
       }
       
@@ -123,8 +149,18 @@ export const matchController = {
         return res.status(404).json({ message: 'Match not found' });
       }
 
-      console.log('Match found:', match.status);
-      res.json(match);
+      // Enforce ownership for non-admins
+      if (req.user && (req.user.userRole === 'admin' || req.user.userRole === 'superadmin')) {
+        console.log('Match found (admin):', match.status);
+        return res.json(match);
+      }
+
+      if (req.user && (match as any).createdBy && (match as any).createdBy.toString() === req.user._id.toString()) {
+        console.log('Match found (owner):', match.status);
+        return res.json(match);
+      }
+
+      return res.status(403).json({ message: 'Access denied' });
     } catch (error: any) {
       console.error('Match retrieval error:', error);
       res.status(500).json({ message: error.message || 'Error retrieving match' });

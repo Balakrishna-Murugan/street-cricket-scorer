@@ -67,7 +67,7 @@ const MatchCommentaryPage: React.FC = () => {
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: isMobile ? 1 : 3 }}>
+  <Container maxWidth="lg" sx={{ py: isMobile ? 1 : 3 }}>
       {/* Commentary Content */}
       <Box>
         <MatchCommentary match={match} onRefresh={handleRefresh} />

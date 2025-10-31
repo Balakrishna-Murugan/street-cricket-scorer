@@ -150,7 +150,7 @@ const MatchOverview: React.FC = () => {
   const canManageMatch = isAdmin || isSuperAdmin || ((isPlayer || isViewer) && match?.createdBy === currentUserId);
 
   return (
-    <Box maxWidth="lg" sx={{ py: isMobile ? 1 : 3, px: isMobile ? 1 : 3, mx: 'auto' }}>
+  <Box maxWidth="lg" sx={{ py: isMobile ? 1 : 3, px: isMobile ? 1 : 3, mx: 'auto' }}>
       <Paper 
         elevation={3} 
         sx={{ 
@@ -267,7 +267,7 @@ const MatchOverview: React.FC = () => {
                       }
                     }}
                   >
-                    Start Match
+                    ⏳ Start Match
                   </Button>
                 )}
                 
@@ -288,7 +288,7 @@ const MatchOverview: React.FC = () => {
                       }
                     }}
                   >
-                    Continue Match
+                    ⏳ Continue Match
                   </Button>
                 )}
               </Stack>

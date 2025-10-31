@@ -5,6 +5,20 @@ export const playerController = {
   // Create a new player
   create: async (req: Request, res: Response) => {
     try {
+      // Attach createdBy from authenticated user if available
+      if (req.user && req.user._id) {
+        req.body.createdBy = req.user._id;
+      }
+
+      // Enforce guest/viewer creation limit: max 12 players
+      const creatorRole = req.user?.userRole;
+      if (creatorRole === 'guest' || creatorRole === 'viewer') {
+        const existingCount = await Player.countDocuments({ createdBy: req.user._id });
+        if (existingCount >= 12) {
+          return res.status(403).json({ message: 'Guest/viewer users can create up to 12 players' });
+        }
+      }
+
       const player = await Player.create(req.body);
       res.status(201).json(player);
     } catch (error: any) {
@@ -13,11 +27,19 @@ export const playerController = {
   },
 
   // Get all players
-  getAll: async (_req: Request, res: Response) => {
+  getAll: async (req: Request, res: Response) => {
     try {
-      const players = await Player.find().populate('teams', 'name');
-      console.log('Fetched players:', players);
-      res.json(players);
+      const { userId } = req.query;
+  let players: any[] = [];
+      if (req.user && (req.user.userRole === 'admin' || req.user.userRole === 'superadmin')) {
+        players = await Player.find().populate('teams', 'name');
+      } else if (req.user && req.user._id) {
+        // Only return players created by this user
+        players = await Player.find({ createdBy: req.user._id }).populate('teams', 'name');
+      } else {
+        players = [];
+      }
+  res.json(players);
     } catch (error: any) {
       res.status(500).json({ message: error.message || 'Error getting players' });
     }
@@ -30,7 +52,16 @@ export const playerController = {
       if (!player) {
         return res.status(404).json({ message: 'Player not found' });
       }
-      res.json(player);
+      // Enforce ownership for non-admins
+      if (req.user && (req.user.userRole === 'admin' || req.user.userRole === 'superadmin')) {
+        return res.json(player);
+      }
+
+      if (req.user && (player as any).createdBy && (player as any).createdBy.toString() === req.user._id.toString()) {
+        return res.json(player);
+      }
+
+      return res.status(403).json({ message: 'Access denied' });
     } catch (error: any) {
       res.status(500).json({ message: error.message || 'Error getting player' });
     }
@@ -39,15 +70,24 @@ export const playerController = {
   // Update player
   update: async (req: Request, res: Response) => {
     try {
+      // Only allow update by admin/superadmin or the creator
+      const existing = await Player.findById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ message: 'Player not found' });
+      }
+
+      if (!(req.user && (req.user.userRole === 'admin' || req.user.userRole === 'superadmin')) ) {
+        if (!(req.user && (existing as any).createdBy && (existing as any).createdBy.toString() === req.user._id.toString())) {
+          return res.status(403).json({ message: 'Access denied' });
+        }
+      }
+
       const player = await Player.findByIdAndUpdate(
         req.params.id,
         { $set: req.body },
         { new: true, runValidators: true }
       ).populate('teams', 'name');
-      
-      if (!player) {
-        return res.status(404).json({ message: 'Player not found' });
-      }
+
       res.json(player);
     } catch (error: any) {
       res.status(400).json({ message: error.message || 'Error updating player' });
@@ -57,10 +97,18 @@ export const playerController = {
   // Delete player
   delete: async (req: Request, res: Response) => {
     try {
-      const player = await Player.findByIdAndDelete(req.params.id);
-      if (!player) {
+      const existing = await Player.findById(req.params.id);
+      if (!existing) {
         return res.status(404).json({ message: 'Player not found' });
       }
+
+      if (!(req.user && (req.user.userRole === 'admin' || req.user.userRole === 'superadmin')) ) {
+        if (!(req.user && (existing as any).createdBy && (existing as any).createdBy.toString() === req.user._id.toString())) {
+          return res.status(403).json({ message: 'Access denied' });
+        }
+      }
+
+      await Player.findByIdAndDelete(req.params.id);
       res.json({ message: 'Player deleted successfully' });
     } catch (error: any) {
       res.status(500).json({ message: error.message || 'Error deleting player' });

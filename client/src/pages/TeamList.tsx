@@ -35,6 +35,7 @@ import {
   Checkbox,
   Fab
 } from '@mui/material';
+import Tooltip from '@mui/material/Tooltip';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
@@ -59,6 +60,19 @@ const TeamList: React.FC = () => {
   
   const [players, setPlayers] = useState<Player[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  useEffect(() => {
+    // Load current user from localStorage
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      try {
+        setCurrentUser(JSON.parse(userData));
+      } catch (e) {
+        setCurrentUser(null);
+      }
+    }
+  }, []);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -116,7 +130,12 @@ const TeamList: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await teamService.getAll();
+      let response;
+      if (currentUser?.userRole === 'admin' || currentUser?.userRole === 'superadmin') {
+        response = await teamService.getAll();
+      } else {
+        response = await teamService.getAll(currentUser?._id);
+      }
       setTeams(response.data);
     } catch (error) {
       setError('Failed to fetch teams. Please try again.');
@@ -142,6 +161,15 @@ const TeamList: React.FC = () => {
     setEditingTeam(null);
     setNewTeam(defaultTeam);
     setOpen(true);
+  };
+
+  // When user clicks Add, check team creation limits and either open dialog or show error
+  const handleAddClick = () => {
+    if ((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && teams.length >= 2) {
+      setError('Guest users can only create up to 2 teams');
+      return;
+    }
+    handleOpen();
   };
 
   const handleClose = () => {
@@ -205,11 +233,17 @@ const TeamList: React.FC = () => {
     setTeamToDelete(null);
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (continueAdding: boolean = false) => {
     console.log('Form submission started with newTeam:', newTeam); // Debug log
     
     if (!newTeam.name) {
       setError('Please fill in team name');
+      return;
+    }
+
+    // Enforce guest/viewer creation limit: max 2 teams
+    if ((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && teams.length >= 2) {
+      setError('Guest/viewer users can create up to 2 teams');
       return;
     }
 
@@ -237,7 +271,7 @@ const TeamList: React.FC = () => {
       console.log('Sending team data:', JSON.stringify(teamData, null, 2)); // Better debug log
       
       let savedTeam: Team;
-      if (editingTeam?._id) {
+  if (editingTeam?._id) {
         // Update existing team
         const updateResponse = await teamService.update(editingTeam._id, teamData);
         savedTeam = updateResponse.data;
@@ -249,14 +283,31 @@ const TeamList: React.FC = () => {
           ).filter(Boolean);
           await updatePlayerTeams(savedTeam._id, memberIds);
         }
+
+        if (continueAdding) {
+          setEditingTeam(null);
+          setNewTeam(defaultTeam);
+          setSuccess('Team updated');
+        } else {
+          handleClose();
+        }
       } else {
         // Create new team (no members initially)
         const createResponse = await teamService.create({ name: newTeam.name.trim() });
         savedTeam = createResponse.data;
+
+        if (continueAdding) {
+          // Clear form for next create but keep dialog open
+          setNewTeam(defaultTeam);
+          setSuccess('Team created');
+        } else {
+          handleClose();
+        }
       }
       
-      handleClose();
+      // Refresh teams and players lists
       fetchTeams();
+      fetchPlayers();
     } catch (error: any) {
       console.error('Error saving team:', error); // Debug log
       const errorMessage = error.response?.data?.message || error.message || 'Unknown error occurred';
@@ -332,7 +383,7 @@ const TeamList: React.FC = () => {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: isMobile ? 2 : 3, px: { xs: 1, sm: 3 } }}>
+  <Container maxWidth="lg" sx={{ py: isMobile ? 2 : 3, px: { xs: 1, sm: 3 } }}>
       {/* Header with Navy Gradient Theme */}
       {!isMobile && (
         <Paper 
@@ -359,24 +410,34 @@ const TeamList: React.FC = () => {
             >
               Teams
             </Typography>
-            <Button 
-              variant="contained" 
-              onClick={handleOpen}
-              disabled={loading}
-              startIcon={<AddIcon />}
-              sx={{ 
-                backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                color: 'white',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                '&:hover': { 
-                  backgroundColor: 'rgba(255, 255, 255, 0.3)',
-                  transform: 'translateY(-1px)'
-                },
-                transition: 'all 0.2s ease'
-              }}
-            >
-              Add Team
-            </Button>
+            {((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && teams.length >= 2) ? (
+              <Tooltip title="Guest users can only create up to 2 teams" arrow>
+                <span>
+                  <Button
+                    variant="contained"
+                    onClick={handleAddClick}
+                    disabled={loading}
+                    startIcon={<AddIcon />}
+                  >
+                    Add Team
+                  </Button>
+                </span>
+              </Tooltip>
+            ) : (
+              <Button 
+                variant="contained" 
+                onClick={handleAddClick}
+                disabled={loading}
+                startIcon={<AddIcon />}
+              >
+                Add Team
+              </Button>
+            )}
+            {(currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && teams.length >= 2 && (
+              <Typography variant="caption" color="error" sx={{ ml: 2 }}>
+                Guest users can only create up to 2 teams.
+              </Typography>
+            )}
           </Box>
         </Paper>
       )}
@@ -385,7 +446,7 @@ const TeamList: React.FC = () => {
       {isMobile && (
         <Fab 
           aria-label="add team"
-          onClick={handleOpen}
+          onClick={handleAddClick}
           disabled={loading}
           sx={{
             position: 'fixed',
@@ -702,8 +763,33 @@ const TeamList: React.FC = () => {
           >
             Cancel
           </Button>
+          {/* Create & Continue - only for new creates (not when editing) */}
+          {!editingTeam && (
+            <Button
+              onClick={() => handleSubmit(true)}
+              variant="contained"
+              disabled={loading || !newTeam.name || ((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && teams.length >= 2)}
+              size={isMobile ? "small" : "medium"}
+              sx={{
+                mr: 1,
+                py: 1.5,
+                borderRadius: 2,
+                textTransform: 'none',
+                fontSize: '1.1rem',
+                fontWeight: 600,
+                background: 'linear-gradient(135deg, #0b6b4f 0%, #2fb58b 100%)',
+                boxShadow: '0 4px 8px rgba(0,0,0,0.12)',
+                color: 'white !important',
+                '&:hover': { opacity: 0.95 },
+                transition: 'all 0.2s ease'
+              }}
+            >
+              {loading ? <CircularProgress size={20} color="inherit" /> : 'Create & Continue'}
+            </Button>
+          )}
+
           <Button 
-            onClick={handleSubmit} 
+            onClick={() => handleSubmit(false)} 
             variant="contained" 
             disabled={loading || !newTeam.name}
             size={isMobile ? "small" : "medium"}
@@ -742,6 +828,16 @@ const TeamList: React.FC = () => {
           {error}
         </Alert>
       </Snackbar>
+
+          <Snackbar
+            open={success !== null}
+            autoHideDuration={3000}
+            onClose={() => setSuccess(null)}
+          >
+            <Alert onClose={() => setSuccess(null)} severity="success">
+              {success}
+            </Alert>
+          </Snackbar>
 
       {/* Delete Confirmation Dialog */}
       <Dialog 

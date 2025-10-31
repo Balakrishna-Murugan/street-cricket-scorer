@@ -24,6 +24,7 @@ import {
   useMediaQuery,
   Autocomplete,
   Alert,
+  Snackbar,
   AlertTitle,
   Checkbox,
   Fab
@@ -91,6 +92,7 @@ const MatchList: React.FC = () => {
   const [editMatch, setEditMatch] = useState<Match | null>(null);
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   // Get user ID from localStorage
   const userData = localStorage.getItem('user');
@@ -241,10 +243,12 @@ const MatchList: React.FC = () => {
         });
       }
       
-      await matchService.create(matchToCreate);
-      handleClose();
-      fetchMatches();
-      setNewMatch(defaultMatch);
+  await matchService.create(matchToCreate);
+  // Show transient success message
+  setSuccess('Match created');
+  handleClose();
+  fetchMatches();
+  setNewMatch(defaultMatch);
     } catch (error) {
       console.error('Error creating match:', error);
     }
@@ -405,7 +409,7 @@ const MatchList: React.FC = () => {
   };
 
   return (
-    <Box maxWidth="lg" sx={{ py: isMobile ? 1 : 3, px: isMobile ? 1 : 3, mx: 'auto' }}>
+  <Box maxWidth="lg" sx={{ py: isMobile ? 1 : 3, px: isMobile ? 1 : 3, mx: 'auto' }}>
       {!isMobile && (
         <Paper 
           elevation={3}
@@ -805,6 +809,7 @@ const MatchList: React.FC = () => {
             fullWidth
             value={newMatch.overs}
             onChange={(e) => setNewMatch({ ...newMatch, overs: Number(e.target.value) })}
+            inputProps={{ min: 1, max: isViewer ? 2 : 100 }}
             sx={{
               '& .MuiOutlinedInput-root': {
                 borderRadius: 2,
@@ -813,6 +818,7 @@ const MatchList: React.FC = () => {
                 },
               },
             }}
+            helperText={isViewer ? 'Viewer/demo matches are limited to a maximum of 2 overs' : ''}
           />
           <TextField
             margin="dense"
@@ -1389,6 +1395,15 @@ const MatchList: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+      <Snackbar
+        open={success !== null}
+        autoHideDuration={3000}
+        onClose={() => setSuccess(null)}
+      >
+        <Alert onClose={() => setSuccess(null)} severity="success">
+          {success}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

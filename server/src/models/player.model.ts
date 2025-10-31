@@ -7,6 +7,7 @@ export interface IPlayer {
   battingStyle?: 'right-handed' | 'left-handed';
   bowlingStyle?: string;
   teams?: mongoose.Types.ObjectId[];
+  createdBy?: mongoose.Types.ObjectId;
   // Authentication fields
   username?: string;
   password?: string;
@@ -74,6 +75,11 @@ const playerSchema = new mongoose.Schema<IPlayer>({
     type: String,
     enum: ['player', 'admin', 'superadmin', 'viewer'],
     default: 'player'
+  },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Player',
+    required: false
   },
   // Guest limitations
   guestLimitations: {

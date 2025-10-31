@@ -18,12 +18,17 @@ export const authMiddleware = {
       // In a real app, you'd verify JWT tokens or session cookies
       const userId = req.headers['user-id'] || req.body.userId;
 
+      console.log('authMiddleware: received userId header/body ->', userId);
+
       if (!userId) {
+        console.log('authMiddleware: no userId provided');
         return res.status(401).json({ message: 'Authentication required' });
       }
 
       const user = await Player.findById(userId);
+      console.log('authMiddleware: lookup user ->', user ? { _id: user._id.toString(), userRole: user.userRole, username: user.username } : null);
       if (!user) {
+        console.log('authMiddleware: user not found for id', userId);
         return res.status(401).json({ message: 'User not found' });
       }
 

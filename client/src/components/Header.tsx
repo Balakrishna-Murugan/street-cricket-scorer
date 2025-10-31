@@ -213,43 +213,39 @@ const Header: React.FC = () => {
           {/* Desktop Navigation */}
           {!isMobile && (
             <Box sx={{ display: 'flex', gap: 1, mr: 2 }}>
-              {(isAdmin || isSuperAdmin) && (
-                <>
-                  <Button 
-                    color="inherit" 
-                    startIcon={<GroupsIcon />}
-                    onClick={() => navigate('/teams')}
-                    sx={{ 
-                      minWidth: '100px',
-                      '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }
-                    }}
-                  >
-                    Teams
-                  </Button>
-                  <Button 
-                    color="inherit" 
-                    startIcon={<PeopleIcon />}
-                    onClick={() => navigate('/players')}
-                    sx={{ 
-                      minWidth: '100px',
-                      '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }
-                    }}
-                  >
-                    Players
-                  </Button>
-                  <Button 
-                    color="inherit" 
-                    startIcon={<SportsBaseballIcon />}
-                    onClick={() => navigate('/matches')}
-                    sx={{ 
-                      minWidth: '100px',
-                      '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }
-                    }}
-                  >
-                    Matches
-                  </Button>
-                </>
-              )}
+              <Button 
+                color="inherit" 
+                startIcon={<GroupsIcon />}
+                onClick={() => navigate('/teams')}
+                sx={{ 
+                  minWidth: '100px',
+                  '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }
+                }}
+              >
+                Teams
+              </Button>
+              <Button 
+                color="inherit" 
+                startIcon={<PeopleIcon />}
+                onClick={() => navigate('/players')}
+                sx={{ 
+                  minWidth: '100px',
+                  '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }
+                }}
+              >
+                Players
+              </Button>
+              <Button 
+                color="inherit" 
+                startIcon={<SportsBaseballIcon />}
+                onClick={() => navigate('/matches')}
+                sx={{ 
+                  minWidth: '100px',
+                  '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }
+                }}
+              >
+                Matches
+              </Button>
             </Box>
           )}
 
@@ -340,33 +336,29 @@ const Header: React.FC = () => {
             <ListItemText primary="Home" />
           </ListItemButton>
           
-          {(isAdmin || isSuperAdmin) && (
-            <>
-              <ListItemButton 
-                onClick={() => { navigate('/teams'); handleDrawerClose(); }}
-                sx={{ 
-                  color: 'white',
-                  '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' }
-                }}
-              >
-                <ListItemIcon><GroupsIcon sx={{ color: 'white' }} /></ListItemIcon>
-                <ListItemText primary="Teams" />
-              </ListItemButton>
-              
-              <ListItemButton 
-                onClick={() => { navigate('/players'); handleDrawerClose(); }}
-                sx={{ 
-                  color: 'white',
-                  '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' }
-                }}
-              >
-                <ListItemIcon><PeopleIcon sx={{ color: 'white' }} /></ListItemIcon>
-                <ListItemText primary="Players" />
-              </ListItemButton>
-              
-              <Divider sx={{ bgcolor: 'rgba(255, 255, 255, 0.2)' }} />
-            </>
-          )}
+          <ListItemButton 
+            onClick={() => { navigate('/teams'); handleDrawerClose(); }}
+            sx={{ 
+              color: 'white',
+              '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' }
+            }}
+          >
+            <ListItemIcon><GroupsIcon sx={{ color: 'white' }} /></ListItemIcon>
+            <ListItemText primary="Teams" />
+          </ListItemButton>
+          
+          <ListItemButton 
+            onClick={() => { navigate('/players'); handleDrawerClose(); }}
+            sx={{ 
+              color: 'white',
+              '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' }
+            }}
+          >
+            <ListItemIcon><PeopleIcon sx={{ color: 'white' }} /></ListItemIcon>
+            <ListItemText primary="Players" />
+          </ListItemButton>
+          
+          <Divider sx={{ bgcolor: 'rgba(255, 255, 255, 0.2)' }} />
           
           <ListItemButton 
             onClick={() => { navigate('/matches'); handleDrawerClose(); }}

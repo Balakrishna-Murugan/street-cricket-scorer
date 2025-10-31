@@ -663,7 +663,15 @@ const MatchSummary: React.FC = () => {
     );
   };
 
-  if (loading) return <Typography>Loading...</Typography>;
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
+        <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          🏏 <span className="loading-spinner">⏳</span> Loading Match Summary...
+        </Typography>
+      </Box>
+    );
+  }
   if (error) return <Typography color="error">{error}</Typography>;
   if (!match) return <Typography>Match not found</Typography>;
 

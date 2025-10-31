@@ -1,179 +1,56 @@
-import React from 'react';
-import { 
-  Typography, 
-  Paper, 
-  Stack, 
-  Box, 
-  useTheme, 
-  useMediaQuery
-} from '@mui/material';
+import React, { useEffect, useState } from 'react';
+import { Box, Paper, Typography, Button, CircularProgress } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import SportsCricketIcon from '@mui/icons-material/SportsCricket';
-import GroupsIcon from '@mui/icons-material/Groups';
-import PersonIcon from '@mui/icons-material/Person';
+import { teamService, playerService, matchService } from '../services/api.service';
 
 const HomePage: React.FC = () => {
-  const navigate = useNavigate();
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  
-  // Get user role for conditional rendering
-  const userRole = localStorage.getItem('userRole') || 'viewer';
-  const isAdmin = userRole === 'admin';
+	const navigate = useNavigate();
+	const [loading, setLoading] = useState(true);
+	const [counts, setCounts] = useState({ teams: 0, players: 0, matches: 0 });
 
-  return (
-    <Box
-      sx={{
-        minHeight: 'calc(100vh - 120px)', // Adjusted for header height
-        background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
-        padding: { xs: 1, sm: 2 }, // 8px padding on mobile for consistent spacing
-      }}
-    >
-      <Box 
-        maxWidth="lg" 
-        sx={{ 
-          mx: 'auto',
-          py: isMobile ? 0.5 : 3, 
-          px: isMobile ? 1 : 3 
-        }}
-      >
-        <Paper
-          elevation={8}
-          sx={{
-            padding: isMobile ? 2 : 4,
-            borderRadius: 3,
-            background: '#ffffff',
-            border: '1px solid rgba(0,0,0,0.1)',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
-            textAlign: 'center'
-          }}
-        >
-          <Typography 
-            variant={isMobile ? "h4" : "h3"} 
-            gutterBottom
-            sx={{ 
-              fontWeight: 'bold',
-              color: '#2c3e50',
-              mb: isMobile ? 1 : 2,
-              textShadow: '2px 2px 4px rgba(0,0,0,0.1)'
-            }}
-          >
-            🏏 Welcome to Cricket Scorecard
-          </Typography>
-          <Typography 
-            variant={isMobile ? "body1" : "h6"} 
-            color="text.secondary" 
-            paragraph
-            sx={{ mb: isMobile ? 2 : 4, fontWeight: 500 }}
-          >
-            Track your cricket matches with professional scoring and statistics
-          </Typography>
+	useEffect(() => {
+		const fetchCounts = async () => {
+			try {
+				setLoading(true);
+				const [t, p, m] = await Promise.all([
+					teamService.getAll(),
+					playerService.getAll(),
+					matchService.getAll(),
+				]);
+				setCounts({ teams: t.data.length || 0, players: p.data.length || 0, matches: m.data.length || 0 });
+			} catch (err) {
+				console.error('HomePage: failed to fetch counts', err);
+			} finally {
+				setLoading(false);
+			}
+		};
 
-          <Stack 
-            direction={isMobile ? "column" : "row"} 
-            spacing={isMobile ? 2 : 3} 
-            sx={{ mt: isMobile ? 2 : 4 }} 
-            useFlexGap 
-            flexWrap="wrap"
-          >
-            {isAdmin && (
-              <>
-                <Box width={{ xs: '100%', sm: isMobile ? '100%' : 'calc(50% - 12px)', md: 'calc(25% - 18px)' }}>
-                  <Paper
-                    onClick={() => navigate('/teams')}
-                sx={{
-                  p: isMobile ? 2 : 3,
-                  textAlign: 'center',
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  borderRadius: '12px',
-                  background: 'linear-gradient(45deg, #e3f2fd 30%, #bbdefb 90%)',
-                  border: '1px solid #2196F3',
-                  minHeight: isMobile ? '100px' : '140px',
-                  '&:hover': {
-                    transform: 'translateY(-4px)',
-                    boxShadow: '0 8px 16px rgba(33, 150, 243, 0.3)'
-                  }
-                }}
-              >
-                <GroupsIcon sx={{ fontSize: isMobile ? 40 : 50, mb: 2, color: '#1565c0' }} />
-                <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#2c3e50' }}>Teams</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Manage your cricket teams
-                </Typography>
-              </Paper>
-            </Box>
+		fetchCounts();
+	}, []);
 
-            <Box width={{ xs: '100%', sm: isMobile ? '100%' : 'calc(50% - 12px)', md: 'calc(25% - 18px)' }}>
-              <Paper
-                onClick={() => navigate('/players')}
-                sx={{
-                  p: isMobile ? 2 : 3,
-                  textAlign: 'center',
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  borderRadius: '12px',
-                  background: 'linear-gradient(45deg, #e8f5e8 30%, #c8e6c9 90%)',
-                  border: '1px solid #4CAF50',
-                  minHeight: isMobile ? '100px' : '140px',
-                  '&:hover': {
-                    transform: 'translateY(-4px)',
-                    boxShadow: '0 8px 16px rgba(76, 175, 80, 0.3)'
-                  }
-                }}
-              >
-                <PersonIcon sx={{ fontSize: isMobile ? 40 : 50, mb: 2, color: '#2e7d32' }} />
-                <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#2c3e50' }}>Players</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Manage player profiles
-                </Typography>
-              </Paper>
-            </Box>
-              </>
-            )}
+	return (
+		<Box sx={{ p: 2 }}>
+			<Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 2 }}>
+				<Paper sx={{ p: 3, textAlign: 'center' }}>
+					<Typography variant="h6">Players</Typography>
+					{loading ? <CircularProgress size={20} /> : <Typography variant="h4">{counts.players}</Typography>}
+					<Button sx={{ mt: 2 }} variant="contained" onClick={() => navigate('/players')}>Manage Players</Button>
+				</Paper>
 
-            <Box width={{ xs: '100%', sm: isMobile ? '100%' : 'calc(50% - 12px)', md: 'calc(25% - 18px)' }}>
-              <Paper
-                onClick={() => navigate('/matches')}
-                sx={{
-                  p: isMobile ? 2 : 3,
-                  textAlign: 'center',
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  borderRadius: '12px',
-                  background: 'linear-gradient(45deg, #fff3e0 30%, #ffcc02 90%)',
-                  border: '1px solid #FF9800',
-                  minHeight: isMobile ? '100px' : '140px',
-                  '&:hover': {
-                    transform: 'translateY(-4px)',
-                    boxShadow: '0 8px 16px rgba(255, 152, 0, 0.3)'
-                  }
-                }}
-              >
-                <SportsCricketIcon sx={{ fontSize: isMobile ? 40 : 50, mb: 2, color: '#e65100' }} />
-                <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#2c3e50' }}>Matches</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {isAdmin ? 'Create and manage matches' : 'View live matches'}
-                </Typography>
-              </Paper>
-            </Box>
-          </Stack>
-        </Paper>
-      </Box>
-    </Box>
-  );
+				<Paper sx={{ p: 3, textAlign: 'center' }}>
+					<Typography variant="h6">Teams</Typography>
+					{loading ? <CircularProgress size={20} /> : <Typography variant="h4">{counts.teams}</Typography>}
+					<Button sx={{ mt: 2 }} variant="contained" onClick={() => navigate('/teams')}>Manage Teams</Button>
+				</Paper>
+
+				<Paper sx={{ p: 3, textAlign: 'center' }}>
+					<Typography variant="h6">Matches</Typography>
+					{loading ? <CircularProgress size={20} /> : <Typography variant="h4">{counts.matches}</Typography>}
+					<Button sx={{ mt: 2 }} variant="contained" onClick={() => navigate('/matches')}>View Matches</Button>
+				</Paper>
+			</Box>
+		</Box>
+	);
 };
 
 export default HomePage;

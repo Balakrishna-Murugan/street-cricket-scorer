@@ -30,6 +30,7 @@ import {
   Autocomplete,
   Fab
 } from '@mui/material';
+import Tooltip from '@mui/material/Tooltip';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
@@ -56,37 +57,53 @@ const PlayerList: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   const [newPlayer, setNewPlayer] = useState<Omit<Player, '_id'>>(defaultPlayer);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  useEffect(() => {
+    // Load current user from localStorage
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      try {
+        setCurrentUser(JSON.parse(userData));
+      } catch (e) {
+        setCurrentUser(null);
+      }
+    }
+  }, []);
   
   // Delete confirmation dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [playerToDelete, setPlayerToDelete] = useState<Player | null>(null);
 
-  // Current user state
-  const [currentUser, setCurrentUser] = useState<Player | null>(null);
+
 
   useEffect(() => {
     fetchPlayers();
     fetchTeams();
-    loadCurrentUser();
-  }, []);
-
-  const loadCurrentUser = () => {
+    // Load current user from localStorage
     const userData = localStorage.getItem('user');
     if (userData) {
       try {
-        const user = JSON.parse(userData);
-        setCurrentUser(user);
-      } catch (error) {
-        console.error('Error parsing user data:', error);
+        setCurrentUser(JSON.parse(userData));
+      } catch (e) {
+        setCurrentUser(null);
       }
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+
 
   const fetchTeams = async () => {
     try {
-      const response = await teamService.getAll();
+      let response;
+      if (currentUser?.userRole === 'admin' || currentUser?.userRole === 'superadmin') {
+        response = await teamService.getAll();
+      } else {
+        response = await teamService.getAll(currentUser?._id);
+      }
       setTeams(response.data);
     } catch (error) {
       console.error('Error fetching teams:', error);
@@ -97,7 +114,12 @@ const PlayerList: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await playerService.getAll();
+      let response;
+      if (currentUser?.userRole === 'admin' || currentUser?.userRole === 'superadmin') {
+        response = await playerService.getAll();
+      } else {
+        response = await playerService.getAll(currentUser?._id);
+      }
       setPlayers(response.data);
     } catch (error) {
       setError('Failed to fetch players. Please try again.');
@@ -111,6 +133,16 @@ const PlayerList: React.FC = () => {
     setEditingPlayer(null);
     setNewPlayer(defaultPlayer);
     setOpen(true);
+  };
+
+  // When user clicks Add, check creation limits and either open dialog or show error
+  const handleAddClick = () => {
+    // If guest/viewer and reached limit, show error instead of opening dialog
+    if ((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && players.length >= 12) {
+      setError('Guest users can only create up to 12 players');
+      return;
+    }
+    handleOpen();
   };
 
   const handleClose = () => {
@@ -223,9 +255,15 @@ const PlayerList: React.FC = () => {
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (continueAdding: boolean = false) => {
     if (!newPlayer.name || newPlayer.age <= 0) {
       setError('Please fill in all required fields correctly');
+      return;
+    }
+
+    // If guest/viewer and reached limit, block create
+    if ((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && players.length >= 12) {
+      setError('Guest users can only create up to 12 players');
       return;
     }
 
@@ -243,10 +281,29 @@ const PlayerList: React.FC = () => {
           teams: newPlayer.teams
         };
         await playerService.update(editingPlayer._id, updateData as Player);
+
+        if (continueAdding) {
+          // After saving edits, reset to create mode
+          setEditingPlayer(null);
+          setNewPlayer(defaultPlayer);
+          // keep dialog open for next create
+        } else {
+          handleClose();
+        }
       } else {
         await playerService.create(newPlayer);
+
+        if (continueAdding) {
+          // Clear form for next create but keep dialog open
+          setNewPlayer(defaultPlayer);
+          // Show transient success snackbar for Create & Continue
+          setSuccess('Player created');
+        } else {
+          handleClose();
+        }
       }
-      handleClose();
+
+      // Refresh list after create/update
       fetchPlayers();
     } catch (error) {
       setError(editingPlayer ? 'Failed to update player' : 'Failed to create player');
@@ -257,7 +314,7 @@ const PlayerList: React.FC = () => {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: isMobile ? 2 : 3, px: { xs: 1, sm: 3 } }}>
+  <Container maxWidth="lg" sx={{ py: isMobile ? 2 : 3, px: { xs: 1, sm: 3 } }}>
       {/* Header with Navy Gradient Theme */}
       {!isMobile && (
         <Paper 
@@ -284,23 +341,35 @@ const PlayerList: React.FC = () => {
             >
               Players
             </Typography>
-            <Button 
-              variant="contained" 
-              onClick={handleOpen}
-              startIcon={<AddIcon />}
-              sx={{ 
-                backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                color: 'white',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                '&:hover': { 
-                  backgroundColor: 'rgba(255, 255, 255, 0.3)',
-                  transform: 'translateY(-1px)'
-                },
-                transition: 'all 0.2s ease'
-              }}
-            >
-              Add Player
-            </Button>
+            {/* Show tooltip when limit reached */}
+            {((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && players.length >= 12) ? (
+              <Tooltip title="Guest users can only create up to 12 players" arrow>
+                <span>
+                  <Button
+                    variant="contained"
+                    onClick={handleAddClick}
+                    disabled={loading}
+                    startIcon={<AddIcon />}
+                  >
+                    Add Player
+                  </Button>
+                </span>
+              </Tooltip>
+            ) : (
+              <Button 
+                variant="contained" 
+                onClick={handleAddClick}
+                disabled={loading}
+                startIcon={<AddIcon />}
+              >
+                Add Player
+              </Button>
+            )}
+            {(currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && players.length >= 12 && (
+              <Typography variant="caption" color="error" sx={{ ml: 2 }}>
+                Guest users can only create up to 12 players.
+              </Typography>
+            )}
           </Box>
         </Paper>
       )}
@@ -309,7 +378,8 @@ const PlayerList: React.FC = () => {
       {isMobile && (
         <Fab 
           aria-label="add player"
-          onClick={handleOpen}
+          onClick={handleAddClick}
+          disabled={loading}
           sx={{
             position: 'fixed',
             bottom: 24,
@@ -752,8 +822,34 @@ const PlayerList: React.FC = () => {
           >
             Cancel
           </Button>
+
+          {/* Create & Continue - only for new creates (not when editing) */}
+          {!editingPlayer && (
+            <Button
+              onClick={() => handleSubmit(true)}
+              variant="contained"
+              disabled={loading || !newPlayer.name || newPlayer.age <= 0 || ((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && players.length >= 12)}
+              size={isMobile ? "small" : "medium"}
+              sx={{
+                mr: 1,
+                py: 1.5,
+                borderRadius: 2,
+                textTransform: 'none',
+                fontSize: '1.1rem',
+                fontWeight: 600,
+                background: 'linear-gradient(135deg, #0b6b4f 0%, #2fb58b 100%)',
+                boxShadow: '0 4px 8px rgba(0,0,0,0.12)',
+                color: 'white !important',
+                '&:hover': { opacity: 0.95 },
+                transition: 'all 0.2s ease'
+              }}
+            >
+              {loading ? <CircularProgress size={20} /> : 'Create & Continue'}
+            </Button>
+          )}
+
           <Button 
-            onClick={handleSubmit} 
+            onClick={() => handleSubmit(false)} 
             variant="contained" 
             disabled={loading || !newPlayer.name || newPlayer.age <= 0}
             size={isMobile ? "small" : "medium"}
@@ -778,13 +874,23 @@ const PlayerList: React.FC = () => {
         </DialogActions>
       </Dialog>
 
-      <Snackbar 
-        open={error !== null} 
-        autoHideDuration={6000} 
+      <Snackbar
+        open={error !== null}
+        autoHideDuration={6000}
         onClose={() => setError(null)}
       >
         <Alert onClose={() => setError(null)} severity="error">
           {error}
+        </Alert>
+      </Snackbar>
+
+      <Snackbar
+        open={success !== null}
+        autoHideDuration={3000}
+        onClose={() => setSuccess(null)}
+      >
+        <Alert onClose={() => setSuccess(null)} severity="success">
+          {success}
         </Alert>
       </Snackbar>
 

@@ -195,12 +195,12 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({ match, onRefresh }) =
 
   return (
     <Paper sx={{ 
-      p: isMobile ? 0.5 : 3, // Reduced mobile padding from 8px to 4px for better mobile UI
-      borderRadius: 2, 
+      p: isMobile ? 2 : 3, // 16px for mobile, 24px for desktop
+      borderRadius: isMobile ? 0 : 2, // No border radius for mobile, rounded for desktop
       background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
       boxShadow: '0 8px 32px rgba(2, 14, 67, 0.3)',
-      mx: isMobile ? 1 : 0, // Add small margins on mobile for better spacing
-      mb: isMobile ? 1 : 0 // Reduced bottom margin on mobile from 16px to 8px
+      mx: 0,
+      mb: 0
     }}>
       <Box sx={{ 
         display: 'flex', 

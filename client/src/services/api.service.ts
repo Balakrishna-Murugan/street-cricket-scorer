@@ -10,6 +10,37 @@ const api = axios.create({
   },
 });
 
+// Attach user-id header automatically from localStorage if available
+api.interceptors.request.use((config) => {
+  try {
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      const user = JSON.parse(userData);
+      if (user && user._id) {
+        // Axios v1 uses AxiosHeaders; set header via set if available
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        if (config.headers && typeof (config.headers as any).set === 'function') {
+          // @ts-ignore
+          (config.headers as any).set('user-id', user._id);
+        } else if (config.headers) {
+          // fallback for plain object
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-ignore
+          config.headers['user-id'] = user._id;
+        } else {
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-ignore
+          config.headers = { 'user-id': user._id };
+        }
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+  return config;
+}, (error) => Promise.reject(error));
+
 // Authentication interfaces
 export interface LoginRequest {
   username: string;
@@ -64,7 +95,11 @@ export const authService = {
 };
 
 export const playerService = {
-  getAll: () => api.get<Player[]>('/players'),
+  getAll: (userId?: string) => {
+    const params = userId ? { userId } : {};
+    const headers = userId ? { 'user-id': userId } : {};
+    return api.get<Player[]>('/players', { params, headers });
+  },
   getById: (id: string) => api.get<Player>(`/players/${id}`),
   create: (data: Omit<Player, '_id'>) => api.post<Player>('/players', data),
   update: (id: string, data: Player) => api.put<Player>(`/players/${id}`, data),
@@ -78,7 +113,11 @@ export const playerService = {
 };
 
 export const teamService = {
-  getAll: () => api.get<Team[]>('/teams'),
+  getAll: (userId?: string) => {
+    const params = userId ? { userId } : {};
+    const headers = userId ? { 'user-id': userId } : {};
+    return api.get<Team[]>('/teams', { params, headers });
+  },
   getById: (id: string) => api.get<Team>(`/teams/${id}`),
   create: (data: Partial<Team>) => api.post<Team>('/teams', data),
   update: (id: string, data: Partial<Team>) => api.put<Team>(`/teams/${id}`, data),
