@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import { Team } from '../models/team.model';
 import { Player } from '../models/player.model';
+import { Match } from '../models/match.model';
 
 export const teamController = {
   // Create a new team
@@ -178,6 +179,15 @@ export const teamController = {
         if (!(req.user && (existing as any).createdBy && (existing as any).createdBy.toString() === req.user._id.toString())) {
           return res.status(403).json({ message: 'Access denied' });
         }
+      }
+
+      // Prevent deletion if this team is part of an in-progress match
+      const inProgressMatch = await Match.findOne({
+        $or: [{ team1: existing._id }, { team2: existing._id }],
+        status: 'in-progress'
+      });
+      if (inProgressMatch) {
+        return res.status(403).json({ message: 'Team cannot be deleted while a match involving the team is in progress' });
       }
 
       await Team.findByIdAndDelete(req.params.id);

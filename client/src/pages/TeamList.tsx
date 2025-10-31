@@ -221,8 +221,9 @@ const TeamList: React.FC = () => {
       setDeleteDialogOpen(false);
       setTeamToDelete(null);
     } catch (error) {
-      setError('Failed to delete team');
       console.error('Error deleting team:', error);
+      const message = error?.response?.data?.message || error?.message || 'Failed to delete team';
+      setError(message);
     } finally {
       setLoading(false);
     }

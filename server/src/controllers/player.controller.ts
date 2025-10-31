@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { Player } from '../models/player.model';
+import { Match } from '../models/match.model';
 
 export const playerController = {
   // Create a new player
@@ -105,6 +106,18 @@ export const playerController = {
       if (!(req.user && (req.user.userRole === 'admin' || req.user.userRole === 'superadmin')) ) {
         if (!(req.user && (existing as any).createdBy && (existing as any).createdBy.toString() === req.user._id.toString())) {
           return res.status(403).json({ message: 'Access denied' });
+        }
+      }
+
+      // Prevent deletion if player belongs to any team that is involved in matches
+      const playerTeams = (existing as any).teams || [];
+      if (playerTeams.length > 0) {
+        // Check if any of these teams are referenced in any match
+        for (const teamId of playerTeams) {
+          const matchFound = await Match.findOne({ $or: [{ team1: teamId }, { team2: teamId }] });
+          if (matchFound) {
+            return res.status(403).json({ message: 'Player cannot be deleted because they are part of a team that is involved in one or more matches' });
+          }
         }
       }
 

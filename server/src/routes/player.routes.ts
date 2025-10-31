@@ -25,7 +25,8 @@ router.put('/:id', authMiddleware.requireAuth, playerController.update);
 router.delete('/:id', authMiddleware.requireAuth, playerController.delete);
 
 // SuperAdmin routes
-router.put('/:playerId/promote', authMiddleware.requireSuperAdmin, playerController.promoteToAdmin);
-router.put('/:playerId/demote', authMiddleware.requireSuperAdmin, playerController.demoteFromAdmin);
+// Require authentication first, then superadmin check
+router.put('/:playerId/promote', authMiddleware.requireAuth, authMiddleware.requireSuperAdmin, playerController.promoteToAdmin);
+router.put('/:playerId/demote', authMiddleware.requireAuth, authMiddleware.requireSuperAdmin, playerController.demoteFromAdmin);
 
 export const playerRoutes = router;
