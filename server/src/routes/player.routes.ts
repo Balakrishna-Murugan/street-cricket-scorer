@@ -14,6 +14,9 @@ router.get('/', authMiddleware.requireAuth, playerController.getAll);
 // GET player by ID
 router.get('/:id', authMiddleware.requireAuth, playerController.getById);
 
+// GET conflicts for player (matches referencing any of player's teams)
+router.get('/:id/conflicts', authMiddleware.requireAuth, playerController.conflicts);
+
 // POST create new player
 // POST create new player (auth + creation limit enforcement)
 router.post('/', authMiddleware.requireAuth, creationLimitMiddleware.checkPlayerLimit, playerController.create);

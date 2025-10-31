@@ -104,6 +104,7 @@ export const playerService = {
   create: (data: Omit<Player, '_id'>) => api.post<Player>('/players', data),
   update: (id: string, data: Player) => api.put<Player>(`/players/${id}`, data),
   delete: (id: string) => api.delete(`/players/${id}`),
+  getConflicts: (id: string) => api.get<{ conflicts: { _id: string; label: string }[] }>(`/players/${id}/conflicts`),
   promoteToAdmin: (playerId: string, userId: string) => 
     api.put(`/players/${playerId}/promote`, {}, { headers: { 'user-id': userId } }),
   demoteFromAdmin: (playerId: string, userId: string) => 
@@ -122,6 +123,7 @@ export const teamService = {
   create: (data: Partial<Team>) => api.post<Team>('/teams', data),
   update: (id: string, data: Partial<Team>) => api.put<Team>(`/teams/${id}`, data),
   delete: (id: string) => api.delete(`/teams/${id}`),
+  getConflicts: (id: string) => api.get<{ conflicts: { _id: string; label: string }[] }>(`/teams/${id}/conflicts`),
 };
 
 export const overService = {

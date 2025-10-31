@@ -82,6 +82,9 @@ const TeamList: React.FC = () => {
   // Delete confirmation dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [teamToDelete, setTeamToDelete] = useState<Team | null>(null);
+  // Conflict pre-check state for team deletion
+  const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
+  const [conflicts, setConflicts] = useState<{ _id: string; label: string }[]>([]);
 
   const fetchPlayers = useCallback(async (currentEditingTeam?: Team | null) => {
     try {
@@ -207,7 +210,22 @@ const TeamList: React.FC = () => {
   // Delete dialog handlers
   const handleDeleteClick = (team: Team) => {
     setTeamToDelete(team);
-    setDeleteDialogOpen(true);
+    // Pre-check for conflicts (in-progress matches) before opening delete confirmation
+    (async () => {
+      try {
+        const resp = await teamService.getConflicts(team._id!);
+        const found = resp.data?.conflicts || [];
+        if (found.length > 0) {
+          setConflicts(found);
+          setConflictDialogOpen(true);
+        } else {
+          setDeleteDialogOpen(true);
+        }
+      } catch (err) {
+        console.error('Error checking team conflicts:', err);
+        setDeleteDialogOpen(true);
+      }
+    })();
   };
 
   const handleDeleteConfirm = async () => {
@@ -231,6 +249,12 @@ const TeamList: React.FC = () => {
 
   const handleDeleteCancel = () => {
     setDeleteDialogOpen(false);
+    setTeamToDelete(null);
+  };
+
+  const handleConflictDialogClose = () => {
+    setConflictDialogOpen(false);
+    setConflicts([]);
     setTeamToDelete(null);
   };
 
@@ -906,6 +930,31 @@ const TeamList: React.FC = () => {
               'Delete Team'
             )}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Conflict Dialog (shown when pre-check finds in-progress matches for this team) */}
+      <Dialog
+        open={conflictDialogOpen}
+        onClose={handleConflictDialogClose}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ color: 'warning.main', fontWeight: 'bold' }}>Cannot delete team</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" gutterBottom>
+            This team cannot be deleted because it is involved in one or more in-progress match(es):
+          </Typography>
+          <Stack spacing={1} sx={{ mt: 1 }}>
+            {conflicts.map(c => (
+              <Box key={c._id} sx={{ py: 0.5 }}>
+                <Typography variant="body2">• {c.label}</Typography>
+              </Box>
+            ))}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleConflictDialogClose} variant="contained">OK</Button>
         </DialogActions>
       </Dialog>
     </Container>

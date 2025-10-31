@@ -68,6 +68,36 @@ export const playerController = {
     }
   },
 
+  // Get conflicts (matches referencing any of the player's teams)
+  conflicts: async (req: Request, res: Response) => {
+    try {
+      const player = await Player.findById(req.params.id);
+      if (!player) {
+        return res.status(404).json({ message: 'Player not found' });
+      }
+
+      const playerTeams = (player as any).teams || [];
+      if (playerTeams.length === 0) {
+        return res.json({ conflicts: [] });
+      }
+
+      const conflictMatches = await Match.find({
+        $or: [{ team1: { $in: playerTeams } }, { team2: { $in: playerTeams } }]
+      }).populate('team1', 'name').populate('team2', 'name');
+
+      const conflicts = conflictMatches.map((m: any) => {
+        const t1 = m.team1?.name || 'Team1';
+        const t2 = m.team2?.name || 'Team2';
+        const dateStr = m.date ? new Date(m.date).toISOString().split('T')[0] : '';
+        return { _id: m._id, label: `${t1} vs ${t2}${dateStr ? ' on ' + dateStr : ''}` };
+      });
+
+      res.json({ conflicts });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || 'Error checking player conflicts' });
+    }
+  },
+
   // Update player
   update: async (req: Request, res: Response) => {
     try {
@@ -112,12 +142,23 @@ export const playerController = {
       // Prevent deletion if player belongs to any team that is involved in matches
       const playerTeams = (existing as any).teams || [];
       if (playerTeams.length > 0) {
-        // Check if any of these teams are referenced in any match
-        for (const teamId of playerTeams) {
-          const matchFound = await Match.findOne({ $or: [{ team1: teamId }, { team2: teamId }] });
-          if (matchFound) {
-            return res.status(403).json({ message: 'Player cannot be deleted because they are part of a team that is involved in one or more matches' });
-          }
+        // Find any matches that reference any of these teams
+        const conflictMatches = await Match.find({
+          $or: [{ team1: { $in: playerTeams } }, { team2: { $in: playerTeams } }]
+        }).populate('team1', 'name').populate('team2', 'name');
+
+        if (conflictMatches && conflictMatches.length > 0) {
+          const conflicts = conflictMatches.map((m: any) => {
+            const t1 = m.team1?.name || 'Team1';
+            const t2 = m.team2?.name || 'Team2';
+            const dateStr = m.date ? new Date(m.date).toISOString().split('T')[0] : '';
+            return { _id: m._id, label: `${t1} vs ${t2}${dateStr ? ' on ' + dateStr : ''}` };
+          });
+
+          return res.status(403).json({
+            message: 'Player cannot be deleted because they belong to a team involved in one or more matches',
+            conflicts
+          });
         }
       }
 

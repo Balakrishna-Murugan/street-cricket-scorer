@@ -76,6 +76,9 @@ const PlayerList: React.FC = () => {
   // Delete confirmation dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [playerToDelete, setPlayerToDelete] = useState<Player | null>(null);
+  // Conflict pre-check state
+  const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
+  const [conflicts, setConflicts] = useState<{ _id: string; label: string }[]>([]);
 
 
 
@@ -173,7 +176,23 @@ const PlayerList: React.FC = () => {
   // Delete dialog handlers
   const handleDeleteClick = (player: Player) => {
     setPlayerToDelete(player);
-    setDeleteDialogOpen(true);
+    // Pre-check for conflicts before opening delete confirmation
+    (async () => {
+      try {
+        const resp = await playerService.getConflicts(player._id!);
+        const found = resp.data?.conflicts || [];
+        if (found.length > 0) {
+          setConflicts(found);
+          setConflictDialogOpen(true);
+        } else {
+          setDeleteDialogOpen(true);
+        }
+      } catch (err) {
+        // If pre-check fails, still open delete dialog to let server handle final check
+        console.error('Error checking player conflicts:', err);
+        setDeleteDialogOpen(true);
+      }
+    })();
   };
 
   const handleDeleteConfirm = async () => {
@@ -197,6 +216,12 @@ const PlayerList: React.FC = () => {
 
   const handleDeleteCancel = () => {
     setDeleteDialogOpen(false);
+    setPlayerToDelete(null);
+  };
+
+  const handleConflictDialogClose = () => {
+    setConflictDialogOpen(false);
+    setConflicts([]);
     setPlayerToDelete(null);
   };
 
@@ -961,6 +986,31 @@ const PlayerList: React.FC = () => {
               'Delete Player'
             )}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Conflict Dialog (shown when pre-check finds matches referencing player's teams) */}
+      <Dialog
+        open={conflictDialogOpen}
+        onClose={handleConflictDialogClose}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ color: 'warning.main', fontWeight: 'bold' }}>Cannot delete player</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" gutterBottom>
+            This player cannot be deleted because they belong to a team that is referenced by the following match(es):
+          </Typography>
+          <Stack spacing={1} sx={{ mt: 1 }}>
+            {conflicts.map(c => (
+              <Box key={c._id} sx={{ py: 0.5 }}>
+                <Typography variant="body2">• {c.label}</Typography>
+              </Box>
+            ))}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleConflictDialogClose} variant="contained">OK</Button>
         </DialogActions>
       </Dialog>
     </Container>

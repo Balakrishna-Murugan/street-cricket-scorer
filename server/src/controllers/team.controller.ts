@@ -119,6 +119,36 @@ export const teamController = {
     }
   },
 
+  // Get conflicts (in-progress matches referencing this team)
+  conflicts: async (req: Request, res: Response) => {
+    try {
+      const existing = await Team.findById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ message: 'Team not found' });
+      }
+
+      const inProgressMatches = await Match.find({
+        $or: [{ team1: existing._id }, { team2: existing._id }],
+        status: 'in-progress'
+      }).populate('team1', 'name').populate('team2', 'name');
+
+      if (!inProgressMatches || inProgressMatches.length === 0) {
+        return res.json({ conflicts: [] });
+      }
+
+      const conflicts = inProgressMatches.map((m: any) => {
+        const t1 = m.team1?.name || 'Team1';
+        const t2 = m.team2?.name || 'Team2';
+        const dateStr = m.date ? new Date(m.date).toISOString().split('T')[0] : '';
+        return { _id: m._id, label: `${t1} vs ${t2}${dateStr ? ' on ' + dateStr : ''}` };
+      });
+
+      res.json({ conflicts });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || 'Error checking team conflicts' });
+    }
+  },
+
   // Update team
   update: async (req: Request, res: Response) => {
     try {
@@ -182,12 +212,23 @@ export const teamController = {
       }
 
       // Prevent deletion if this team is part of an in-progress match
-      const inProgressMatch = await Match.findOne({
+      const inProgressMatches = await Match.find({
         $or: [{ team1: existing._id }, { team2: existing._id }],
         status: 'in-progress'
-      });
-      if (inProgressMatch) {
-        return res.status(403).json({ message: 'Team cannot be deleted while a match involving the team is in progress' });
+      }).populate('team1', 'name').populate('team2', 'name');
+
+      if (inProgressMatches && inProgressMatches.length > 0) {
+        const conflicts = inProgressMatches.map((m: any) => {
+          const t1 = m.team1?.name || 'Team1';
+          const t2 = m.team2?.name || 'Team2';
+          const dateStr = m.date ? new Date(m.date).toISOString().split('T')[0] : '';
+          return { _id: m._id, label: `${t1} vs ${t2}${dateStr ? ' on ' + dateStr : ''}` };
+        });
+
+        return res.status(403).json({
+          message: 'Team cannot be deleted while a match involving the team is in progress',
+          conflicts
+        });
       }
 
       await Team.findByIdAndDelete(req.params.id);
