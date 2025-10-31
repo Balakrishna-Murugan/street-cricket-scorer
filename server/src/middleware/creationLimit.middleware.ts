@@ -12,8 +12,9 @@ export const creationLimitMiddleware = {
       const role = user.userRole;
       if (role === 'guest' || role === 'viewer') {
         const count = await Player.countDocuments({ createdBy: user._id });
-        if (count >= 12) {
-          return res.status(403).json({ message: 'Guest/viewer users can create up to 12 players' });
+        const limit = 12;
+        if (count >= limit) {
+          return res.status(403).json({ message: 'Guest/viewer users can create up to 12 players', limit, currentCount: count });
         }
       }
 
@@ -32,8 +33,9 @@ export const creationLimitMiddleware = {
       const role = user.userRole;
       if (role === 'guest' || role === 'viewer') {
         const count = await Team.countDocuments({ createdBy: user._id });
-        if (count >= 2) {
-          return res.status(403).json({ message: 'Guest/viewer users can create up to 2 teams' });
+        const limit = 2;
+        if (count >= limit) {
+          return res.status(403).json({ message: 'Guest/viewer users can create up to 2 teams', limit, currentCount: count });
         }
       }
 

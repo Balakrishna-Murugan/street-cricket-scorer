@@ -14,11 +14,12 @@ export const authMiddleware = {
   // Middleware to check if user is authenticated
   requireAuth: async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // For now, we'll assume the user ID is passed in the request body or headers
+      // For now, we'll accept a user id passed in several possible places (headers, body, query)
       // In a real app, you'd verify JWT tokens or session cookies
-      const userId = req.headers['user-id'] || req.body.userId;
+      const header = req.headers as Record<string, any>;
+      const userId = header['user-id'] || header['userid'] || header['userId'] || header['x-user-id'] || req.body?.userId || req.query?.userId || (header.authorization ? String(header.authorization).replace(/^Bearer\s+/i, '') : undefined);
 
-      console.log('authMiddleware: received userId header/body ->', userId);
+      console.log('authMiddleware: received userId candidate ->', userId);
 
       if (!userId) {
         console.log('authMiddleware: no userId provided');

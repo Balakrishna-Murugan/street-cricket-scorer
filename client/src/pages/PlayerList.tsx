@@ -205,7 +205,7 @@ const PlayerList: React.FC = () => {
       fetchPlayers();
       setDeleteDialogOpen(false);
       setPlayerToDelete(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting player:', error);
       const message = error?.response?.data?.message || error?.message || 'Failed to delete player';
       setError(message);
