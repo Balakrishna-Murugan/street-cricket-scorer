@@ -40,7 +40,7 @@ const HomePage: React.FC = () => {
 						<Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, alignItems: 'center' }}>
 							<Box sx={{ flex: 1, width: { xs: '100%', md: '66%' } }}>
 								<Typography variant="h4" sx={{ fontWeight: 'bold', mb: 1 }}>Street Cricket Scorer</Typography>
-								<Typography variant="body1" sx={{ opacity: 0.9, mb: 2 }}>Fast, minimal live scoring for street cricket. Create matches, track ball-by-ball scoring and share results.</Typography>
+								<Typography variant="body1" sx={{ opacity: 0.9, mb: 2 }}>Minimal live scoring for street cricket</Typography>
 								<Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
 									<Button variant="contained" onClick={() => navigate('/matches')} sx={{ mr: 1 }}>View Matches</Button>
 									<Button variant="outlined" onClick={() => navigate('/matches')} sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.2)' }}>Create Match</Button>

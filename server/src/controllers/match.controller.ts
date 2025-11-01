@@ -14,16 +14,20 @@ export const matchController = {
         req.body.createdBy = req.user._id;
       }
 
-      // Enforce guest/viewer creation limit: max 1 match
-      const creatorRole = req.user?.userRole;
-      if (creatorRole === 'guest' || creatorRole === 'viewer') {
-        const existingCount = await Match.countDocuments({ createdBy: req.user._id });
+      // Enforce guest/viewer creation limit and overs cap
+      const userRole = typeof req.user?.userRole === 'string' ? req.user.userRole.toLowerCase() : undefined;
+      const isGuestUser = req.user?.isGuest === true || userRole === 'guest';
+      const isViewerUser = userRole === 'viewer';
+
+      if (isGuestUser || isViewerUser) {
+        // Ensure createdBy is set
+        const creatorId = req.user._id;
+        const existingCount = await Match.countDocuments({ createdBy: creatorId });
         if (existingCount >= 1) {
           return res.status(403).json({ message: 'Guest/viewer users can create only 1 match' });
         }
 
-        // Enforce guest/viewer overs cap: maximum 2 overs per match
-        // Ensure req.body.overs is a number and cap it to 2 for guests/viewers
+        // Enforce guest/viewer overs cap: maximum 2 overs per match (i.e., less than 3 overs)
         const requestedOvers = Number(req.body.overs) || 2;
         const cappedOvers = Math.min(2, Math.max(1, Math.floor(requestedOvers)));
         req.body.overs = cappedOvers;
