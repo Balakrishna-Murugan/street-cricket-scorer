@@ -1,43 +1,90 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { Match, Player, BallOutcome } from '../types';
+import { Match, Player, BallOutcome, PlayerRef } from '../types';
 import { matchService, playerService } from '../services/api.service';
 import MatchDetails from '../components/MatchDetails';
 import {
   Box,
-  Paper,
-  Typography,
-  Button,
-  Select,
-  MenuItem,
-  FormControl,
   InputLabel,
   Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Table,
-  TableBody,
-  TableCell,
   TableContainer,
   TableHead,
-  TableRow,
-  Stack,
-  SelectChangeEvent,
   Alert,
   AlertTitle,
   TextField,
-  Container,
   Autocomplete,
   useTheme,
   useMediaQuery,
   IconButton,
   Tooltip,
+  Typography,
+  Paper,
+  Button,
+  Table,
+  TableBody,
+  TableRow,
+  TableCell,
+  Stack,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  FormControl,
+  Select,
+  MenuItem,
+  SelectChangeEvent,
 } from '@mui/material';
-import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+// ...existing code...
+
+// ...existing code...
 import ChangeCircleIcon from '@mui/icons-material/ChangeCircle';
+import UndoIcon from '@mui/icons-material/Undo';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 
 interface Props {}
+
+// Undo action types
+interface UndoAction {
+  id: string;
+  type: 'ball_outcome' | 'wicket' | 'extra' | 'player_change';
+  timestamp: number;
+  data: any;
+  matchState: {
+    totalRuns: number;
+    wickets: number;
+    balls: number;
+    overs: number;
+    striker: string;
+    nonStriker: string;
+    bowler: string;
+    strikerStats: {
+      runs: number;
+      balls: number;
+      fours?: number;
+      sixes?: number;
+      isOut?: boolean;
+      dismissalType?: string;
+      howOut?: string;
+      dismissedBy?: string | PlayerRef;
+      strikeRate?: number;
+      isOnStrike?: boolean;
+    };
+    nonStrikerStats: {
+      runs: number;
+      balls: number;
+      fours?: number;
+      sixes?: number;
+      isOut?: boolean;
+      dismissalType?: string;
+      howOut?: string;
+      dismissedBy?: string | PlayerRef;
+      strikeRate?: number;
+      isOnStrike?: boolean;
+    };
+    bowlerStats: { overs: number; runs: number; wickets: number; balls: number };
+    currentOverBalls: BallOutcome[];
+    extras: { wides: number; noBalls: number; byes: number; legByes: number; total: number };
+  };
+}
 
 interface DialogContext {
   title: string;
@@ -53,9 +100,21 @@ const LiveScoring: React.FC<Props> = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   
-  // Check user role for permissions
+  // Check user info and role for permissions
   const userRole = localStorage.getItem('userRole') || 'viewer';
   const isAdmin = userRole === 'admin';
+  const isSuperAdmin = userRole === 'superadmin';
+  // parse current user id from localStorage 'user' object if present
+  let currentUserId: string | null = null;
+  try {
+    const u = localStorage.getItem('user');
+    if (u) {
+      const parsed = JSON.parse(u);
+      currentUserId = parsed && parsed._id ? parsed._id : null;
+    }
+  } catch (e) {
+    currentUserId = null;
+  }
   const [match, setMatch] = useState<Match | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -82,8 +141,30 @@ const LiveScoring: React.FC<Props> = () => {
   const [extraType, setExtraType] = useState<'bye' | 'leg-bye' | 'wide' | 'no-ball' | null>(null);
   const [extraRuns, setExtraRuns] = useState<number>(1);
 
-  const [strikerStats, setStrikerStats] = useState<{ runs: number; balls: number }>({ runs: 0, balls: 0 });
-  const [nonStrikerStats, setNonStrikerStats] = useState<{ runs: number; balls: number }>({ runs: 0, balls: 0 });
+  const [strikerStats, setStrikerStats] = useState<{
+    runs: number;
+    balls: number;
+    fours?: number;
+    sixes?: number;
+    isOut?: boolean;
+    dismissalType?: string;
+    howOut?: string;
+    dismissedBy?: string | PlayerRef;
+    strikeRate?: number;
+    isOnStrike?: boolean;
+  }>({ runs: 0, balls: 0 });
+  const [nonStrikerStats, setNonStrikerStats] = useState<{
+    runs: number;
+    balls: number;
+    fours?: number;
+    sixes?: number;
+    isOut?: boolean;
+    dismissalType?: string;
+    howOut?: string;
+    dismissedBy?: string | PlayerRef;
+    strikeRate?: number;
+    isOnStrike?: boolean;
+  }>({ runs: 0, balls: 0 });
   const [bowlerStats, setBowlerStats] = useState<{ overs: number; runs: number; wickets: number; balls: number }>({ overs: 0, runs: 0, wickets: 0, balls: 0 });
   const [allowBowlerChange, setAllowBowlerChange] = useState(false);
   const [bowlerChangeReason, setBowlerChangeReason] = useState('');
@@ -95,6 +176,9 @@ const LiveScoring: React.FC<Props> = () => {
   
   // New state for player selection dialog
   const [isPlayerSelectionDialogOpen, setIsPlayerSelectionDialogOpen] = useState(false);
+  // Track when a player-change flow is active (so we can distinguish tactical swaps
+  // from wicket flows and avoid auto-opening the wicket/new-batsman context)
+  const [isPlayerChangeInProgress, setIsPlayerChangeInProgress] = useState(false);
   
   // State for player change functionality
   const [isPlayerChangeDialogOpen, setIsPlayerChangeDialogOpen] = useState(false);
@@ -110,6 +194,10 @@ const LiveScoring: React.FC<Props> = () => {
   const [showBowlerChangeAlert, setShowBowlerChangeAlert] = useState(true);
   const [showBowlerRotationAlert, setShowBowlerRotationAlert] = useState(true);
   const [showInsufficientBatsmenAlert, setShowInsufficientBatsmenAlert] = useState(true);
+
+  // Undo functionality state
+  const [undoHistory, setUndoHistory] = useState<UndoAction[]>([]);
+  const [canUndo, setCanUndo] = useState(false);
 
   // Helper function to check if all required players are selected
   const arePlayersSelected = useCallback(() => {
@@ -141,27 +229,26 @@ const LiveScoring: React.FC<Props> = () => {
       
       if (!hasTeam) return false;
       
-      // Check if player is out
-      const isPlayerOut = currentInning.battingStats && Array.isArray(currentInning.battingStats) 
-        ? currentInning.battingStats.some(stat => {
+      // Check if player is out - but only if they have batting stats
+      // If a player has no batting stats, they're available
+      const playerBattingStats = currentInning.battingStats && Array.isArray(currentInning.battingStats) 
+        ? currentInning.battingStats.find(stat => {
             const playerId = typeof stat.player === 'string' ? stat.player : stat.player._id;
-            return playerId === player._id && stat.isOut;
+            return playerId === player._id;
           })
-        : false;
+        : null;
       
-      return !isPlayerOut;
+      // If player has no batting stats, they're available
+      if (!playerBattingStats) return true;
+      
+      // If player has batting stats, check if they're out
+      return !playerBattingStats.isOut;
     });
   }, [match, players, currentInnings]);
 
   // Helper function to get dialog context
   const getDialogContext = useCallback((): DialogContext => {
-    console.log('🔍 DEBUG getDialogContext called with:', {
-      changePlayerType,
-      isOverCompleted,
-      isWaitingForNewBatsman,
-      matchInningsLength: match?.innings?.length,
-      currentInnings
-    });
+    // debug info removed
 
     if (changePlayerType) {
       // Player change context
@@ -174,7 +261,7 @@ const LiveScoring: React.FC<Props> = () => {
           showOnlyNonStriker: false,
           gradientColor: 'linear-gradient(45deg, #9C27B0 30%, #BA68C8 90%)'
         };
-        console.log('🔍 DEBUG returning bowler change context:', context);
+  // returning bowler change context
         return context;
       } else if (changePlayerType === 'striker') {
         const context = {
@@ -185,7 +272,7 @@ const LiveScoring: React.FC<Props> = () => {
           showOnlyNonStriker: false,
           gradientColor: 'linear-gradient(45deg, #FF5722 30%, #FF8A65 90%)'
         };
-        console.log('🔍 DEBUG returning striker change context:', context);
+  // returning striker change context
         return context;
       } else if (changePlayerType === 'nonStriker') {
         const context = {
@@ -196,7 +283,7 @@ const LiveScoring: React.FC<Props> = () => {
           showOnlyNonStriker: true,
           gradientColor: 'linear-gradient(45deg, #607D8B 30%, #90A4AE 90%)'
         };
-        console.log('🔍 DEBUG returning nonStriker change context:', context);
+  // returning nonStriker change context
         return context;
       }
     }
@@ -210,7 +297,7 @@ const LiveScoring: React.FC<Props> = () => {
         showOnlyNonStriker: false,
         gradientColor: 'linear-gradient(45deg, #FF9800 30%, #FFB74D 90%)'
       };
-      console.log('🔍 DEBUG returning over completed context:', context);
+  // returning over completed context
       return context;
     } else if (isWaitingForNewBatsman) {
       const context = {
@@ -221,7 +308,7 @@ const LiveScoring: React.FC<Props> = () => {
         showOnlyNonStriker: false,
         gradientColor: 'linear-gradient(45deg, #f44336 30%, #e57373 90%)'
       };
-      console.log('🔍 DEBUG returning wicket context:', context);
+  // returning wicket context
       return context;
     } else {
       const context = {
@@ -232,7 +319,7 @@ const LiveScoring: React.FC<Props> = () => {
         showOnlyNonStriker: false,
         gradientColor: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)'
       };
-      console.log('🔍 DEBUG returning default match start context:', context);
+      // returning default match start context
       return context;
     }
   }, [isOverCompleted, isWaitingForNewBatsman, match, currentInnings, changePlayerType, changePlayerReason]);
@@ -240,32 +327,15 @@ const LiveScoring: React.FC<Props> = () => {
   // Helper function to check if required selections are made based on context
   const areRequiredSelectionsComplete = useCallback(() => {
     const context = getDialogContext();
-    console.log('🔍 DEBUG areRequiredSelectionsComplete:', {
-      context,
-      bowler,
-      striker,
-      nonStriker,
-      showOnlyBowler: context.showOnlyBowler,
-      showOnlyStriker: context.showOnlyStriker,
-      showOnlyNonStriker: (context as any).showOnlyNonStriker
-    });
 
     if (context.showOnlyBowler) {
-      const result = !!bowler;
-      console.log('🔍 DEBUG showOnlyBowler check:', result);
-      return result;
+      return !!bowler;
     } else if (context.showOnlyStriker) {
-      const result = !!striker && striker !== nonStriker;
-      console.log('🔍 DEBUG showOnlyStriker check:', result, { striker, nonStriker, different: striker !== nonStriker });
-      return result;
+      return !!striker && striker !== nonStriker;
     } else if ((context as any).showOnlyNonStriker) {
-      const result = !!nonStriker && striker !== nonStriker;
-      console.log('🔍 DEBUG showOnlyNonStriker check:', result, { striker, nonStriker, different: striker !== nonStriker });
-      return result;
+      return !!nonStriker && striker !== nonStriker;
     } else {
-      const result = arePlayersSelected();
-      console.log('🔍 DEBUG arePlayersSelected check:', result, { striker, nonStriker, bowler, strikerNotEqualNonStriker: striker !== nonStriker });
-      return result;
+      return arePlayersSelected();
     }
   }, [getDialogContext, bowler, striker, nonStriker, arePlayersSelected]);
 
@@ -563,11 +633,14 @@ const LiveScoring: React.FC<Props> = () => {
       
       // Sync currentInnings state with match data
       if (data && typeof data.currentInnings === 'number') {
-        console.log('FetchMatch - Setting currentInnings to:', data.currentInnings);
+        // Sync currentInnings from server data
         setCurrentInnings(data.currentInnings);
       } else {
         setCurrentInnings(0);
       }
+      
+      // Refresh players data to ensure team membership is up to date
+      await fetchPlayers();
       
       // Initialize striker, non-striker, and bowler if not set
       if (data && data.innings && data.innings.length > 0) {
@@ -598,12 +671,7 @@ const LiveScoring: React.FC<Props> = () => {
           setIsOverInProgress(true);
           setIsOverCompleted(false);
           
-          // FIXED: Restore current over's ball-by-ball history when resuming match
-          console.log('Ball data check:', {
-            currentOverBalls: currentInning.currentOverBalls?.length || 0,
-            recentBalls: currentInning.recentBalls?.length || 0,
-            totalBalls: currentInning.balls
-          });
+          // FIXED: Restore current over's ball-by-ball history when resuming match (debug logs removed)
           
           // WORKAROUND: Check localStorage for current over data as backup
           const matchStorageKey = `currentOverBalls_${matchId}_${currentInnings}`;
@@ -647,8 +715,8 @@ const LiveScoring: React.FC<Props> = () => {
             fallbackReconstruction();
           }
         } else if (totalBalls > 0 && currentBall === 0) {
-          // If total balls is multiple of 6, over might be completed
-          setIsOverCompleted(false);
+          // If total balls is multiple of 6, over is completed - need new bowler
+          setIsOverCompleted(true);
           setIsOverInProgress(false);
           setCurrentOverBalls([]);
         }
@@ -740,12 +808,21 @@ const LiveScoring: React.FC<Props> = () => {
     } finally {
       setLoading(false);
     }
-  }, [matchId, currentInnings]);
+  }, [matchId, currentInnings, fetchPlayers]);
 
   useEffect(() => {
     fetchMatch();
     fetchPlayers();
   }, [fetchMatch, fetchPlayers]);
+
+  // Refresh players data periodically to catch team assignment changes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchPlayers();
+    }, 5000); // Refresh every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [fetchPlayers]);
 
   // Reset dropdown selections when innings changes, but preserve score displays
   useEffect(() => {
@@ -790,7 +867,7 @@ const LiveScoring: React.FC<Props> = () => {
             await matchService.updateScore(match._id, cleanedMatch);
 
           } catch (error) {
-            console.log('Failed to save recentBalls initialization:', error);
+            console.error('Failed to save recentBalls initialization:', error);
           }
         }
       }
@@ -853,6 +930,8 @@ const LiveScoring: React.FC<Props> = () => {
   const handlePlayerChange = (playerType: 'striker' | 'nonStriker' | 'bowler') => {
     setChangePlayerType(playerType);
     setIsPlayerChangeDialogOpen(true);
+    // mark that a player-change flow has started
+    setIsPlayerChangeInProgress(true);
   };
 
   const handlePlayerChangeSubmit = () => {
@@ -866,9 +945,15 @@ const LiveScoring: React.FC<Props> = () => {
       setIsOverCompleted(false);
       setIsWaitingForNewBatsman(false);
     } else if (changePlayerType === 'striker') {
-      // For striker change, set only striker selection
+      // For striker change, only set waiting-for-new-batsman when the change
+      // is due to injury/retire_hurt. Tactical or other changes shouldn't trigger
+      // the wicket/new-batsman flow.
       setIsOverCompleted(false);
-      setIsWaitingForNewBatsman(true);
+      if (changePlayerReason === 'injury' || changePlayerReason === 'retire_hurt') {
+        setIsWaitingForNewBatsman(true);
+      } else {
+        setIsWaitingForNewBatsman(false);
+      }
     }
     // Note: For non-striker changes, we'll handle in the selection dialog context
   };
@@ -877,40 +962,43 @@ const LiveScoring: React.FC<Props> = () => {
     setIsPlayerChangeDialogOpen(false);
     setChangePlayerType(null);
     setChangePlayerReason('');
+    // canceling the change should clear the in-progress flag
+    setIsPlayerChangeInProgress(false);
   };
+
+  // determine if the current user is the match creator (owner)
+  const isMatchCreator = match && currentUserId && (() => {
+    try {
+      if (!match) return false;
+      const cb = (match as any).createdBy;
+      if (!cb) return false;
+      if (typeof cb === 'string') return cb === currentUserId;
+      if (typeof cb === 'object') return (cb._id || cb.toString()) === currentUserId || cb === currentUserId;
+      return false;
+    } catch (e) {
+      return false;
+    }
+  })();
+
+  // whether the current user can edit/score this match
+  const canEdit = isAdmin || isSuperAdmin || isMatchCreator;
 
   // Auto-open player selection dialog when match loads if no players selected
   useEffect(() => {
-    console.log('🔍 DEBUG Auto-open useEffect triggered:', {
-      match: !!match,
-      isAdmin,
-      arePlayersSelected: arePlayersSelected(),
-      isPlayerSelectionDialogOpen,
-      loading,
-      userDismissedDialog,
-      isOverInProgress,
-      striker,
-      nonStriker,
-      bowler
-    });
-
-    if (match && isAdmin && !isPlayerSelectionDialogOpen && !loading && !userDismissedDialog && 
+    if (match && canEdit && !isPlayerSelectionDialogOpen && !loading && !userDismissedDialog &&
         (!arePlayersSelected() || (arePlayersSelected() && !isOverInProgress))) {
-      console.log('🔍 DEBUG Opening player selection dialog automatically');
       // Small delay to ensure UI has rendered
       const timer = setTimeout(() => {
         setIsPlayerSelectionDialogOpen(true);
       }, 500);
-      
+
       return () => clearTimeout(timer);
-    } else {
-      console.log('🔍 DEBUG NOT opening dialog - conditions not met');
     }
-  }, [match, isAdmin, arePlayersSelected, isPlayerSelectionDialogOpen, loading, userDismissedDialog, isOverInProgress, striker, nonStriker, bowler]);
+  }, [match, canEdit, arePlayersSelected, isPlayerSelectionDialogOpen, loading, userDismissedDialog, isOverInProgress, striker, nonStriker, bowler]);
 
   // Auto-open player selection dialog when over is completed and needs new bowler
   useEffect(() => {
-    if (isOverCompleted && isAdmin && !isPlayerSelectionDialogOpen) {
+    if (isOverCompleted && canEdit && !isPlayerSelectionDialogOpen) {
       // Reset dismissed flag for over completion - this is a required selection
       setUserDismissedDialog(false);
       
@@ -921,11 +1009,11 @@ const LiveScoring: React.FC<Props> = () => {
       
       return () => clearTimeout(timer);
     }
-  }, [isOverCompleted, isAdmin, isPlayerSelectionDialogOpen]);
+  }, [isOverCompleted, canEdit, isPlayerSelectionDialogOpen]);
 
   // Auto-open player selection dialog when waiting for new batsman after wicket
   useEffect(() => {
-    if (isWaitingForNewBatsman && isAdmin && !isPlayerSelectionDialogOpen) {
+    if (isWaitingForNewBatsman && !isPlayerChangeInProgress && canEdit && !isPlayerSelectionDialogOpen) {
       // Reset dismissed flag for wicket situations - this is a required selection
       setUserDismissedDialog(false);
       
@@ -936,7 +1024,7 @@ const LiveScoring: React.FC<Props> = () => {
       
       return () => clearTimeout(timer);
     }
-  }, [isWaitingForNewBatsman, isAdmin, isPlayerSelectionDialogOpen]);
+  }, [isWaitingForNewBatsman, canEdit, isPlayerSelectionDialogOpen, isPlayerChangeInProgress]);
 
   const handleBallOutcome = async (runs: number, isExtra: boolean = false) => {
     if (!match || !matchId) return;
@@ -973,6 +1061,57 @@ const LiveScoring: React.FC<Props> = () => {
         lastBallRuns: runs
       };
     }
+
+    // Save undo state BEFORE making any changes
+    const preBallStrikerStats = currentInning.battingStats && Array.isArray(currentInning.battingStats)
+      ? currentInning.battingStats.find((stat) => (typeof stat.player === 'string' ? stat.player : stat.player._id) === striker)
+      : null;
+    const preBallNonStrikerStats = currentInning.battingStats && Array.isArray(currentInning.battingStats)
+      ? currentInning.battingStats.find((stat) => (typeof stat.player === 'string' ? stat.player : stat.player._id) === nonStriker)
+      : null;
+
+    const undoAction: UndoAction = {
+      id: `ball_${Date.now()}`,
+      type: 'ball_outcome',
+      timestamp: Date.now(),
+      data: { runs, isExtra },
+      matchState: {
+        totalRuns: currentInning.totalRuns,
+        wickets: currentInning.wickets,
+        balls: currentInning.balls || 0,
+        overs: currentInning.overs,
+        striker,
+        nonStriker,
+        bowler,
+        strikerStats: preBallStrikerStats ? {
+          runs: preBallStrikerStats.runs,
+          balls: preBallStrikerStats.balls,
+          fours: preBallStrikerStats.fours || 0,
+          sixes: preBallStrikerStats.sixes || 0,
+          isOut: preBallStrikerStats.isOut || false,
+          dismissalType: preBallStrikerStats.dismissalType,
+          howOut: preBallStrikerStats.howOut,
+          dismissedBy: preBallStrikerStats.dismissedBy,
+          strikeRate: preBallStrikerStats.strikeRate || 0,
+          isOnStrike: preBallStrikerStats.isOnStrike || false
+        } : { runs: 0, balls: 0 },
+        nonStrikerStats: preBallNonStrikerStats ? {
+          runs: preBallNonStrikerStats.runs,
+          balls: preBallNonStrikerStats.balls,
+          fours: preBallNonStrikerStats.fours || 0,
+          sixes: preBallNonStrikerStats.sixes || 0,
+          isOut: preBallNonStrikerStats.isOut || false,
+          dismissalType: preBallNonStrikerStats.dismissalType,
+          howOut: preBallNonStrikerStats.howOut,
+          dismissedBy: preBallNonStrikerStats.dismissedBy,
+          strikeRate: preBallNonStrikerStats.strikeRate || 0,
+          isOnStrike: preBallNonStrikerStats.isOnStrike || false
+        } : { runs: 0, balls: 0 },
+        bowlerStats: { ...bowlerStats },
+        currentOverBalls: [...currentOverBalls],
+        extras: { ...currentInning.extras }
+      }
+    };
 
     if (!isExtra) {
       // Ensure battingStats array exists
@@ -1124,9 +1263,8 @@ const LiveScoring: React.FC<Props> = () => {
       if (newRecentBalls.length > 12) {
         newRecentBalls.splice(0, newRecentBalls.length - 12);
       }
-      currentInning.recentBalls = newRecentBalls;
-      match.innings[currentInnings].recentBalls = newRecentBalls;
-      console.log(`✅ Ball saved: recentBalls=${newRecentBalls.length}, currentOverBalls=${newCurrentOverBalls.length}`);
+  currentInning.recentBalls = newRecentBalls;
+  match.innings[currentInnings].recentBalls = newRecentBalls;
       
       // WORKAROUND: Also save to localStorage as backup until server schema is applied
       const matchStorageKey = `currentOverBalls_${matchId}_${currentInnings}`;
@@ -1231,7 +1369,10 @@ const LiveScoring: React.FC<Props> = () => {
                       legByes: 0,
                       total: 0
                     },
-                    runRate: inning.runRate || 0
+                    runRate: inning.runRate || 0,
+                    requiredRunRate: inning.requiredRunRate,
+                    currentOverBalls: inning.currentOverBalls || [],
+                    recentBalls: inning.recentBalls || []
                   }))
                 };
               };
@@ -1256,7 +1397,7 @@ const LiveScoring: React.FC<Props> = () => {
           if (match && match.innings && match.innings[currentInnings]) {
             match.innings[currentInnings].currentOverBalls = [];
           }
-          console.log('Over completed - cleared currentOverBalls');
+          // Over completed - cleared currentOverBalls (log removed)
         }
         
         // Mark bowler's last bowling over
@@ -1377,9 +1518,12 @@ const LiveScoring: React.FC<Props> = () => {
               currentBall: 0,
               lastBallRuns: 0
             },
-            extras: {
-              ...inning.extras,
-              total: inning.extras.total || 0
+            extras: inning.extras || {
+              wides: 0,
+              noBalls: 0,
+              byes: 0,
+              legByes: 0,
+              total: 0
             },
             runRate: inning.runRate || 0,
             requiredRunRate: inning.requiredRunRate,
@@ -1391,13 +1535,16 @@ const LiveScoring: React.FC<Props> = () => {
 
       const cleanedMatch = cleanMatchData(updatedMatch);
 
-      console.log(`💾 Saving to server: recentBalls=${cleanedMatch.innings[currentInnings]?.recentBalls?.length || 0}, currentOverBalls=${cleanedMatch.innings[currentInnings]?.currentOverBalls?.length || 0}`);
-      const { data } = await matchService.updateScore(matchId, cleanedMatch);
-      
-      console.log(`📥 Server response: recentBalls=${data.innings[currentInnings]?.recentBalls?.length || 0}, currentOverBalls=${data.innings[currentInnings]?.currentOverBalls?.length || 0}`);
+  // Saving to server (debug logs removed)
+  const { data } = await matchService.updateScore(matchId, cleanedMatch);
+
+  // Server response received (debug logs removed)
       
       // Update local state with the response data to keep in sync
       setMatch(data);
+
+      // Track action for undo
+      addToUndoHistory(undoAction);
     } catch (error: any) {
       setError('Error updating match');
       console.error('Error updating match:', error?.response?.data || error?.message || error);
@@ -1436,6 +1583,58 @@ const LiveScoring: React.FC<Props> = () => {
         lastBallRuns: runs
       };
     }
+
+    // CRITICAL FIX: Create undo action BEFORE making any changes
+    const preExtraStrikerStats = currentInning.battingStats && Array.isArray(currentInning.battingStats)
+      ? currentInning.battingStats.find((stat) => (typeof stat.player === 'string' ? stat.player : stat.player._id) === striker)
+      : null;
+    const preExtraNonStrikerStats = currentInning.battingStats && Array.isArray(currentInning.battingStats)
+      ? currentInning.battingStats.find((stat) => (typeof stat.player === 'string' ? stat.player : stat.player._id) === nonStriker)
+      : null;
+
+    const undoAction: UndoAction = {
+      id: `extra_${Date.now()}`,
+      type: 'extra',
+      timestamp: Date.now(),
+      data: { type, runs },
+      matchState: {
+        totalRuns: currentInning.totalRuns,
+        wickets: currentInning.wickets,
+        balls: currentInning.balls,
+        overs: currentInning.overs,
+        currentOverBalls: [...(currentInning.currentOverBalls || [])],
+        extras: { ...currentInning.extras },
+        striker,
+        nonStriker,
+        bowler,
+        strikerStats: preExtraStrikerStats ? {
+          runs: preExtraStrikerStats.runs,
+          balls: preExtraStrikerStats.balls,
+          fours: preExtraStrikerStats.fours || 0,
+          sixes: preExtraStrikerStats.sixes || 0,
+          isOut: preExtraStrikerStats.isOut || false,
+          dismissalType: preExtraStrikerStats.dismissalType,
+          howOut: preExtraStrikerStats.howOut,
+          dismissedBy: preExtraStrikerStats.dismissedBy,
+          strikeRate: preExtraStrikerStats.strikeRate || 0,
+          isOnStrike: preExtraStrikerStats.isOnStrike || false
+        } : { runs: 0, balls: 0 },
+        nonStrikerStats: preExtraNonStrikerStats ? {
+          runs: preExtraNonStrikerStats.runs,
+          balls: preExtraNonStrikerStats.balls,
+          fours: preExtraNonStrikerStats.fours || 0,
+          sixes: preExtraNonStrikerStats.sixes || 0,
+          isOut: preExtraNonStrikerStats.isOut || false,
+          dismissalType: preExtraNonStrikerStats.dismissalType,
+          howOut: preExtraNonStrikerStats.howOut,
+          dismissedBy: preExtraNonStrikerStats.dismissedBy,
+          strikeRate: preExtraNonStrikerStats.strikeRate || 0,
+          isOnStrike: preExtraNonStrikerStats.isOnStrike || false
+        } : { runs: 0, balls: 0 },
+        bowlerStats: { ...bowlerStats }
+      }
+    };
+    addToUndoHistory(undoAction);
 
     let ballsToAdd = 0;
     
@@ -1526,7 +1725,7 @@ const LiveScoring: React.FC<Props> = () => {
         if (match && match.innings && match.innings[currentInnings]) {
           match.innings[currentInnings].currentOverBalls = [];
         }
-        console.log('Over completed (extras) - cleared currentOverBalls');
+        // Over completed (extras) - cleared currentOverBalls (log removed)
         
         if (bowlerBowlingStats) {
           bowlerBowlingStats.lastBowledOver = completeInningsOvers;
@@ -1567,7 +1766,7 @@ const LiveScoring: React.FC<Props> = () => {
     // WORKAROUND: Also save to localStorage as backup until server schema is applied
     const matchStorageKey = `currentOverBalls_${matchId}_${currentInnings}`;
     localStorage.setItem(matchStorageKey, JSON.stringify(newCurrentOverBalls));
-    console.log('Saved extra ball currentOverBalls to localStorage as backup:', matchStorageKey, extraBall);
+  // Saved extra ball currentOverBalls to localStorage as backup (log removed)
     
     // Calculate overs and economy for bowler
     const totalBalls = bowlerBowlingStats.balls;
@@ -1694,6 +1893,58 @@ const LiveScoring: React.FC<Props> = () => {
       };
     }
 
+    // CRITICAL FIX: Create undo action BEFORE making any changes
+    const preWicketStrikerStats = currentInning.battingStats && Array.isArray(currentInning.battingStats)
+      ? currentInning.battingStats.find((stat) => (typeof stat.player === 'string' ? stat.player : stat.player._id) === striker)
+      : null;
+    const preWicketNonStrikerStats = currentInning.battingStats && Array.isArray(currentInning.battingStats)
+      ? currentInning.battingStats.find((stat) => (typeof stat.player === 'string' ? stat.player : stat.player._id) === nonStriker)
+      : null;
+
+    const undoAction: UndoAction = {
+      id: `wicket_${Date.now()}`,
+      type: 'wicket',
+      timestamp: Date.now(),
+      data: { type, howOut, dismissedBy },
+      matchState: {
+        totalRuns: currentInning.totalRuns,
+        wickets: currentInning.wickets,
+        balls: currentInning.balls,
+        overs: currentInning.overs,
+        currentOverBalls: [...(currentInning.currentOverBalls || [])],
+        extras: { ...currentInning.extras },
+        striker,
+        nonStriker,
+        bowler,
+        strikerStats: preWicketStrikerStats ? {
+          runs: preWicketStrikerStats.runs,
+          balls: preWicketStrikerStats.balls,
+          fours: preWicketStrikerStats.fours || 0,
+          sixes: preWicketStrikerStats.sixes || 0,
+          isOut: preWicketStrikerStats.isOut || false,
+          dismissalType: preWicketStrikerStats.dismissalType,
+          howOut: preWicketStrikerStats.howOut,
+          dismissedBy: preWicketStrikerStats.dismissedBy,
+          strikeRate: preWicketStrikerStats.strikeRate || 0,
+          isOnStrike: preWicketStrikerStats.isOnStrike || false
+        } : { runs: 0, balls: 0 },
+        nonStrikerStats: preWicketNonStrikerStats ? {
+          runs: preWicketNonStrikerStats.runs,
+          balls: preWicketNonStrikerStats.balls,
+          fours: preWicketNonStrikerStats.fours || 0,
+          sixes: preWicketNonStrikerStats.sixes || 0,
+          isOut: preWicketNonStrikerStats.isOut || false,
+          dismissalType: preWicketNonStrikerStats.dismissalType,
+          howOut: preWicketNonStrikerStats.howOut,
+          dismissedBy: preWicketNonStrikerStats.dismissedBy,
+          strikeRate: preWicketNonStrikerStats.strikeRate || 0,
+          isOnStrike: preWicketNonStrikerStats.isOnStrike || false
+        } : { runs: 0, balls: 0 },
+        bowlerStats: { ...bowlerStats }
+      }
+    };
+    addToUndoHistory(undoAction);
+
     // Update batting stats - mark striker as out
     const strikerBattingStats = currentInning.battingStats && Array.isArray(currentInning.battingStats)
       ? currentInning.battingStats.find((stat) => (typeof stat.player === 'string' ? stat.player : stat.player._id) === striker)
@@ -1793,14 +2044,14 @@ const LiveScoring: React.FC<Props> = () => {
     // WORKAROUND: Also save to localStorage as backup until server schema is applied
     const matchStorageKey = `currentOverBalls_${matchId}_${currentInnings}`;
     localStorage.setItem(matchStorageKey, JSON.stringify(newCurrentOverBalls));
-    console.log('Saved wicket ball currentOverBalls to localStorage as backup:', matchStorageKey, wicketBall);
+  // Saved wicket ball currentOverBalls to localStorage as backup (log removed)
 
     // Check if no more batsmen are available (for teams with less than 10 players)
     const availableBatsmen = getAvailableBatsmen();
     // Need at least 2 batsmen to continue (striker + non-striker)
     // Current striker is now out, so we need at least 2 remaining players
     const availableBatsmenCount = availableBatsmen.length;
-    console.log('Available batsmen after wicket:', availableBatsmenCount, availableBatsmen.map(p => p.name));
+  // Available batsmen after wicket computed (log removed)
     
     if (availableBatsmenCount < 2) {
       // Not enough batsmen to continue - innings ends
@@ -2020,6 +2271,209 @@ const LiveScoring: React.FC<Props> = () => {
     }
   };
 
+  // Undo functionality
+  const addToUndoHistory = useCallback((action: UndoAction) => {
+    setUndoHistory(prev => {
+      const newHistory = [...prev, action];
+      // Keep only last 10 actions to prevent memory issues
+      if (newHistory.length > 10) {
+        newHistory.shift();
+      }
+      setCanUndo(newHistory.length > 0);
+      return newHistory;
+    });
+  }, []);
+
+  const handleUndo = async () => {
+    if (!match || !matchId || undoHistory.length === 0) return;
+
+    const lastAction = undoHistory[undoHistory.length - 1];
+    const updatedMatch = { ...match };
+    updatedMatch.currentInnings = currentInnings;
+    const currentInning = updatedMatch.innings[currentInnings];
+
+    // Restore the match state from the action
+    const previousState = lastAction.matchState;
+    currentInning.totalRuns = previousState.totalRuns;
+    currentInning.wickets = previousState.wickets;
+    currentInning.currentOverBalls = previousState.currentOverBalls;
+    currentInning.extras = previousState.extras;
+
+    // Recalculate balls and overs based on the restored currentOverBalls array
+    // Count legal deliveries (exclude wides and no-balls from ball count)
+    const legalDeliveries = previousState.currentOverBalls.filter(ball =>
+      !ball.extras || (ball.extras.type !== 'wide' && ball.extras.type !== 'no-ball')
+    ).length;
+    currentInning.balls = previousState.balls - (previousState.currentOverBalls.length - legalDeliveries);
+
+    // Recalculate overs based on the corrected ball count
+    const totalInningsBalls = currentInning.balls;
+    const completeInningsOvers = Math.floor(totalInningsBalls / 6);
+    const remainingInningsBalls = totalInningsBalls % 6;
+    currentInning.overs = completeInningsOvers + (remainingInningsBalls / 10);
+
+    // Restore local state for current over balls
+    setCurrentOverBalls(previousState.currentOverBalls);
+
+    // Restore player states
+    setStriker(previousState.striker);
+    setNonStriker(previousState.nonStriker);
+    setBowler(previousState.bowler);
+
+    // Restore player stats
+    setStrikerStats(previousState.strikerStats);
+    setNonStrikerStats(previousState.nonStrikerStats);
+    setBowlerStats(previousState.bowlerStats);
+
+    // Restore batting stats
+    if (currentInning.battingStats) {
+      currentInning.battingStats.forEach(stat => {
+        if (typeof stat.player === 'string') {
+          if (stat.player === previousState.striker) {
+            stat.runs = previousState.strikerStats.runs;
+            stat.balls = previousState.strikerStats.balls;
+            stat.fours = previousState.strikerStats.fours || 0;
+            stat.sixes = previousState.strikerStats.sixes || 0;
+            stat.isOut = previousState.strikerStats.isOut || false;
+            stat.dismissalType = previousState.strikerStats.dismissalType;
+            stat.howOut = previousState.strikerStats.howOut;
+            stat.dismissedBy = previousState.strikerStats.dismissedBy;
+            stat.strikeRate = previousState.strikerStats.strikeRate || 0;
+            stat.isOnStrike = true;
+          } else if (stat.player === previousState.nonStriker) {
+            stat.runs = previousState.nonStrikerStats.runs;
+            stat.balls = previousState.nonStrikerStats.balls;
+            stat.fours = previousState.nonStrikerStats.fours || 0;
+            stat.sixes = previousState.nonStrikerStats.sixes || 0;
+            stat.isOut = previousState.nonStrikerStats.isOut || false;
+            stat.dismissalType = previousState.nonStrikerStats.dismissalType;
+            stat.howOut = previousState.nonStrikerStats.howOut;
+            stat.dismissedBy = previousState.nonStrikerStats.dismissedBy;
+            stat.strikeRate = previousState.nonStrikerStats.strikeRate || 0;
+            stat.isOnStrike = false;
+          }
+        } else {
+          if (stat.player._id === previousState.striker) {
+            stat.runs = previousState.strikerStats.runs;
+            stat.balls = previousState.strikerStats.balls;
+            stat.fours = previousState.strikerStats.fours || 0;
+            stat.sixes = previousState.strikerStats.sixes || 0;
+            stat.isOut = previousState.strikerStats.isOut || false;
+            stat.dismissalType = previousState.strikerStats.dismissalType;
+            stat.howOut = previousState.strikerStats.howOut;
+            stat.dismissedBy = previousState.strikerStats.dismissedBy;
+            stat.strikeRate = previousState.strikerStats.strikeRate || 0;
+            stat.isOnStrike = true;
+          } else if (stat.player._id === previousState.nonStriker) {
+            stat.runs = previousState.nonStrikerStats.runs;
+            stat.balls = previousState.nonStrikerStats.balls;
+            stat.fours = previousState.nonStrikerStats.fours || 0;
+            stat.sixes = previousState.nonStrikerStats.sixes || 0;
+            stat.isOut = previousState.nonStrikerStats.isOut || false;
+            stat.dismissalType = previousState.nonStrikerStats.dismissalType;
+            stat.howOut = previousState.nonStrikerStats.howOut;
+            stat.dismissedBy = previousState.nonStrikerStats.dismissedBy;
+            stat.strikeRate = previousState.nonStrikerStats.strikeRate || 0;
+            stat.isOnStrike = false;
+          }
+        }
+      });
+    }
+
+    // Restore bowling stats
+    if (currentInning.bowlingStats) {
+      currentInning.bowlingStats.forEach(stat => {
+        if (typeof stat.player === 'string') {
+          if (stat.player === previousState.bowler) {
+            stat.overs = previousState.bowlerStats.overs;
+            stat.runs = previousState.bowlerStats.runs;
+            stat.wickets = previousState.bowlerStats.wickets;
+            stat.balls = previousState.bowlerStats.balls;
+          }
+        } else {
+          if (stat.player._id === previousState.bowler) {
+            stat.overs = previousState.bowlerStats.overs;
+            stat.runs = previousState.bowlerStats.runs;
+            stat.wickets = previousState.bowlerStats.wickets;
+            stat.balls = previousState.bowlerStats.balls;
+          }
+        }
+      });
+    }
+
+    // Remove the undone action from history
+    setUndoHistory(prev => {
+      const newHistory = prev.slice(0, -1);
+      setCanUndo(newHistory.length > 0);
+      return newHistory;
+    });
+
+    // Save the restored state
+    try {
+      const cleanMatchData = (match: Match): Match => {
+        return {
+          ...match,
+          team1: typeof match.team1 === 'object' ? match.team1._id : match.team1,
+          team2: typeof match.team2 === 'object' ? match.team2._id : match.team2,
+          currentInnings: match.currentInnings || 0,
+          innings: match.innings.map(inning => ({
+            battingTeam: typeof inning.battingTeam === 'object' ? inning.battingTeam._id : inning.battingTeam,
+            bowlingTeam: typeof inning.bowlingTeam === 'object' ? inning.bowlingTeam._id : inning.bowlingTeam,
+            totalRuns: inning.totalRuns,
+            wickets: inning.wickets,
+            overs: inning.overs,
+            balls: inning.balls || 0,
+            isCompleted: inning.isCompleted || false,
+            battingStats: inning.battingStats.map(stat => ({
+              player: typeof stat.player === 'object' ? stat.player._id : stat.player,
+              runs: stat.runs,
+              balls: stat.balls,
+              fours: stat.fours,
+              sixes: stat.sixes,
+              isOut: stat.isOut,
+              dismissalType: stat.dismissalType,
+              howOut: stat.howOut,
+              dismissedBy: stat.dismissedBy,
+              strikeRate: stat.strikeRate || 0,
+              isOnStrike: stat.isOnStrike || false
+            })),
+            bowlingStats: inning.bowlingStats.map(stat => ({
+              player: typeof stat.player === 'object' ? stat.player._id : stat.player,
+              overs: stat.overs,
+              balls: stat.balls || 0,
+              runs: stat.runs,
+              wickets: stat.wickets,
+              wides: stat.wides || 0,
+              noBalls: stat.noBalls || 0,
+              economy: stat.economy || 0,
+              lastBowledOver: stat.lastBowledOver
+            })),
+            currentState: inning.currentState || {
+              currentOver: 0,
+              currentBall: 0,
+              lastBallRuns: 0
+            },
+            extras: {
+              ...inning.extras,
+              total: inning.extras.total || 0
+            },
+            runRate: inning.runRate || 0,
+            requiredRunRate: inning.requiredRunRate,
+            currentOverBalls: inning.currentOverBalls || [],
+            recentBalls: inning.recentBalls || []
+          }))
+        };
+      };
+
+      const cleanedMatch = cleanMatchData(updatedMatch);
+      const { data } = await matchService.updateScore(matchId, cleanedMatch);
+      setMatch(data);
+    } catch (error: any) {
+      setError('Error undoing action');
+      console.error('Error undoing action:', error?.response?.data || error?.message || error);
+    }
+  };
+
   const handleBatsmanChange = (event: SelectChangeEvent) => {
     const newStriker = event.target.value;
     setStriker(newStriker);
@@ -2109,13 +2563,12 @@ const LiveScoring: React.FC<Props> = () => {
             // Just over completed, continue with same innings
             setIsOverCompleted(true);
             setOverCompletionMessage(`Over ${completeInningsOvers} completed! Please select a new bowler and start the next over.`);
-            
             // CRITICAL FIX: Clear current over balls when over completes after wicket
-            // This prevents old over information from persisting into the new over
             setCurrentOverBalls([]);
             if (match && match.innings && match.innings[currentInnings]) {
               match.innings[currentInnings].currentOverBalls = [];
             }
+            // Over completed - cleared currentOverBalls (log removed)
           }
         }
         
@@ -2175,7 +2628,7 @@ const LiveScoring: React.FC<Props> = () => {
       if (match && match.innings && match.innings[currentInnings]) {
         match.innings[currentInnings].currentOverBalls = [];
       }
-      console.log('New over started - cleared currentOverBalls');
+      // New over started - cleared currentOverBalls (log removed)
     }
     
     // Reset mid-over change permission after use
@@ -2242,7 +2695,7 @@ const LiveScoring: React.FC<Props> = () => {
       
       return player.teams.some(team => {
         const teamId = typeof team === 'string' ? team : team._id;
-        return teamId === secondInningsBattingTeamId;
+        return teamId === String(secondInningsBattingTeamId);
       });
     });
     
@@ -2326,7 +2779,10 @@ const LiveScoring: React.FC<Props> = () => {
               legByes: 0,
               total: 0
             },
-            runRate: inning.runRate || 0
+            runRate: inning.runRate || 0,
+            requiredRunRate: inning.requiredRunRate,
+            currentOverBalls: inning.currentOverBalls || [],
+            recentBalls: inning.recentBalls || []
           }))
         };
       };
@@ -2356,7 +2812,7 @@ const LiveScoring: React.FC<Props> = () => {
     }
   };
 
-  if (loading) return <Typography>Loading...</Typography>;
+  if (loading) return <Typography sx={{ fontSize: '2.5rem', textAlign: 'center', py: 6 }}>⏳</Typography>;
   if (error) return <Typography color="error">{error}</Typography>;
   if (!match) return <Typography>Match not found</Typography>;
 
@@ -2371,8 +2827,8 @@ const LiveScoring: React.FC<Props> = () => {
       : 'Team 2';
 
     return (
-      <Container maxWidth="lg">
-        <Box sx={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)', p: 3 }}>
+      <Box sx={{ maxWidth: 'lg', py: isMobile ? 1 : 3, px: isMobile ? 1 : 3, mx: 'auto' }}>
+        <Box sx={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)', p: isMobile ? 1 : 3 }}>
           <Paper elevation={6} sx={{ p: 4, borderRadius: 3, textAlign: 'center' }}>
             <Typography variant="h3" sx={{ mb: 3, color: '#2c3e50', fontWeight: 'bold' }}>
               🏏 First Innings Complete!
@@ -2380,10 +2836,10 @@ const LiveScoring: React.FC<Props> = () => {
             
             <Box sx={{ mb: 4, p: 3, backgroundColor: '#e8f5e8', borderRadius: 2 }}>
               <Typography variant="h4" sx={{ mb: 2, color: '#2e7d32' }}>
-                {firstInningBattingTeam}: {firstInning?.totalRuns}/{firstInning?.wickets}
+                {firstInningBattingTeam}: {firstInning?.totalRuns || 0}/{firstInning?.wickets || 0}
               </Typography>
               <Typography variant="h6" sx={{ color: '#4caf50' }}>
-                Overs: {firstInning?.overs} | Run Rate: {(firstInning?.runRate || 0).toFixed(2)}
+                Overs: {firstInning?.overs || 0} | Run Rate: {(firstInning?.runRate || 0).toFixed(2)}
               </Typography>
             </Box>
 
@@ -2415,7 +2871,7 @@ const LiveScoring: React.FC<Props> = () => {
             </Button>
           </Paper>
         </Box>
-      </Container>
+      </Box>
     );
   }
 
@@ -2424,9 +2880,11 @@ const LiveScoring: React.FC<Props> = () => {
   // If currentInning is undefined (during innings transition), show loading or return early
   if (!currentInning) {
     return (
-      <Container>
-        <Typography>Loading innings data...</Typography>
-      </Container>
+      <Box sx={{ px: isMobile ? 1 : 3, mx: 'auto', textAlign: 'center', py: 6 }}>
+        <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#1976d2', mb: 2 }}>
+          ⏳ Loading innings data...
+        </Typography>
+      </Box>
     );
   }
   
@@ -2438,31 +2896,32 @@ const LiveScoring: React.FC<Props> = () => {
     : currentInning?.bowlingTeam?._id;
 
   return (
-    <Container 
-      maxWidth="lg" 
+    <Box 
       sx={{ 
-        px: isMobile ? 0 : 3, // Remove padding on mobile for full screen usage
-        py: isMobile ? 0 : 2,
-        margin: isMobile ? 0 : 'auto' // Remove auto margins on mobile
+        maxWidth: 'lg',
+        px: isMobile ? 1 : 3, // 8px for mobile, 24px for desktop
+        py: isMobile ? 1 : 3,
+        mx: 'auto'
       }}
     >
+
       <Box 
         sx={{ 
           minHeight: '100vh',
           background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
-          p: isMobile ? 0 : 3, // Remove all padding on mobile
-          mx: isMobile ? 0 : 0 // No margin on mobile
+          p: 0,
+          mx: 0
         }}
       >
       <Paper 
         elevation={8}
         sx={{ 
-          p: isMobile ? 1 : 4, // Minimal padding for mobile
-          borderRadius: isMobile ? 0 : 3, // No border radius on mobile for full width
+          p: isMobile ? 1 : 3, // 8px for mobile, 24px for desktop
+          borderRadius: isMobile ? 0 : 3,
           background: '#ffffff',
           border: '1px solid rgba(0,0,0,0.1)',
           boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
-          margin: isMobile ? 0 : 'auto' // Remove margins on mobile
+          margin: 0
         }}
       >
         <Typography 
@@ -2510,7 +2969,7 @@ const LiveScoring: React.FC<Props> = () => {
         </Box>
 
       {/* Viewer Mode Alert */}
-      {!isAdmin && showViewerModeAlert && (
+  {!canEdit && showViewerModeAlert && (
         <Alert 
           severity="info"
           onClose={() => setShowViewerModeAlert(false)}
@@ -2525,9 +2984,10 @@ const LiveScoring: React.FC<Props> = () => {
           }}
         >
           <AlertTitle sx={{ fontWeight: 'bold', color: 'info.main' }}>
-            👀 Viewer Mode
+            👀 Guest User Mode
           </AlertTitle>
-          You are in viewer mode. You can watch the live scoring but cannot make any changes to the match.
+          You can score <strong>1-6 runs</strong> and record <strong>caught wickets</strong> for demo purposes. 
+          The 0-runs button and other wicket types are disabled. For full scoring features, please contact an admin.
         </Alert>
       )}
 
@@ -2557,58 +3017,49 @@ const LiveScoring: React.FC<Props> = () => {
 
       {/* Waiting for New Batsman Alert */}
       {isWaitingForNewBatsman && showWicketAlert && (
-        <Alert 
+        <Alert
           severity="info"
           onClose={() => setShowWicketAlert(false)}
-          sx={{ 
-            mb: 3, 
+          sx={{
+            mb: 3,
             borderRadius: 2,
             boxShadow: '0 4px 12px rgba(33, 150, 243, 0.3)',
             border: '1px solid',
             borderColor: 'info.main',
             background: 'linear-gradient(135deg, rgba(33, 150, 243, 0.1) 0%, rgba(21, 101, 192, 0.1) 100%)',
-            '& .MuiAlert-message': { width: '100%' },
-            '& .MuiAlert-icon': { fontSize: '1.5rem' }
+            '& .MuiAlert-message': { width: '100%' }
           }}
+          action={
+            <Button
+              size="large"
+              onClick={handleStartOrContinueMatch}
+              sx={{
+                px: 4,
+                py: 1.5,
+                fontSize: '1.1rem',
+                fontWeight: 'bold',
+                borderRadius: 3,
+                background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+                boxShadow: '0 4px 12px rgba(33, 150, 243, 0.4)',
+                '&:hover': {
+                  background: 'linear-gradient(45deg, #1976D2 30%, #2196F3 90%)',
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 6px 16px rgba(33, 150, 243, 0.5)',
+                },
+              }}
+            >
+              🏏 {match.innings.length > 1 && currentInnings === 1 ? 'Continue Match' : 'Start Match'}
+            </Button>
+          }
         >
-          <AlertTitle>Wicket Recorded!</AlertTitle>
-          A batsman is out. Please select a new striker from the dropdown below to continue.
-          <br />
-          <Typography variant="body2" sx={{ mt: 1, fontWeight: 'bold' }}>
-            All scoring options are disabled until new batsman is selected.
+          <Typography sx={{ mb: 2, fontWeight: 'bold' }}>
+            Waiting for new batsman to be selected.
           </Typography>
         </Alert>
       )}
 
-      {/* Start/Continue Match Button - Show when players not selected or match needs to start */}
-      {isAdmin && !arePlayersSelected() && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
-          <Button
-            variant="contained"
-            size="large"
-            onClick={handleStartOrContinueMatch}
-            sx={{
-              px: 4,
-              py: 1.5,
-              fontSize: '1.1rem',
-              fontWeight: 'bold',
-              borderRadius: 3,
-              background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
-              boxShadow: '0 4px 12px rgba(33, 150, 243, 0.4)',
-              '&:hover': {
-                background: 'linear-gradient(45deg, #1976D2 30%, #2196F3 90%)',
-                transform: 'translateY(-2px)',
-                boxShadow: '0 6px 16px rgba(33, 150, 243, 0.5)',
-              },
-            }}
-          >
-            🏏 {match.innings.length > 1 && currentInnings === 1 ? 'Continue Match' : 'Start Match'}
-          </Button>
-        </Box>
-      )}
-
       {/* Score Summary */}
-      <Paper sx={{ p: isMobile ? 1 : 2, mb: isMobile ? 2 : 3, mx: isMobile ? 0 : 'auto' }} component="div">
+  <Paper sx={{ p: isMobile ? 1 : 3, mb: isMobile ? 2 : 3, mx: isMobile ? 0 : 'auto' }} component="div">
         {/* Comprehensive Innings Display - Hidden on mobile */}
         {match.innings.length > 1 && !isMobile && (
           <Box sx={{ mb: 3 }}>
@@ -2617,7 +3068,7 @@ const LiveScoring: React.FC<Props> = () => {
             </Typography>
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
               {/* First Innings */}
-              <Paper sx={{ p: 2, backgroundColor: currentInnings === 0 ? '#e3f2fd' : '#f5f5f5' }}>
+              <Paper sx={{ p: isMobile ? 1 : 2, backgroundColor: currentInnings === 0 ? '#e3f2fd' : '#f5f5f5' }}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
                   1st Innings{currentInnings === 0 && ' (Current)'}
                 </Typography>
@@ -2630,7 +3081,7 @@ const LiveScoring: React.FC<Props> = () => {
               </Paper>
               
               {/* Second Innings */}
-              <Paper sx={{ p: 2, backgroundColor: currentInnings === 1 ? '#e8f5e8' : '#f5f5f5' }}>
+              <Paper sx={{ p: isMobile ? 1 : 2, backgroundColor: currentInnings === 1 ? '#e8f5e8' : '#f5f5f5' }}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
                   2nd Innings{currentInnings === 1 && ' (Current)'}
                 </Typography>
@@ -2720,7 +3171,7 @@ const LiveScoring: React.FC<Props> = () => {
               handleBatsmanChange({ target: { value: newValue._id } } as SelectChangeEvent);
             }
           }}
-          disabled={!isAdmin || (isOverCompleted && !isWaitingForNewBatsman)}
+          disabled={!canEdit || (isOverCompleted && !isWaitingForNewBatsman)}
           renderInput={(params) => (
             <TextField 
               {...params} 
@@ -2773,7 +3224,7 @@ const LiveScoring: React.FC<Props> = () => {
               handleNonStrikerChange({ target: { value: newValue._id } } as SelectChangeEvent);
             }
           }}
-          disabled={!isAdmin || isOverCompleted || isWaitingForNewBatsman}
+          disabled={!canEdit || isOverCompleted || isWaitingForNewBatsman}
           renderInput={(params) => (
             <TextField 
               {...params} 
@@ -2825,7 +3276,7 @@ const LiveScoring: React.FC<Props> = () => {
               handleBowlerChange({ target: { value: newValue._id } } as SelectChangeEvent);
             }
           }}
-          disabled={!isAdmin || isWaitingForNewBatsman}
+          disabled={!canEdit || isWaitingForNewBatsman}
           renderInput={(params) => (
             <TextField 
               {...params} 
@@ -2895,7 +3346,7 @@ const LiveScoring: React.FC<Props> = () => {
         <Box 
           sx={{ 
             display: 'grid',
-            gridTemplateColumns: isMobile ? 'repeat(4, 1fr)' : 'repeat(6, 1fr)',
+            gridTemplateColumns: isMobile ? 'repeat(4, 1fr)' : 'repeat(8, 1fr)',
             gap: isMobile ? 0.5 : 2
           }}
         >
@@ -2904,7 +3355,7 @@ const LiveScoring: React.FC<Props> = () => {
               key={runs}
               variant="contained" 
               onClick={() => handleBallOutcome(runs)}
-              disabled={!isAdmin || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
+              disabled={!canEdit || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted || (!canEdit && runs === 0)}
               sx={{
                 minHeight: isMobile ? '35px' : '60px',
                 borderRadius: isMobile ? '6px' : '12px',
@@ -2937,7 +3388,7 @@ const LiveScoring: React.FC<Props> = () => {
             variant="contained"
             color="error"
             onClick={() => setIsWicketDialogOpen(true)}
-            disabled={!isAdmin || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
+            disabled={!canEdit || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
             sx={{
               minHeight: isMobile ? '35px' : '60px',
               borderRadius: isMobile ? '6px' : '12px',
@@ -2958,6 +3409,36 @@ const LiveScoring: React.FC<Props> = () => {
           >
             W
           </Button>
+          <Tooltip title={canUndo ? "Undo last action" : "No actions to undo"}>
+            <span>
+              <IconButton
+                onClick={handleUndo}
+                disabled={!canUndo || !canEdit || isMatchCompleted}
+                sx={{
+                  minWidth: isMobile ? '35px' : '60px',
+                  minHeight: isMobile ? '35px' : '60px',
+                  borderRadius: isMobile ? '6px' : '12px',
+                  background: canUndo ? 'linear-gradient(45deg, #FF9800 30%, #F57C00 90%)' : 'rgba(255, 255, 255, 0.1)',
+                  color: canUndo ? '#fff' : '#ccc',
+                  border: canUndo ? '2px solid #FF9800' : '2px solid #ccc',
+                  boxShadow: canUndo ? '0 4px 12px rgba(255, 152, 0, 0.4)' : 'none',
+                  transition: 'all 0.3s ease',
+                  '&:hover': canUndo ? {
+                    background: 'linear-gradient(45deg, #F57C00 30%, #EF6C00 90%)',
+                    transform: isMobile ? 'scale(0.98)' : 'translateY(-2px)',
+                    boxShadow: isMobile ? '0 2px 6px rgba(255, 152, 0, 0.5)' : '0 6px 16px rgba(255, 152, 0, 0.5)',
+                  } : {},
+                  '&:disabled': {
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    color: '#ccc',
+                    border: '2px solid #ccc',
+                  }
+                }}
+              >
+                <UndoIcon sx={{ fontSize: isMobile ? '1.2rem' : '1.8rem' }} />
+              </IconButton>
+            </span>
+          </Tooltip>
         </Box>
       </Box>
 
@@ -2990,7 +3471,7 @@ const LiveScoring: React.FC<Props> = () => {
               setExtraRuns(1);
               setIsExtraRunsDialogOpen(true);
             }}
-            disabled={!isAdmin || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
+            disabled={!canEdit || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
             sx={{
               minHeight: isMobile ? '32px' : '50px',
               borderRadius: isMobile ? '6px' : '10px',
@@ -3023,7 +3504,7 @@ const LiveScoring: React.FC<Props> = () => {
               setExtraRuns(1);
               setIsExtraRunsDialogOpen(true);
             }}
-            disabled={!isAdmin || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
+            disabled={!canEdit || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
             sx={{
               minHeight: isMobile ? '32px' : '50px',
               borderRadius: isMobile ? '6px' : '10px',
@@ -3056,7 +3537,7 @@ const LiveScoring: React.FC<Props> = () => {
               setExtraRuns(1);
               setIsExtraRunsDialogOpen(true);
             }}
-            disabled={!isAdmin || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
+            disabled={!canEdit || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
             sx={{
               minHeight: isMobile ? '32px' : '50px',
               borderRadius: isMobile ? '6px' : '10px',
@@ -3089,7 +3570,7 @@ const LiveScoring: React.FC<Props> = () => {
               setExtraRuns(1);
               setIsExtraRunsDialogOpen(true);
             }}
-            disabled={!isAdmin || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
+            disabled={!canEdit || isOverCompleted || !isOverInProgress || isWaitingForNewBatsman || !striker || !nonStriker || !bowler || isMatchCompleted}
             sx={{
               minHeight: isMobile ? '32px' : '50px',
               borderRadius: isMobile ? '6px' : '10px',
@@ -3154,7 +3635,6 @@ const LiveScoring: React.FC<Props> = () => {
                 <TableCell align="right">4s</TableCell>
                 <TableCell align="right">6s</TableCell>
                 <TableCell align="right">{isMobile ? 'SR' : 'S/R'}</TableCell>
-                <TableCell align="center">{isMobile ? 'Sts' : 'Status'}</TableCell>
               </TableRow>
             </TableHead>
           <TableBody>
@@ -3169,23 +3649,6 @@ const LiveScoring: React.FC<Props> = () => {
                   ? ((stat.runs / stat.balls) * 100).toFixed(2)
                   : '0.00';
 
-              let statusDisplay = '';
-              let statusColor = 'inherit';
-              
-              if (stat.isOut) {
-                statusDisplay = `${stat.dismissalType || 'Out'}${stat.howOut ? ` (${stat.howOut})` : ''}`;
-                statusColor = 'error.main';
-              } else if (playerId === striker) {
-                statusDisplay = isMobile ? '' : 'Batting*';
-                statusColor = 'success.main';
-              } else if (playerId === nonStriker) {
-                statusDisplay = isMobile ? '' : 'Batting';
-                statusColor = 'primary.main';
-              } else {
-                statusDisplay = isMobile ? '✓' : 'Not Out';
-                statusColor = 'text.secondary';
-              }
-
               return (
                 <TableRow 
                   key={playerId} 
@@ -3198,42 +3661,56 @@ const LiveScoring: React.FC<Props> = () => {
                                (playerId === nonStriker ? '4px solid #2196f3' : '4px solid transparent'))
                   }}
                 >
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      {playerName}
-                      {playerId === striker && !stat.isOut && <Box component="span" sx={{ color: 'success.main', fontWeight: 'bold' }}>*</Box>}
-                      {playerId === nonStriker && !stat.isOut && <Box component="span" sx={{ color: 'primary.main' }}>†</Box>}
-                      {stat.isOut && <Box component="span" sx={{ color: 'error.main', fontWeight: 'bold', fontSize: '0.75rem' }}>(OUT)</Box>}
+                  <TableCell sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
+                    <Box>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <strong>{playerName}</strong>
+                        {canEdit && !stat.isOut && (playerId === striker || playerId === nonStriker) && (
+                          <Tooltip title="Change Batsman">
+                            <IconButton
+                              size="small"
+                              onClick={() => handlePlayerChange(playerId === striker ? 'striker' : 'nonStriker')}
+                              sx={{ 
+                                minWidth: 20, 
+                                minHeight: 20, 
+                                padding: 0.25,
+                                color: 'secondary.main',
+                                '&:hover': { backgroundColor: 'secondary.light', color: 'secondary.dark' }
+                              }}
+                            >
+                              <SwapHorizIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        {playerId === striker && !stat.isOut && ' *'}
+                      </Box>
+                      <Typography 
+                        variant="caption" 
+                        color={stat.isOut ? "error" : "success"} 
+                        sx={{ 
+                          display: 'block',
+                          fontSize: isMobile ? '0.65rem' : '0.7rem',
+                          mt: 0.5
+                        }}
+                      >
+                        {stat.isOut ? (stat.dismissalType || 'out') : 'not out'}
+                      </Typography>
                     </Box>
                   </TableCell>
-                  <TableCell align="right" sx={{ fontWeight: playerId === striker && !stat.isOut ? 'bold' : 'normal' }}>{stat.runs}</TableCell>
-                  <TableCell align="right">{stat.balls}</TableCell>
-                  <TableCell align="right">{stat.fours}</TableCell>
-                  <TableCell align="right">{stat.sixes}</TableCell>
-                  <TableCell align="right">{strikeRate}</TableCell>
-                  <TableCell align="center">
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
-                      <Typography variant="body2" sx={{ color: statusColor, fontSize: '0.75rem' }}>
-                        {statusDisplay}
-                      </Typography>
-                      {isAdmin && !stat.isOut && (playerId === striker || playerId === nonStriker) && (
-                        <Tooltip title={`Change ${playerId === striker ? 'Striker' : 'Non-Striker'}`}>
-                          <IconButton
-                            size="small"
-                            onClick={() => handlePlayerChange(playerId === striker ? 'striker' : 'nonStriker')}
-                            sx={{ 
-                              minWidth: 20, 
-                              minHeight: 20, 
-                              padding: 0.25,
-                              color: 'primary.main',
-                              '&:hover': { backgroundColor: 'primary.light', color: 'primary.dark' }
-                            }}
-                          >
-                            <SwapHorizIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                    </Box>
+                  <TableCell align="right" sx={{ fontWeight: playerId === striker && !stat.isOut ? 'bold' : 'normal', fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
+                    {stat.runs}
+                  </TableCell>
+                  <TableCell align="right" sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
+                    {stat.balls}
+                  </TableCell>
+                  <TableCell align="right" sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
+                    {stat.fours}
+                  </TableCell>
+                  <TableCell align="right" sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
+                    {stat.sixes}
+                  </TableCell>
+                  <TableCell align="right" sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }}>
+                    {strikeRate}
                   </TableCell>
                 </TableRow>
               );
@@ -3282,7 +3759,6 @@ const LiveScoring: React.FC<Props> = () => {
                 <TableCell align="right">{isMobile ? 'R' : 'Runs'}</TableCell>
                 <TableCell align="right">{isMobile ? 'W' : 'Wickets'}</TableCell>
                 <TableCell align="right">{isMobile ? 'Eco' : 'Economy'}</TableCell>
-                <TableCell align="center">{isMobile ? 'Sts' : 'Status'}</TableCell>
               </TableRow>
             </TableHead>
           <TableBody>
@@ -3317,8 +3793,32 @@ const LiveScoring: React.FC<Props> = () => {
                 <TableRow key={playerId} sx={{ backgroundColor: playerId === bowler ? 'action.selected' : 'inherit' }}>
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      {playerName}
-                      {playerId === bowler && <Box component="span" sx={{ color: 'success.main', fontWeight: 'bold' }}>*</Box>}
+                      <Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          {playerName}
+                          {playerId === bowler && <Box component="span" sx={{ color: 'success.main', fontWeight: 'bold' }}>*</Box>}
+                          {canEdit && playerId === bowler && (
+                            <Tooltip title="Change Bowler">
+                              <IconButton
+                                size="small"
+                                onClick={() => handlePlayerChange('bowler')}
+                                sx={{ 
+                                  minWidth: 20, 
+                                  minHeight: 20, 
+                                  padding: 0.25,
+                                  color: 'secondary.main',
+                                  '&:hover': { backgroundColor: 'secondary.light', color: 'secondary.dark' }
+                                }}
+                              >
+                                <ChangeCircleIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                        </Box>
+                        <Typography variant="caption" sx={{ color: statusColor, fontSize: '0.7rem', display: 'block', mt: 0.5 }}>
+                          {statusDisplay}
+                        </Typography>
+                      </Box>
                     </Box>
                   </TableCell>
                   <TableCell align="right" sx={{ fontWeight: playerId === bowler ? 'bold' : 'normal' }}>{oversDisplay}</TableCell>
@@ -3326,30 +3826,6 @@ const LiveScoring: React.FC<Props> = () => {
                   <TableCell align="right">{stat.runs}</TableCell>
                   <TableCell align="right">{stat.wickets}</TableCell>
                   <TableCell align="right">{economy}</TableCell>
-                  <TableCell align="center">
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
-                      <Typography variant="body2" sx={{ color: statusColor, fontSize: '0.75rem' }}>
-                        {statusDisplay}
-                      </Typography>
-                      {isAdmin && playerId === bowler && (
-                        <Tooltip title="Change Bowler">
-                          <IconButton
-                            size="small"
-                            onClick={() => handlePlayerChange('bowler')}
-                            sx={{ 
-                              minWidth: 20, 
-                              minHeight: 20, 
-                              padding: 0.25,
-                              color: 'secondary.main',
-                              '&:hover': { backgroundColor: 'secondary.light', color: 'secondary.dark' }
-                            }}
-                          >
-                            <ChangeCircleIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                    </Box>
-                  </TableCell>
                 </TableRow>
               );
             })}
@@ -3440,7 +3916,7 @@ const LiveScoring: React.FC<Props> = () => {
         PaperProps={{
           sx: {
             borderRadius: '16px',
-            background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.9) 100%)',
+            background: 'white',
             backdropFilter: 'blur(20px)',
             border: '1px solid rgba(255,255,255,0.3)',
             boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
@@ -3462,126 +3938,171 @@ const LiveScoring: React.FC<Props> = () => {
               <Typography variant="body2" sx={{ mb: 2, color: 'text.primary', fontWeight: 500 }}>
                 Select dismissal type:
               </Typography>
-              <Button 
-                variant="outlined" 
-                onClick={() => setWicketDetails({ type: 'bowled' })}
-                fullWidth
-                sx={{
-                  borderRadius: '10px',
-                  fontWeight: 'bold',
-                  background: 'linear-gradient(45deg, rgba(76, 175, 80, 0.1) 30%, rgba(139, 195, 74, 0.1) 90%)',
-                  borderColor: '#4CAF50',
-                  color: '#4CAF50',
-                  '&:hover': {
-                    background: 'linear-gradient(45deg, #4CAF50 30%, #8BC34A 90%)',
-                    color: '#fff',
-                    transform: 'translateY(-1px)',
-                    boxShadow: '0 4px 8px rgba(76, 175, 80, 0.3)',
-                  }
-                }}
-              >
-                🎯 Bowled
-              </Button>
-              <Button 
-                variant="outlined" 
-                onClick={() => setWicketDetails({ type: 'caught' })}
-                fullWidth
-                sx={{
-                  borderRadius: '10px',
-                  fontWeight: 'bold',
-                  background: 'linear-gradient(45deg, rgba(33, 150, 243, 0.1) 30%, rgba(33, 203, 243, 0.1) 90%)',
-                  borderColor: '#2196F3',
-                  color: '#2196F3',
-                  '&:hover': {
-                    background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
-                    color: '#fff',
-                    transform: 'translateY(-1px)',
-                    boxShadow: '0 4px 8px rgba(33, 150, 243, 0.3)',
-                  }
-                }}
-              >
-                🤲 Caught
-              </Button>
-              <Button 
-                variant="outlined" 
-                onClick={() => setWicketDetails({ type: 'lbw' })}
-                fullWidth
-                sx={{
-                  borderRadius: '10px',
-                  fontWeight: 'bold',
-                  background: 'linear-gradient(45deg, rgba(255, 152, 0, 0.1) 30%, rgba(255, 183, 77, 0.1) 90%)',
-                  borderColor: '#FF9800',
-                  color: '#FF9800',
-                  '&:hover': {
-                    background: 'linear-gradient(45deg, #FF9800 30%, #FFB74D 90%)',
-                    color: '#fff',
-                    transform: 'translateY(-1px)',
-                    boxShadow: '0 4px 8px rgba(255, 152, 0, 0.3)',
-                  }
-                }}
-              >
-                🦵 LBW
-              </Button>
-              <Button 
-                variant="outlined" 
-                onClick={() => setWicketDetails({ type: 'run out' })}
-                fullWidth
-                sx={{
-                  borderRadius: '10px',
-                  fontWeight: 'bold',
-                  background: 'linear-gradient(45deg, rgba(244, 67, 54, 0.1) 30%, rgba(211, 47, 47, 0.1) 90%)',
-                  borderColor: '#f44336',
-                  color: '#f44336',
-                  '&:hover': {
-                    background: 'linear-gradient(45deg, #f44336 30%, #d32f2f 90%)',
-                    color: '#fff',
-                    transform: 'translateY(-1px)',
-                    boxShadow: '0 4px 8px rgba(244, 67, 54, 0.3)',
-                  }
-                }}
-              >
-                🏃 Run Out
-              </Button>
-              <Button 
-                variant="outlined" 
-                onClick={() => setWicketDetails({ type: 'stumped' })}
-                fullWidth
-                sx={{
-                  borderRadius: '10px',
-                  fontWeight: 'bold',
-                  background: 'linear-gradient(45deg, rgba(156, 39, 176, 0.1) 30%, rgba(142, 36, 170, 0.1) 90%)',
-                  borderColor: '#9C27B0',
-                  color: '#9C27B0',
-                  '&:hover': {
-                    background: 'linear-gradient(45deg, #9C27B0 30%, #8E24AA 90%)',
-                    color: '#fff',
-                    transform: 'translateY(-1px)',
-                    boxShadow: '0 4px 8px rgba(156, 39, 176, 0.3)',
-                  }
-                }}
-              >
-                🧤 Stumped
-              </Button>
-              <Button 
-                variant="outlined" 
-                onClick={() => setWicketDetails({ type: 'hit wicket' })}
-                fullWidth
-                sx={{
-                  borderRadius: '10px',
-                  fontWeight: 'bold',
-                  background: 'linear-gradient(45deg, rgba(121, 85, 72, 0.1) 30%, rgba(141, 110, 99, 0.1) 90%)',
-                  borderColor: '#795548',
-                  color: '#795548',
-                  '&:hover': {
-                    background: 'linear-gradient(45deg, #795548 30%, #8D6E63 90%)',
-                    color: '#fff',
-                    transform: 'translateY(-1px)',
-                    boxShadow: '0 4px 8px rgba(121, 85, 72, 0.3)',
-                  }
-                }}
-              >
-                💥 Hit Wicket
-              </Button>
+              {canEdit ? (
+                <>
+                  <Button 
+                    variant="outlined" 
+                    onClick={() => setWicketDetails({ type: 'bowled' })}
+                    fullWidth
+                    sx={{
+                      borderRadius: '10px',
+                      fontWeight: 'bold',
+                      background: 'linear-gradient(45deg, rgba(76, 175, 80, 0.1) 30%, rgba(139, 195, 74, 0.1) 90%)',
+                      borderColor: '#4CAF50',
+                      color: '#4CAF50',
+                      '&:hover': {
+                        background: 'linear-gradient(45deg, #4CAF50 30%, #8BC34A 90%)',
+                        color: '#fff',
+                        transform: 'translateY(-1px)',
+                        boxShadow: '0 4px 8px rgba(76, 175, 80, 0.3)',
+                      }
+                    }}
+                  >
+                    🎯 Bowled
+                  </Button>
+                  <Button 
+                    variant="outlined" 
+                    onClick={() => setWicketDetails({ type: 'caught' })}
+                    fullWidth
+                    sx={{
+                      borderRadius: '10px',
+                      fontWeight: 'bold',
+                      background: 'linear-gradient(45deg, rgba(33, 150, 243, 0.1) 30%, rgba(33, 203, 243, 0.1) 90%)',
+                      borderColor: '#2196F3',
+                      color: '#2196F3',
+                      '&:hover': {
+                        background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+                        color: '#fff',
+                        transform: 'translateY(-1px)',
+                        boxShadow: '0 4px 8px rgba(33, 150, 243, 0.3)',
+                      }
+                    }}
+                  >
+                    🤲 Caught
+                  </Button>
+                  <Button 
+                    variant="outlined" 
+                    onClick={() => setWicketDetails({ type: 'lbw' })}
+                    fullWidth
+                    sx={{
+                      borderRadius: '10px',
+                      fontWeight: 'bold',
+                      background: 'linear-gradient(45deg, rgba(255, 152, 0, 0.1) 30%, rgba(255, 183, 77, 0.1) 90%)',
+                      borderColor: '#FF9800',
+                      color: '#FF9800',
+                      '&:hover': {
+                        background: 'linear-gradient(45deg, #FF9800 30%, #FFB74D 90%)',
+                        color: '#fff',
+                        transform: 'translateY(-1px)',
+                        boxShadow: '0 4px 8px rgba(255, 152, 0, 0.3)',
+                      }
+                    }}
+                  >
+                    🦵 LBW
+                  </Button>
+                  <Button 
+                    variant="outlined" 
+                    onClick={() => setWicketDetails({ type: 'run out' })}
+                    fullWidth
+                    sx={{
+                      borderRadius: '10px',
+                      fontWeight: 'bold',
+                      background: 'linear-gradient(45deg, rgba(244, 67, 54, 0.1) 30%, rgba(211, 47, 47, 0.1) 90%)',
+                      borderColor: '#f44336',
+                      color: '#f44336',
+                      '&:hover': {
+                        background: 'linear-gradient(45deg, #f44336 30%, #d32f2f 90%)',
+                        color: '#fff',
+                        transform: 'translateY(-1px)',
+                        boxShadow: '0 4px 8px rgba(244, 67, 54, 0.3)',
+                      }
+                    }}
+                  >
+                    🏃 Run Out
+                  </Button>
+                  <Button 
+                    variant="outlined" 
+                    onClick={() => setWicketDetails({ type: 'stumped' })}
+                    fullWidth
+                    sx={{
+                      borderRadius: '10px',
+                      fontWeight: 'bold',
+                      background: 'linear-gradient(45deg, rgba(156, 39, 176, 0.1) 30%, rgba(142, 36, 170, 0.1) 90%)',
+                      borderColor: '#9C27B0',
+                      color: '#9C27B0',
+                      '&:hover': {
+                        background: 'linear-gradient(45deg, #9C27B0 30%, #8E24AA 90%)',
+                        color: '#fff',
+                        transform: 'translateY(-1px)',
+                        boxShadow: '0 4px 8px rgba(156, 39, 176, 0.3)',
+                      }
+                    }}
+                  >
+                    🧤 Stumped
+                  </Button>
+                  <Button 
+                    variant="outlined" 
+                    onClick={() => setWicketDetails({ type: 'hit wicket' })}
+                    fullWidth
+                    sx={{
+                      borderRadius: '10px',
+                      fontWeight: 'bold',
+                      background: 'linear-gradient(45deg, rgba(121, 85, 72, 0.1) 30%, rgba(141, 110, 99, 0.1) 90%)',
+                      borderColor: '#795548',
+                      color: '#795548',
+                      '&:hover': {
+                        background: 'linear-gradient(45deg, #795548 30%, #8D6E63 90%)',
+                        color: '#fff',
+                        transform: 'translateY(-1px)',
+                        boxShadow: '0 4px 8px rgba(121, 85, 72, 0.3)',
+                      }
+                    }}
+                  >
+                    💥 Hit Wicket
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>
+                    <AlertTitle sx={{ fontWeight: 'bold' }}>🎯 Viewer Mode</AlertTitle>
+                    As a guest user, you can only record <strong>caught</strong> wickets. For other dismissal types, please contact an admin.
+                  </Alert>
+                  <Button 
+                    variant="outlined" 
+                    onClick={() => setWicketDetails({ type: 'caught' })}
+                    fullWidth
+                    sx={{
+                      borderRadius: '10px',
+                      fontWeight: 'bold',
+                      background: 'linear-gradient(45deg, rgba(33, 150, 243, 0.1) 30%, rgba(33, 203, 243, 0.1) 90%)',
+                      borderColor: '#2196F3',
+                      color: '#2196F3',
+                      '&:hover': {
+                        background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+                        color: '#fff',
+                        transform: 'translateY(-1px)',
+                        boxShadow: '0 4px 8px rgba(33, 150, 243, 0.3)',
+                      }
+                    }}
+                  >
+                    🤲 Caught
+                  </Button>
+                  <Button 
+                    variant="outlined" 
+                    disabled
+                    fullWidth
+                    sx={{
+                      borderRadius: '10px',
+                      fontWeight: 'bold',
+                      background: 'linear-gradient(45deg, rgba(158, 158, 158, 0.1) 30%, rgba(158, 158, 158, 0.1) 90%)',
+                      borderColor: '#9E9E9E',
+                      color: '#9E9E9E',
+                    }}
+                  >
+                    🔒 Other dismissal types (Admin only)
+                  </Button>
+                </>
+              )}
             </Stack>
           ) : (
             <Stack spacing={3} component="div">
@@ -3775,7 +4296,7 @@ const LiveScoring: React.FC<Props> = () => {
             </Stack>
           )}
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ p: isMobile ? 1 : 3 }}>
           <Button onClick={() => {
             setIsWicketDialogOpen(false);
             setWicketDetails(null);
@@ -3799,7 +4320,7 @@ const LiveScoring: React.FC<Props> = () => {
         PaperProps={{
           sx: {
             borderRadius: '16px',
-            background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.9) 100%)',
+            background: 'white',
             backdropFilter: 'blur(20px)',
             border: '1px solid rgba(255,255,255,0.3)',
             boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
@@ -3876,7 +4397,7 @@ const LiveScoring: React.FC<Props> = () => {
             </Typography>
           </Stack>
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ p: isMobile ? 1 : 3 }}>
           <Button 
             onClick={() => setIsExtraRunsDialogOpen(false)}
             sx={{
@@ -3931,7 +4452,7 @@ const LiveScoring: React.FC<Props> = () => {
         PaperProps={{
           sx: {
             borderRadius: '16px',
-            background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.9) 100%)',
+            background: 'white',
             backdropFilter: 'blur(20px)',
             border: '1px solid rgba(255,255,255,0.3)',
             boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
@@ -4039,7 +4560,7 @@ const LiveScoring: React.FC<Props> = () => {
             </Button>
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
+        <DialogActions sx={{ p: isMobile ? 1 : 3 }}>
           <Button 
             onClick={handleCancelBowlerChange}
             sx={{
@@ -4118,7 +4639,7 @@ const LiveScoring: React.FC<Props> = () => {
             </FormControl>
           </Box>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
+        <DialogActions sx={{ p: isMobile ? 1 : 3 }}>
           <Button 
             onClick={handlePlayerChangeCancel}
             sx={{
@@ -4164,7 +4685,7 @@ const LiveScoring: React.FC<Props> = () => {
         sx={{
           '& .MuiDialog-paper': {
             borderRadius: '16px',
-            background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
+            background: 'white',
             boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
           }
         }}
@@ -4349,7 +4870,7 @@ const LiveScoring: React.FC<Props> = () => {
           </Box>
         </DialogContent>
         <DialogActions sx={{ 
-          p: isMobile ? 2 : 3,
+          p: isMobile ? 1 : 3,
           flexDirection: isMobile ? 'column' : 'row',
           gap: isMobile ? 1 : 0,
           '& > button': {
@@ -4404,30 +4925,69 @@ const LiveScoring: React.FC<Props> = () => {
           <Button 
             variant="contained" 
             onClick={() => {
-              console.log('🔍 DEBUG Dialog Continue button clicked:', {
-                areRequiredSelectionsComplete: areRequiredSelectionsComplete(),
-                changePlayerType,
-                isOverCompleted,
-                isWaitingForNewBatsman,
-                striker,
-                nonStriker,
-                bowler,
-                getDialogContext: getDialogContext()
-              });
+              // Dialog Continue clicked (debug info removed)
 
               if (areRequiredSelectionsComplete()) {
-                console.log('🔍 DEBUG Selections are complete, proceeding...');
+                // Selections are complete, proceeding
                 setUserDismissedDialog(false); // Reset flag when players are properly selected
                 setIsPlayerSelectionDialogOpen(false);
                 
                 // Handle different contexts
                 if (changePlayerType) {
-                  console.log('🔍 DEBUG Handling player change context');
-                  // Player change - reset the change state and continue
+                  // Handling player change context
+                  // Player change - sync local match batting stats so UI updates immediately
+                  if (match) {
+                    const updatedMatch = { ...match };
+                    updatedMatch.currentInnings = currentInnings;
+                    const currInning = updatedMatch.innings[currentInnings];
+                    if (!currInning.battingStats) currInning.battingStats = [];
+
+                    const ensureBattingStat = (playerId: string | undefined, isOnStrike: boolean) => {
+                      if (!playerId) return;
+                      let stat = currInning.battingStats.find((s: any) => (typeof s.player === 'string' ? s.player : s.player._id) === playerId);
+                      if (!stat) {
+                        currInning.battingStats.push({
+                          player: playerId,
+                          runs: 0,
+                          balls: 0,
+                          fours: 0,
+                          sixes: 0,
+                          isOut: false,
+                          strikeRate: 0,
+                          isOnStrike: isOnStrike
+                        });
+                      } else {
+                        stat.isOnStrike = isOnStrike;
+                      }
+                    };
+
+                    // Ensure striker/non-striker entries exist and mark strike
+                    ensureBattingStat(striker || undefined, true);
+                    ensureBattingStat(nonStriker || undefined, false);
+
+                    // Ensure all other batting stats have correct isOnStrike flag
+                    currInning.battingStats.forEach((s: any) => {
+                      const pid = typeof s.player === 'string' ? s.player : s.player._id;
+                      s.isOnStrike = pid === striker;
+                    });
+
+                    // Update local match state so MatchDetails and grids reflect immediately
+                    setMatch(updatedMatch);
+
+                    // Update local striker/non-striker summary stats
+                    const newStrikerStat = currInning.battingStats.find((st: any) => (typeof st.player === 'string' ? st.player : st.player._id) === striker);
+                    const newNonStrikerStat = currInning.battingStats.find((st: any) => (typeof st.player === 'string' ? st.player : st.player._id) === nonStriker);
+                    setStrikerStats({ runs: newStrikerStat?.runs || 0, balls: newStrikerStat?.balls || 0 });
+                    setNonStrikerStats({ runs: newNonStrikerStat?.runs || 0, balls: newNonStrikerStat?.balls || 0 });
+                  }
+
+                  // Player change completed - reset change dialog state
                   setChangePlayerType(null);
                   setChangePlayerReason('');
+                  // Player-change flow finished
+                  setIsPlayerChangeInProgress(false);
                 } else if (isOverCompleted) {
-                  console.log('🔍 DEBUG Handling over completion context');
+                  // Handling over completion context
                   // Over completion - reset the over completion state and clear current over
                   setIsOverCompleted(false);
                   setOverCompletionMessage('');
@@ -4444,20 +5004,19 @@ const LiveScoring: React.FC<Props> = () => {
                   // WORKAROUND: Also clear localStorage backup when over is completed
                   const matchStorageKey = `currentOverBalls_${matchId}_${currentInnings}`;
                   localStorage.setItem(matchStorageKey, JSON.stringify([]));
-                  console.log('Cleared currentOverBalls from localStorage for new over:', matchStorageKey);
                 } else if (isWaitingForNewBatsman) {
-                  console.log('🔍 DEBUG Handling wicket context');
+                  // Handling wicket context
                   // Wicket - reset the waiting state and continue
                   setIsWaitingForNewBatsman(false);
                 } else {
-                  console.log('🔍 DEBUG Handling match start/continue context');
+                  // Handling match start/continue context
                   // Match start/continue - start the match
                   setIsOverInProgress(true);
                   setIsOverCompleted(false);
                   setOverCompletionMessage('');
                 }
               } else {
-                console.log('🔍 DEBUG Selections are NOT complete, button should be disabled');
+                // Selections are NOT complete, button should be disabled
               }
             }}
             disabled={!areRequiredSelectionsComplete()}
@@ -4495,7 +5054,7 @@ const LiveScoring: React.FC<Props> = () => {
       </Dialog>
       </Paper>
     </Box>
-    </Container>
+    </Box>
   );
 };
 

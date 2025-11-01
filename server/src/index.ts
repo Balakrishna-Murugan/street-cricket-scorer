@@ -13,17 +13,25 @@ const app = express();
 connectDB();
 
 // Middleware
-app.use(cors());
+// Enable CORS and explicitly allow Authorization and user-id headers which browsers may otherwise block
+app.use(cors({
+  origin: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'user-id', 'x-user-id'],
+  exposedHeaders: ['Authorization', 'user-id']
+}));
 app.use(express.json());
 
 // Routes
 import { playerRoutes } from './routes/player.routes';
 import { teamRoutes } from './routes/team.routes';
 import { matchRoutes } from './routes/match.routes';
+import { authRoutes } from './routes/auth.routes';
 
 app.use('/api/players', playerRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/matches', matchRoutes);
+app.use('/api/auth', authRoutes);
 
 // Basic route
 app.get('/', (req, res) => {

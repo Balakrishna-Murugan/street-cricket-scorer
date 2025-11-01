@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Typography,
   Paper,
@@ -20,11 +20,11 @@ import {
   Card,
   CardContent,
   CardActions,
-  Container,
   useTheme,
   useMediaQuery,
   Autocomplete,
   Alert,
+  Snackbar,
   AlertTitle,
   Checkbox,
   Fab
@@ -90,39 +90,48 @@ const MatchList: React.FC = () => {
   const [editOpen, setEditOpen] = useState(false);
   const [newMatch, setNewMatch] = useState<Omit<Match, '_id'>>(defaultMatch);
   const [editMatch, setEditMatch] = useState<Match | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
-  // Get user role for permissions
-  const userRole = localStorage.getItem('userRole') || 'viewer';
+  // Get user ID from localStorage
+  const userData = localStorage.getItem('user');
+  const currentUserId = userData ? JSON.parse(userData)._id : null;
+  
+  // Get user role from localStorage
+  const userRole = localStorage.getItem('userRole') || '';
   const isAdmin = userRole === 'admin';
   const isSuperAdmin = userRole === 'superadmin';
+  const isViewer = userRole === 'viewer';
+  const isPlayer = userRole === 'player';
   
   // State for multi-select delete functionality
   const [selectedMatches, setSelectedMatches] = useState<string[]>([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
-  useEffect(() => {
-    fetchMatches();
-    fetchTeams();
-  }, []);
-
-  const fetchMatches = async () => {
+  const fetchMatches = useCallback(async () => {
     try {
-      const response = await matchService.getAll();
+      const response = await matchService.getAll(currentUserId || undefined);
       setMatches(response.data);
-    } catch (error) {
-      console.error('Error fetching matches:', error);
+    } catch (error: any) {
+      console.error('MatchList: Error fetching matches:', error);
     }
-  };
+  }, [currentUserId]);
 
   const fetchTeams = async () => {
     try {
       const response = await teamService.getAll();
       setTeams(response.data);
-    } catch (error) {
-      console.error('Error fetching teams:', error);
+    } catch (error: any) {
+      console.error('MatchList: Error fetching teams:', error);
     }
   };
+
+  useEffect(() => {
+    fetchMatches();
+    fetchTeams();
+  }, [fetchMatches]);
 
   const handleOpen = () => setOpen(true);
   const handleClose = () => setOpen(false);
@@ -135,12 +144,24 @@ const MatchList: React.FC = () => {
   const handleEditClose = () => {
     setEditOpen(false);
     setEditMatch(null);
+    setEditError(null);
+    setEditLoading(false);
   };
 
   const handleSubmit = async () => {
     try {
+      // Check if user is authenticated
+      if (!currentUserId) {
+        console.error('User not authenticated - currentUserId is null');
+        alert('You must be logged in to create a match. Please log in again.');
+        return;
+      }
+
       // Create match with properly configured innings based on toss
-      const matchToCreate = { ...newMatch };
+      const matchToCreate = { 
+        ...newMatch,
+        createdBy: currentUserId // Add createdBy field
+      };
       
       if (matchToCreate.tossWinner && matchToCreate.tossDecision) {
         // Determine batting and bowling teams based on toss
@@ -195,31 +216,54 @@ const MatchList: React.FC = () => {
         });
       }
       
-      await matchService.create(matchToCreate);
-      handleClose();
-      fetchMatches();
-      setNewMatch(defaultMatch);
+  await matchService.create(matchToCreate);
+  // Show transient success message
+  setSuccess('Match created');
+  handleClose();
+  fetchMatches();
+  setNewMatch(defaultMatch);
     } catch (error) {
       console.error('Error creating match:', error);
     }
   };
 
   const handleEditSubmit = async () => {
+    if (!editMatch) return;
+
+    setEditLoading(true);
+    setEditError(null);
+
     try {
-      if (!editMatch) return;
-      
+  // Starting match edit (debug log removed)
+
+      // Validate required fields
+      if (!editMatch.team1 || !editMatch.team2) {
+        throw new Error('Both teams must be selected');
+      }
+
+      if (!editMatch.overs || editMatch.overs <= 0) {
+        throw new Error('Number of overs must be greater than 0');
+      }
+
       // Update match with edited values
       const updatedMatch = { ...editMatch };
-      
-      // Reconfigure innings if toss info changed
-      if (updatedMatch.tossWinner && updatedMatch.tossDecision) {
+
+      // Ensure team IDs are strings (not objects)
+      updatedMatch.team1 = typeof updatedMatch.team1 === 'string' ? updatedMatch.team1 : updatedMatch.team1._id;
+      updatedMatch.team2 = typeof updatedMatch.team2 === 'string' ? updatedMatch.team2 : updatedMatch.team2._id;
+      if (updatedMatch.tossWinner) {
+        updatedMatch.tossWinner = typeof updatedMatch.tossWinner === 'string' ? updatedMatch.tossWinner : updatedMatch.tossWinner._id;
+      }
+
+      // Reconfigure innings if toss info changed and innings exist
+      if (updatedMatch.tossWinner && updatedMatch.tossDecision && updatedMatch.innings && updatedMatch.innings.length > 0) {
         let battingTeam: string;
         let bowlingTeam: string;
-        
-        const tossWinnerId = typeof updatedMatch.tossWinner === 'string' ? updatedMatch.tossWinner : updatedMatch.tossWinner._id;
-        const team1Id = typeof updatedMatch.team1 === 'string' ? updatedMatch.team1 : updatedMatch.team1._id;
-        const team2Id = typeof updatedMatch.team2 === 'string' ? updatedMatch.team2 : updatedMatch.team2._id;
-        
+
+        const tossWinnerId = updatedMatch.tossWinner;
+        const team1Id = updatedMatch.team1;
+        const team2Id = updatedMatch.team2;
+
         if (updatedMatch.tossDecision === 'bat') {
           battingTeam = tossWinnerId;
           bowlingTeam = tossWinnerId === team1Id ? team2Id : team1Id;
@@ -227,24 +271,38 @@ const MatchList: React.FC = () => {
           bowlingTeam = tossWinnerId;
           battingTeam = tossWinnerId === team1Id ? team2Id : team1Id;
         }
-        
+
         // Update innings team assignments
-        if (updatedMatch.innings && updatedMatch.innings.length > 0) {
+        if (updatedMatch.innings[0]) {
           updatedMatch.innings[0].battingTeam = battingTeam;
           updatedMatch.innings[0].bowlingTeam = bowlingTeam;
-          
-          if (updatedMatch.innings.length > 1) {
-            updatedMatch.innings[1].battingTeam = bowlingTeam;
-            updatedMatch.innings[1].bowlingTeam = battingTeam;
-          }
+        }
+
+        if (updatedMatch.innings.length > 1 && updatedMatch.innings[1]) {
+          updatedMatch.innings[1].battingTeam = bowlingTeam;
+          updatedMatch.innings[1].bowlingTeam = battingTeam;
         }
       }
-      
-      await matchService.update(editMatch._id!, updatedMatch);
+
+      // Prepare data to send - only include fields that can be edited for upcoming matches
+      const updateData = {
+        team1: updatedMatch.team1,
+        team2: updatedMatch.team2,
+        date: updatedMatch.date,
+        venue: updatedMatch.venue,
+        overs: updatedMatch.overs,
+        tossWinner: updatedMatch.tossWinner,
+        tossDecision: updatedMatch.tossDecision,
+      };
+
+  await matchService.update(editMatch._id!, updateData as any);
       handleEditClose();
       fetchMatches();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating match:', error);
+      setEditError(error.message || 'Failed to update match. Please try again.');
+    } finally {
+      setEditLoading(false);
     }
   };
 
@@ -300,7 +358,7 @@ const MatchList: React.FC = () => {
       await fetchMatches();
       handleDeleteDialogClose();
       
-      console.log(`${selectedMatches.length} match(es) deleted successfully`);
+  // Matches deleted successfully (debug log removed)
     } catch (error) {
       console.error('Error deleting selected matches:', error);
     }
@@ -320,68 +378,102 @@ const MatchList: React.FC = () => {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: isMobile ? 2 : 3 }}>
+  <Box maxWidth="lg" sx={{ py: isMobile ? 1 : 3, px: isMobile ? 1 : 3, mx: 'auto' }}>
       {!isMobile && (
-        <Box sx={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          mb: 3
-        }}>
-          <Typography variant="h5">
-            {(isAdmin || isSuperAdmin) ? 'Matches' : 'View Matches'}
-            {isSuperAdmin && selectedMatches.length > 0 && (
-              <Chip 
-                label={`${selectedMatches.length} selected`} 
-                color="secondary" 
-                size="small" 
-                sx={{ ml: 2 }}
-              />
-            )}
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            {(isAdmin || isSuperAdmin) && (
-              <Button 
-                variant="contained" 
-                color="primary" 
-                onClick={handleOpen}
-                startIcon={<AddIcon />}
-              >
-                Add Match
-              </Button>
-            )}
-            {isSuperAdmin && (
-              <>
-                <Button 
-                  variant="outlined" 
-                  color="secondary" 
-                  onClick={handleSelectAll}
-                  startIcon={selectedMatches.length === matches.length ? <DeselectIcon /> : <SelectAllIcon />}
-                  sx={{ ml: 1 }}
-                >
-                  {selectedMatches.length === matches.length ? 'Deselect All' : 'Select All'}
-                </Button>
+        <Paper 
+          elevation={3}
+          sx={{ 
+            p: 3,
+            background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
+            borderRadius: 3,
+            color: 'white',
+            mb: 3
+          }}
+        >
+          <Box sx={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center'
+          }}>
+            <Typography 
+              variant="h5" 
+              sx={{ 
+                fontWeight: 'bold',
+                textShadow: '2px 2px 4px rgba(0,0,0,0.3)'
+              }}
+            >
+              {(isAdmin || isSuperAdmin) ? 'Matches' : 'View Matches'}
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              {(isAdmin || isSuperAdmin || isPlayer || (isViewer && matches.length === 0)) && (
                 <Button 
                   variant="contained" 
-                  color="error" 
-                  onClick={handleDeleteSelectedOpen}
-                  startIcon={<DeleteForeverIcon />}
-                  disabled={selectedMatches.length === 0}
-                  sx={{ ml: 1 }}
+                  color="primary" 
+                  onClick={handleOpen}
+                  startIcon={<AddIcon />}
+                  disabled={isViewer && matches.length >= 1} // Viewer can create max 1 match
+                  sx={{ 
+                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                    color: 'white',
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    '&:hover': { 
+                      backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                      transform: 'translateY(-1px)'
+                    },
+                    transition: 'all 0.2s ease'
+                  }}
                 >
-                  Delete Selected ({selectedMatches.length})
+                  {isViewer ? 'Create Demo Match' : 'Add Match'}
                 </Button>
-              </>
-            )}
+              )}
+              {isSuperAdmin && (
+                <>
+                  <Button 
+                    variant="outlined" 
+                    color="secondary" 
+                    onClick={handleSelectAll}
+                    startIcon={selectedMatches.length === matches.length ? <DeselectIcon /> : <SelectAllIcon />}
+                    sx={{ 
+                      color: 'white',
+                      borderColor: 'rgba(255, 255, 255, 0.3)',
+                      '&:hover': { 
+                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                        borderColor: 'rgba(255, 255, 255, 0.5)'
+                      }
+                    }}
+                  >
+                    {selectedMatches.length === matches.length ? 'Deselect All' : 'Select All'}
+                  </Button>
+                  <Button 
+                    variant="contained" 
+                    color="error" 
+                    onClick={handleDeleteSelectedOpen}
+                    startIcon={<DeleteForeverIcon />}
+                    disabled={selectedMatches.length === 0}
+                    sx={{ 
+                      backgroundColor: 'rgba(244, 67, 54, 0.8)',
+                      '&:hover': { 
+                        backgroundColor: 'rgba(244, 67, 54, 1)',
+                        transform: 'translateY(-1px)'
+                      },
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    Delete Selected ({selectedMatches.length})
+                  </Button>
+                </>
+              )}
+            </Box>
           </Box>
-        </Box>
+        </Paper>
       )}
 
       {/* Floating Action Button for Mobile */}
-      {(isAdmin || isSuperAdmin) && isMobile && (
+      {(isAdmin || isSuperAdmin || isPlayer || (isViewer && matches.length === 0)) && isMobile && (
         <Fab 
           aria-label="add"
           onClick={handleOpen}
+          disabled={isViewer && matches.length >= 1} // Viewer can create max 1 match
           sx={{
             position: 'fixed',
             bottom: 24,
@@ -394,9 +486,35 @@ const MatchList: React.FC = () => {
               transform: 'scale(1.1)',
             },
             transition: 'all 0.3s ease',
+            '&:disabled': {
+              background: 'rgba(158, 158, 158, 0.5)',
+              color: 'rgba(255, 255, 255, 0.5)',
+            }
           }}
         >
           <AddIcon />
+        </Fab>
+      )}
+
+      {/* Floating Delete FAB for SuperAdmin when matches selected (mobile) */}
+      {isSuperAdmin && isMobile && selectedMatches.length > 0 && (
+        <Fab
+          aria-label="delete-selected"
+          color="error"
+          onClick={handleDeleteSelectedOpen}
+          sx={{
+            position: 'fixed',
+            bottom: 96, // stacked above the add FAB
+            right: 24,
+            zIndex: 1001,
+            background: 'linear-gradient(135deg, #f44336 0%, #d32f2f 100%)',
+            color: 'white',
+            '&:hover': {
+              transform: 'scale(1.05)'
+            }
+          }}
+        >
+          <DeleteForeverIcon />
         </Fab>
       )}
 
@@ -600,9 +718,23 @@ const MatchList: React.FC = () => {
         fullScreen={isMobile}
         maxWidth="sm"
         fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '16px',
+            background: 'white',
+            color: 'black',
+          }
+        }}
       >
-        <DialogTitle>Add New Match</DialogTitle>
-        <DialogContent sx={{ pb: 1 }}>
+        <DialogTitle sx={{ 
+          background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
+          color: 'white',
+          fontWeight: 'bold',
+          borderRadius: '16px 16px 0 0'
+        }}>
+          Add New Match
+        </DialogTitle>
+        <DialogContent sx={{ p: 3 }}>
           <Autocomplete
             fullWidth
             options={teams}
@@ -616,6 +748,14 @@ const MatchList: React.FC = () => {
                 {...params} 
                 label="Team 1"
                 margin="dense"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    '&:hover fieldset': {
+                      borderColor: theme.palette.primary.main,
+                    },
+                  },
+                }}
               />
             )}
             renderOption={(props, option) => (
@@ -637,6 +777,14 @@ const MatchList: React.FC = () => {
                 {...params} 
                 label="Team 2"
                 margin="dense"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    '&:hover fieldset': {
+                      borderColor: theme.palette.primary.main,
+                    },
+                  },
+                }}
               />
             )}
             renderOption={(props, option) => (
@@ -652,6 +800,16 @@ const MatchList: React.FC = () => {
             fullWidth
             value={newMatch.overs}
             onChange={(e) => setNewMatch({ ...newMatch, overs: Number(e.target.value) })}
+            inputProps={{ min: 1, max: isViewer ? 2 : 100 }}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 2,
+                '&:hover fieldset': {
+                  borderColor: theme.palette.primary.main,
+                },
+              },
+            }}
+            helperText={isViewer ? 'Viewer/demo matches are limited to a maximum of 2 overs' : ''}
           />
           <TextField
             margin="dense"
@@ -661,6 +819,14 @@ const MatchList: React.FC = () => {
             InputLabelProps={{ shrink: true }}
             value={new Date(newMatch.date).toISOString().split('T')[0]}
             onChange={(e) => setNewMatch({ ...newMatch, date: new Date(e.target.value).toISOString() })}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 2,
+                '&:hover fieldset': {
+                  borderColor: theme.palette.primary.main,
+                },
+              },
+            }}
           />
           <TextField
             margin="dense"
@@ -668,6 +834,14 @@ const MatchList: React.FC = () => {
             fullWidth
             value={newMatch.venue}
             onChange={(e) => setNewMatch({ ...newMatch, venue: e.target.value })}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 2,
+                '&:hover fieldset': {
+                  borderColor: theme.palette.primary.main,
+                },
+              },
+            }}
           />
           
           <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>
@@ -690,6 +864,14 @@ const MatchList: React.FC = () => {
                 {...params} 
                 label="Toss Winner"
                 margin="dense"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    '&:hover fieldset': {
+                      borderColor: theme.palette.primary.main,
+                    },
+                  },
+                }}
               />
             )}
             renderOption={(props, option) => (
@@ -716,6 +898,14 @@ const MatchList: React.FC = () => {
                 {...params} 
                 label="Toss Decision"
                 margin="dense"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    '&:hover fieldset': {
+                      borderColor: theme.palette.primary.main,
+                    },
+                  },
+                }}
               />
             )}
             renderOption={(props, option) => (
@@ -725,9 +915,48 @@ const MatchList: React.FC = () => {
             )}
           />
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleClose}>Cancel</Button>
-          <Button onClick={handleSubmit} variant="contained" color="primary">
+        <DialogActions sx={{ p: 3, pt: 0 }}>
+          <Button 
+            onClick={handleClose}
+            sx={{
+              py: 1.5,
+              borderRadius: 2,
+              textTransform: 'none',
+              fontSize: '1.1rem',
+              fontWeight: 600,
+              borderColor: theme.palette.primary.main,
+              color: theme.palette.primary.main,
+              '&:hover': {
+                borderColor: theme.palette.primary.main,
+                backgroundColor: 'rgba(2, 14, 67, 0.04)',
+                transform: 'translateY(-1px)',
+                boxShadow: '0 4px 8px rgba(2, 14, 67, 0.2)',
+              },
+              transition: 'all 0.3s ease',
+            }}
+            variant="outlined"
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSubmit} 
+            variant="contained" 
+            sx={{
+              py: 1.5,
+              borderRadius: 2,
+              textTransform: 'none',
+              fontSize: '1.1rem',
+              fontWeight: 600,
+              background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
+              boxShadow: '0 4px 12px rgba(2, 14, 67, 0.4)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #764ba2 0%, #020e43 100%)',
+                boxShadow: '0 6px 16px rgba(118, 75, 162, 0.6)',
+                transform: 'translateY(-2px)',
+              },
+              transition: 'all 0.3s ease',
+            }}
+          >
             Create
           </Button>
         </DialogActions>
@@ -740,24 +969,65 @@ const MatchList: React.FC = () => {
         fullScreen={isMobile}
         maxWidth="sm"
         fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '16px',
+            background: 'white',
+            color: 'black',
+          }
+        }}
       >
-        <DialogTitle>Edit Match</DialogTitle>
-        <DialogContent sx={{ pb: 1 }}>
+        <DialogTitle sx={{ 
+          background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
+          color: 'white',
+          fontWeight: 'bold',
+          borderRadius: '16px 16px 0 0'
+        }}>
+          Edit Match
+        </DialogTitle>
+        <DialogContent sx={{ p: 3 }}>
+          {editError && (
+            <Alert severity="error" sx={{ mb: 2, backgroundColor: 'rgba(255, 255, 255, 0.9)', color: '#d32f2f' }}>
+              {editError}
+            </Alert>
+          )}
+          
           {editMatch && (
             <>
               <Autocomplete
                 fullWidth
                 options={teams}
                 getOptionLabel={(option) => option.name}
-                value={teams.find(team => team._id === (typeof editMatch.team1 === 'string' ? editMatch.team1 : editMatch.team1._id)) || null}
+                value={teams.find(team => team._id === (typeof editMatch.team1 === 'string' ? editMatch.team1 : editMatch.team1._id)) || undefined}
                 onChange={(event, newValue) => {
-                  setEditMatch({ ...editMatch, team1: newValue?._id || '' });
+                  if (newValue && newValue._id) {
+                    setEditMatch({ ...editMatch, team1: newValue._id });
+                    setEditError(null); // Clear error when user makes changes
+                  }
                 }}
+                disableClearable
                 renderInput={(params) => (
                   <TextField 
                     {...params} 
                     label="Team 1"
                     margin="dense"
+                    error={!editMatch.team1}
+                    helperText={!editMatch.team1 ? 'Team 1 is required' : ''}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                        '&:hover fieldset': {
+                          borderColor: theme.palette.primary.main,
+                        },
+                      },
+                      '& .MuiFormHelperText-root': {
+                        color: '#f44336',
+                        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                        margin: 0,
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                      }
+                    }}
                   />
                 )}
                 renderOption={(props, option) => (
@@ -770,15 +1040,36 @@ const MatchList: React.FC = () => {
                 fullWidth
                 options={teams}
                 getOptionLabel={(option) => option.name}
-                value={teams.find(team => team._id === (typeof editMatch.team2 === 'string' ? editMatch.team2 : editMatch.team2._id)) || null}
+                value={teams.find(team => team._id === (typeof editMatch.team2 === 'string' ? editMatch.team2 : editMatch.team2._id)) || undefined}
                 onChange={(event, newValue) => {
-                  setEditMatch({ ...editMatch, team2: newValue?._id || '' });
+                  if (newValue && newValue._id) {
+                    setEditMatch({ ...editMatch, team2: newValue._id });
+                    setEditError(null); // Clear error when user makes changes
+                  }
                 }}
+                disableClearable
                 renderInput={(params) => (
                   <TextField 
                     {...params} 
                     label="Team 2"
                     margin="dense"
+                    error={!editMatch.team2}
+                    helperText={!editMatch.team2 ? 'Team 2 is required' : ''}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                        '&:hover fieldset': {
+                          borderColor: theme.palette.primary.main,
+                        },
+                      },
+                      '& .MuiFormHelperText-root': {
+                        color: '#f44336',
+                        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                        margin: 0,
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                      }
+                    }}
                   />
                 )}
                 renderOption={(props, option) => (
@@ -793,7 +1084,27 @@ const MatchList: React.FC = () => {
                 type="number"
                 fullWidth
                 value={editMatch.overs}
-                onChange={(e) => setEditMatch({ ...editMatch, overs: Number(e.target.value) })}
+                onChange={(e) => {
+                  setEditMatch({ ...editMatch, overs: Number(e.target.value) });
+                  setEditError(null); // Clear error when user makes changes
+                }}
+                error={!editMatch.overs || editMatch.overs <= 0}
+                helperText={!editMatch.overs || editMatch.overs <= 0 ? 'Overs must be greater than 0' : ''}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    '&:hover fieldset': {
+                      borderColor: theme.palette.primary.main,
+                    },
+                  },
+                  '& .MuiFormHelperText-root': {
+                    color: '#f44336',
+                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                    margin: 0,
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                  }
+                }}
               />
               <TextField
                 margin="dense"
@@ -802,14 +1113,36 @@ const MatchList: React.FC = () => {
                 fullWidth
                 InputLabelProps={{ shrink: true }}
                 value={new Date(editMatch.date).toISOString().split('T')[0]}
-                onChange={(e) => setEditMatch({ ...editMatch, date: new Date(e.target.value).toISOString() })}
+                onChange={(e) => {
+                  setEditMatch({ ...editMatch, date: new Date(e.target.value).toISOString() });
+                  setEditError(null); // Clear error when user makes changes
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    '&:hover fieldset': {
+                      borderColor: theme.palette.primary.main,
+                    },
+                  },
+                }}
               />
               <TextField
                 margin="dense"
                 label="Venue"
                 fullWidth
                 value={editMatch.venue}
-                onChange={(e) => setEditMatch({ ...editMatch, venue: e.target.value })}
+                onChange={(e) => {
+                  setEditMatch({ ...editMatch, venue: e.target.value });
+                  setEditError(null); // Clear error when user makes changes
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    '&:hover fieldset': {
+                      borderColor: theme.palette.primary.main,
+                    },
+                  },
+                }}
               />
               
               <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>
@@ -827,15 +1160,24 @@ const MatchList: React.FC = () => {
                   const team1Id = typeof editMatch.team1 === 'string' ? editMatch.team1 : editMatch.team1._id;
                   return `${option.name} ${option._id === team1Id ? '(Team 1)' : '(Team 2)'}`;
                 }}
-                value={teams.find(team => team._id === editMatch.tossWinner) || null}
+                value={teams.find(team => team._id === editMatch.tossWinner) || undefined}
                 onChange={(event, newValue) => {
-                  setEditMatch({ ...editMatch, tossWinner: newValue?._id || '' });
+                  setEditMatch({ ...editMatch, tossWinner: newValue && newValue._id ? newValue._id : undefined });
+                  setEditError(null); // Clear error when user makes changes
                 }}
                 renderInput={(params) => (
                   <TextField 
                     {...params} 
                     label="Toss Winner"
                     margin="dense"
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                        '&:hover fieldset': {
+                          borderColor: theme.palette.primary.main,
+                        },
+                      },
+                    }}
                   />
                 )}
                 renderOption={(props, option) => {
@@ -858,6 +1200,7 @@ const MatchList: React.FC = () => {
                 value={editMatch.tossDecision ? { value: editMatch.tossDecision, label: editMatch.tossDecision === 'bat' ? 'Chose to Bat First' : 'Chose to Bowl First' } : null}
                 onChange={(event, newValue) => {
                   setEditMatch({ ...editMatch, tossDecision: (newValue?.value as 'bat' | 'bowl') || '' });
+                  setEditError(null); // Clear error when user makes changes
                 }}
                 disabled={!editMatch.tossWinner}
                 renderInput={(params) => (
@@ -865,6 +1208,14 @@ const MatchList: React.FC = () => {
                     {...params} 
                     label="Toss Decision"
                     margin="dense"
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                        '&:hover fieldset': {
+                          borderColor: theme.palette.primary.main,
+                        },
+                      },
+                    }}
                   />
                 )}
                 renderOption={(props, option) => (
@@ -876,10 +1227,51 @@ const MatchList: React.FC = () => {
             </>
           )}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleEditClose}>Cancel</Button>
-          <Button onClick={handleEditSubmit} variant="contained" color="primary">
-            Save Changes
+        <DialogActions sx={{ p: 3, pt: 0 }}>
+          <Button 
+            onClick={handleEditClose} 
+            disabled={editLoading}
+            sx={{
+              py: 1.5,
+              borderRadius: 2,
+              textTransform: 'none',
+              fontSize: '1.1rem',
+              fontWeight: 600,
+              borderColor: theme.palette.primary.main,
+              color: theme.palette.primary.main,
+              '&:hover': {
+                borderColor: theme.palette.primary.main,
+                backgroundColor: 'rgba(2, 14, 67, 0.04)',
+                transform: 'translateY(-1px)',
+                boxShadow: '0 4px 8px rgba(2, 14, 67, 0.2)',
+              },
+              transition: 'all 0.3s ease',
+            }}
+            variant="outlined"
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleEditSubmit} 
+            variant="contained" 
+            disabled={editLoading || !editMatch?.team1 || !editMatch?.team2 || !editMatch?.overs || editMatch.overs <= 0}
+            sx={{
+              py: 1.5,
+              borderRadius: 2,
+              textTransform: 'none',
+              fontSize: '1.1rem',
+              fontWeight: 600,
+              background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
+              boxShadow: '0 4px 12px rgba(2, 14, 67, 0.4)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #764ba2 0%, #020e43 100%)',
+                boxShadow: '0 6px 16px rgba(118, 75, 162, 0.6)',
+                transform: 'translateY(-2px)',
+              },
+              transition: 'all 0.3s ease',
+            }}
+          >
+            {editLoading ? 'Saving...' : 'Save Changes'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -962,8 +1354,8 @@ const MatchList: React.FC = () => {
           )}
         </DialogContent>
         <DialogActions sx={{ 
-          px: isMobile ? 2 : 3,
-          py: isMobile ? 1.5 : 2,
+          px: isMobile ? 1 : 3,
+          py: isMobile ? 1 : 2,
           gap: isMobile ? 1 : 2
         }}>
           <Button 
@@ -994,7 +1386,16 @@ const MatchList: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Container>
+      <Snackbar
+        open={success !== null}
+        autoHideDuration={3000}
+        onClose={() => setSuccess(null)}
+      >
+        <Alert onClose={() => setSuccess(null)} severity="success">
+          {success}
+        </Alert>
+      </Snackbar>
+    </Box>
   );
 };
 

@@ -8,8 +8,9 @@ interface AdminGuardProps {
 const AdminGuard: React.FC<AdminGuardProps> = ({ children }) => {
   const userRole = localStorage.getItem('userRole');
   const isAdmin = userRole === 'admin';
+  const isSuperAdmin = userRole === 'superadmin';
 
-  if (!isAdmin) {
+  if (!isAdmin && !isSuperAdmin) {
     // Redirect non-admin users to matches page (view only)
     return <Navigate to="/matches" />;
   }

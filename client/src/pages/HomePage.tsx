@@ -1,173 +1,103 @@
-import React from 'react';
-import { 
-  Typography, 
-  Paper, 
-  Container, 
-  Stack, 
-  Box, 
-  useTheme, 
-  useMediaQuery
-} from '@mui/material';
+import React, { useEffect, useState } from 'react';
+import { Box, Paper, Typography, Button, CircularProgress, Card, CardContent, Stack, Chip } from '@mui/material';
+// use CSS Grid via Box for layout to avoid Grid typing/platform issues
 import { useNavigate } from 'react-router-dom';
-import SportsCricketIcon from '@mui/icons-material/SportsCricket';
-import GroupsIcon from '@mui/icons-material/Groups';
-import PersonIcon from '@mui/icons-material/Person';
+import { teamService, playerService, matchService } from '../services/api.service';
 
 const HomePage: React.FC = () => {
-  const navigate = useNavigate();
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  
-  // Get user role for conditional rendering
-  const userRole = localStorage.getItem('userRole') || 'viewer';
-  const isAdmin = userRole === 'admin';
+	const navigate = useNavigate();
+	const [loading, setLoading] = useState(true);
+	const [counts, setCounts] = useState({ teams: 0, players: 0, matches: 0 });
+	const [recentMatches, setRecentMatches] = useState<any[]>([]);
 
-  return (
-    <Box
-      sx={{
-        minHeight: 'calc(100vh - 120px)', // Adjusted for header height
-        background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
-        padding: { xs: 1, sm: 2 },
-      }}
-    >
-      <Container maxWidth="lg">
-        <Paper
-          elevation={8}
-          sx={{
-            padding: isMobile ? 3 : 4,
-            borderRadius: 3,
-            background: '#ffffff',
-            border: '1px solid rgba(0,0,0,0.1)',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
-            textAlign: 'center'
-          }}
-        >
-          <Typography 
-            variant={isMobile ? "h4" : "h3"} 
-            gutterBottom
-            sx={{ 
-              fontWeight: 'bold',
-              color: '#2c3e50',
-              mb: 2,
-              textShadow: '2px 2px 4px rgba(0,0,0,0.1)'
-            }}
-          >
-            🏏 Welcome to Street Cricket Scorecard
-          </Typography>
-          <Typography 
-            variant={isMobile ? "body1" : "h6"} 
-            color="text.secondary" 
-            paragraph
-            sx={{ mb: 4, fontWeight: 500 }}
-          >
-            Track your street cricket matches with professional scoring and statistics
-          </Typography>
+	useEffect(() => {
+		const fetchData = async () => {
+			try {
+				setLoading(true);
+				const [t, p, m] = await Promise.all([
+					teamService.getAll(),
+					playerService.getAll(),
+					matchService.getAll(),
+				]);
+				setCounts({ teams: t.data.length || 0, players: p.data.length || 0, matches: m.data.length || 0 });
+				// take latest 3 matches sorted by date desc
+				const matches = (m.data || []).slice().sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+				setRecentMatches(matches.slice(0, 3));
+			} catch (err) {
+				console.error('HomePage: failed to fetch counts', err);
+			} finally {
+				setLoading(false);
+			}
+		};
 
-          <Stack 
-            direction={isMobile ? "column" : "row"} 
-            spacing={3} 
-            sx={{ mt: 4 }} 
-            useFlexGap 
-            flexWrap="wrap"
-          >
-            {isAdmin && (
-              <>
-                <Box width={{ xs: '100%', sm: isMobile ? '100%' : 'calc(50% - 12px)', md: 'calc(25% - 18px)' }}>
-                  <Paper
-                    onClick={() => navigate('/teams')}
-                sx={{
-                  p: 3,
-                  textAlign: 'center',
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  borderRadius: '12px',
-                  background: 'linear-gradient(45deg, #e3f2fd 30%, #bbdefb 90%)',
-                  border: '1px solid #2196F3',
-                  minHeight: isMobile ? '120px' : '140px',
-                  '&:hover': {
-                    transform: 'translateY(-4px)',
-                    boxShadow: '0 8px 16px rgba(33, 150, 243, 0.3)'
-                  }
-                }}
-              >
-                <GroupsIcon sx={{ fontSize: isMobile ? 40 : 50, mb: 2, color: '#1565c0' }} />
-                <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#2c3e50' }}>Teams</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Manage your cricket teams
-                </Typography>
-              </Paper>
-            </Box>
+		fetchData();
+	}, []);
 
-            <Box width={{ xs: '100%', sm: isMobile ? '100%' : 'calc(50% - 12px)', md: 'calc(25% - 18px)' }}>
-              <Paper
-                onClick={() => navigate('/players')}
-                sx={{
-                  p: 3,
-                  textAlign: 'center',
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  borderRadius: '12px',
-                  background: 'linear-gradient(45deg, #e8f5e8 30%, #c8e6c9 90%)',
-                  border: '1px solid #4CAF50',
-                  minHeight: isMobile ? '120px' : '140px',
-                  '&:hover': {
-                    transform: 'translateY(-4px)',
-                    boxShadow: '0 8px 16px rgba(76, 175, 80, 0.3)'
-                  }
-                }}
-              >
-                <PersonIcon sx={{ fontSize: isMobile ? 40 : 50, mb: 2, color: '#2e7d32' }} />
-                <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#2c3e50' }}>Players</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Manage player profiles
-                </Typography>
-              </Paper>
-            </Box>
-              </>
-            )}
+	return (
+		<Box sx={{ p: { xs: 2, md: 4 } }}>
+			{/* Hero */}
+			<Paper sx={{ p: { xs: 2, md: 4 }, mb: 3, borderRadius: 3, background: 'linear-gradient(135deg,#020e43 0%,#764ba2 100%)', color: 'white' }}>
+						<Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, alignItems: 'center' }}>
+							<Box sx={{ flex: 1, width: { xs: '100%', md: '66%' } }}>
+								<Typography variant="h4" sx={{ fontWeight: 'bold', mb: 1 }}>Street Cricket Scorer</Typography>
+								<Typography variant="body1" sx={{ opacity: 0.9, mb: 2 }}>Fast, minimal live scoring for street cricket. Create matches, track ball-by-ball scoring and share results.</Typography>
+								<Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+									<Button variant="contained" onClick={() => navigate('/matches')} sx={{ mr: 1 }}>View Matches</Button>
+									<Button variant="outlined" onClick={() => navigate('/matches')} sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.2)' }}>Create Match</Button>
+								</Stack>
+							</Box>
+							<Box sx={{ width: { xs: '100%', md: '34%' } }}>
+								<Stack direction="row" spacing={1} justifyContent={{ xs: 'flex-start', md: 'flex-end' }}>
+									<Chip label={loading ? '...' : `Teams: ${counts.teams}`} color="default" sx={{ bgcolor: 'rgba(255,255,255,0.08)', color: 'white' }} />
+									<Chip label={loading ? '...' : `Players: ${counts.players}`} color="default" sx={{ bgcolor: 'rgba(255,255,255,0.08)', color: 'white' }} />
+									<Chip label={loading ? '...' : `Matches: ${counts.matches}`} color="default" sx={{ bgcolor: 'rgba(255,255,255,0.08)', color: 'white' }} />
+								</Stack>
+							</Box>
+						</Box>
+			</Paper>
 
-            <Box width={{ xs: '100%', sm: isMobile ? '100%' : 'calc(50% - 12px)', md: 'calc(25% - 18px)' }}>
-              <Paper
-                onClick={() => navigate('/matches')}
-                sx={{
-                  p: 3,
-                  textAlign: 'center',
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  borderRadius: '12px',
-                  background: 'linear-gradient(45deg, #fff3e0 30%, #ffcc02 90%)',
-                  border: '1px solid #FF9800',
-                  minHeight: isMobile ? '120px' : '140px',
-                  '&:hover': {
-                    transform: 'translateY(-4px)',
-                    boxShadow: '0 8px 16px rgba(255, 152, 0, 0.3)'
-                  }
-                }}
-              >
-                <SportsCricketIcon sx={{ fontSize: isMobile ? 40 : 50, mb: 2, color: '#e65100' }} />
-                <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#2c3e50' }}>Matches</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {isAdmin ? 'Create and manage matches' : 'View live matches'}
-                </Typography>
-              </Paper>
-            </Box>
-          </Stack>
-        </Paper>
-      </Container>
-    </Box>
-  );
+			{/* Quick actions + Recent matches */}
+						<Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2 }}>
+							<Box sx={{ width: { xs: '100%', md: '66%' } }}>
+								<Paper sx={{ p: 2, borderRadius: 2 }}>
+									<Typography variant="h6" sx={{ mb: 2 }}>Quick Actions</Typography>
+									<Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+										<Button variant="contained" onClick={() => navigate('/matches')} startIcon={<></>}>Create/View Matches</Button>
+										<Button variant="outlined" onClick={() => navigate('/teams')}>Manage Teams</Button>
+										<Button variant="outlined" onClick={() => navigate('/players')}>Manage Players</Button>
+									</Stack>
+								</Paper>
+							</Box>
+
+							<Box sx={{ width: { xs: '100%', md: '34%' } }}>
+								<Card sx={{ borderRadius: 2 }}>
+									<CardContent>
+										<Typography variant="h6" sx={{ mb: 1 }}>Recent Matches</Typography>
+										{loading ? (
+											<CircularProgress size={20} />
+										) : (
+											recentMatches.length === 0 ? (
+												<Typography variant="body2">No recent matches</Typography>
+											) : (
+												<Stack spacing={1}>
+													{recentMatches.map((m: any) => (
+														<Box key={m._id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+														<Box>
+															<Typography variant="subtitle2">{typeof m.team1 === 'object' ? m.team1.name : m.team1} vs {typeof m.team2 === 'object' ? m.team2.name : m.team2}</Typography>
+															<Typography variant="caption" color="text.secondary">{new Date(m.date).toLocaleString()}</Typography>
+														</Box>
+														<Button size="small" onClick={() => navigate(`/matches/${m._id}/overview`)}>View</Button>
+													</Box>
+													))}
+												</Stack>
+											)
+										)}
+									</CardContent>
+								</Card>
+							</Box>
+						</Box>
+		</Box>
+	);
 };
 
 export default HomePage;
