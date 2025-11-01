@@ -160,8 +160,7 @@ const MatchCommentary: React.FC<MatchCommentaryProps> = ({ match, onRefresh }) =
   // Get ball outcomes from recent balls (last 12 balls for live commentary)
   const allBalls: BallOutcome[] = [];
   
-  // DEBUG: Check ball data availability
-  console.log(`Commentary: ${currentInnings.balls} balls, recentBalls=${currentInnings.recentBalls?.length || 0}, currentOverBalls=${currentInnings.currentOverBalls?.length || 0}`);
+  // Check ball data availability (no console logs in production)
   
   // Use recent balls if available (last 12 balls across overs)
   if (currentInnings.recentBalls && Array.isArray(currentInnings.recentBalls) && currentInnings.recentBalls.length > 0) {

@@ -321,6 +321,74 @@ export const matchController = {
     }
   },
 
+  // Send match summary to an email (if SMTP configured on server)
+  sendSummary: async (req: Request, res: Response) => {
+    try {
+      const { matchId } = req.params;
+      const { email } = req.body;
+      if (!email) return res.status(400).json({ message: 'Email is required' });
+
+      const match = await Match.findById(matchId)
+        .populate('team1', 'name')
+        .populate('team2', 'name')
+        .populate('innings.battingStats.player', 'name')
+        .populate('innings.bowlingStats.player', 'name')
+        .populate('innings.currentState.onStrikeBatsman', 'name')
+        .populate('innings.currentState.offStrikeBatsman', 'name');
+
+      if (!match) return res.status(404).json({ message: 'Match not found' });
+
+      // Build a simple summary text
+      const summaryLines: string[] = [];
+      summaryLines.push(`${(match.team1 as any)?.name || 'Team 1'} vs ${(match.team2 as any)?.name || 'Team 2'}`);
+      summaryLines.push(`Date: ${match.date}`);
+      summaryLines.push(`Status: ${match.status}`);
+      if (match.innings && match.innings.length > 0) {
+        match.innings.forEach((inning: any, idx: number) => {
+          summaryLines.push(`Innings ${idx + 1}: ${inning.totalRuns}/${inning.wickets} in ${inning.overs} overs`);
+        });
+      }
+
+      const summaryText = summaryLines.join('\n');
+
+      // If SMTP is configured (via env vars), attempt to send email using nodemailer
+      const smtpHost = process.env.SMTP_HOST;
+      const smtpUser = process.env.SMTP_USER;
+      const smtpPass = process.env.SMTP_PASS;
+
+      if (smtpHost && smtpUser && smtpPass) {
+        // dynamic import nodemailer to avoid hard dependency if not configured
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const nodemailer = require('nodemailer');
+        const transporter = nodemailer.createTransport({
+          host: smtpHost,
+          port: Number(process.env.SMTP_PORT) || 587,
+          secure: process.env.SMTP_SECURE === 'true',
+          auth: {
+            user: smtpUser,
+            pass: smtpPass
+          }
+        });
+
+        const mailOptions = {
+          from: process.env.EMAIL_FROM || smtpUser,
+          to: email,
+          subject: `Match Summary: ${(match.team1 as any)?.name || ''} vs ${(match.team2 as any)?.name || ''}`,
+          text: summaryText
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        return res.json({ message: 'Summary sent', info });
+      }
+
+      // If no SMTP, return summary content so client can handle sending
+      return res.json({ message: 'No SMTP configured', summary: summaryText });
+    } catch (error: any) {
+      console.error('Error sending match summary:', error);
+      res.status(500).json({ message: error.message || 'Failed to send match summary' });
+    }
+  },
+
   // Legacy update score method (kept for backwards compatibility)
   updateScore: async (req: Request, res: Response) => {
     try {

@@ -111,51 +111,24 @@ const MatchList: React.FC = () => {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   const fetchMatches = useCallback(async () => {
-    console.log('MatchList: fetchMatches called');
-    console.log('MatchList: Authentication state:', {
-      isAuthenticated: localStorage.getItem('isAuthenticated'),
-      userRole: localStorage.getItem('userRole'),
-      currentUserId
-    });
-    
     try {
-      console.log('MatchList: Making API call to matchService.getAll() with userId:', currentUserId);
       const response = await matchService.getAll(currentUserId || undefined);
-      console.log('MatchList: API response received:', response);
-      console.log('MatchList: Setting matches state with', response.data?.length || 0, 'matches');
       setMatches(response.data);
     } catch (error: any) {
       console.error('MatchList: Error fetching matches:', error);
-      console.error('MatchList: Error details:', {
-        message: error?.message,
-        response: error?.response,
-        status: error?.response?.status,
-        data: error?.response?.data
-      });
     }
   }, [currentUserId]);
 
   const fetchTeams = async () => {
-    console.log('MatchList: fetchTeams called');
     try {
-      console.log('MatchList: Making API call to teamService.getAll()');
       const response = await teamService.getAll();
-      console.log('MatchList: Teams API response received:', response);
-      console.log('MatchList: Setting teams state with', response.data?.length || 0, 'teams');
       setTeams(response.data);
     } catch (error: any) {
       console.error('MatchList: Error fetching teams:', error);
-      console.error('MatchList: Teams error details:', {
-        message: error?.message,
-        response: error?.response,
-        status: error?.response?.status,
-        data: error?.response?.data
-      });
     }
   };
 
   useEffect(() => {
-    console.log('MatchList: Component mounted, calling fetchMatches and fetchTeams');
     fetchMatches();
     fetchTeams();
   }, [fetchMatches]);
@@ -261,7 +234,7 @@ const MatchList: React.FC = () => {
     setEditError(null);
 
     try {
-      console.log('Starting match edit with data:', editMatch);
+  // Starting match edit (debug log removed)
 
       // Validate required fields
       if (!editMatch.team1 || !editMatch.team2) {
@@ -322,11 +295,7 @@ const MatchList: React.FC = () => {
         tossDecision: updatedMatch.tossDecision,
       };
 
-      console.log('Sending update data:', updateData);
-
-      await matchService.update(editMatch._id!, updateData as any);
-
-      console.log('Match updated successfully');
+  await matchService.update(editMatch._id!, updateData as any);
       handleEditClose();
       fetchMatches();
     } catch (error: any) {
@@ -389,7 +358,7 @@ const MatchList: React.FC = () => {
       await fetchMatches();
       handleDeleteDialogClose();
       
-      console.log(`${selectedMatches.length} match(es) deleted successfully`);
+  // Matches deleted successfully (debug log removed)
     } catch (error) {
       console.error('Error deleting selected matches:', error);
     }
@@ -524,6 +493,28 @@ const MatchList: React.FC = () => {
           }}
         >
           <AddIcon />
+        </Fab>
+      )}
+
+      {/* Floating Delete FAB for SuperAdmin when matches selected (mobile) */}
+      {isSuperAdmin && isMobile && selectedMatches.length > 0 && (
+        <Fab
+          aria-label="delete-selected"
+          color="error"
+          onClick={handleDeleteSelectedOpen}
+          sx={{
+            position: 'fixed',
+            bottom: 96, // stacked above the add FAB
+            right: 24,
+            zIndex: 1001,
+            background: 'linear-gradient(135deg, #f44336 0%, #d32f2f 100%)',
+            color: 'white',
+            '&:hover': {
+              transform: 'scale(1.05)'
+            }
+          }}
+        >
+          <DeleteForeverIcon />
         </Fab>
       )}
 

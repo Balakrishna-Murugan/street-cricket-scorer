@@ -240,10 +240,10 @@ const PlayerList: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      console.log('Promoting player:', playerId, 'by user:', currentUser._id);
-      await playerService.promoteToAdmin(playerId, currentUser._id);
-      fetchPlayers(); // Refresh the list to show updated roles
-      setError('Player promoted to admin successfully');
+  // Promoting player (debug log removed)
+  await playerService.promoteToAdmin(playerId, currentUser._id);
+  fetchPlayers(); // Refresh the list to show updated roles
+  setSuccess('Player promoted to admin successfully');
     } catch (error: any) {
       console.error('Error promoting player:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Failed to promote player to admin';
@@ -268,10 +268,10 @@ const PlayerList: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      console.log('Demoting player:', playerId, 'by user:', currentUser._id);
-      await playerService.demoteFromAdmin(playerId, currentUser._id);
-      fetchPlayers(); // Refresh the list to show updated roles
-      setError('Admin demoted to player successfully');
+  // Demoting player (debug log removed)
+  await playerService.demoteFromAdmin(playerId, currentUser._id);
+  fetchPlayers(); // Refresh the list to show updated roles
+  setSuccess('Admin demoted to player successfully');
     } catch (error: any) {
       console.error('Error demoting admin:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Failed to demote admin';

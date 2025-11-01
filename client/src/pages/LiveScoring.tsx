@@ -176,6 +176,9 @@ const LiveScoring: React.FC<Props> = () => {
   
   // New state for player selection dialog
   const [isPlayerSelectionDialogOpen, setIsPlayerSelectionDialogOpen] = useState(false);
+  // Track when a player-change flow is active (so we can distinguish tactical swaps
+  // from wicket flows and avoid auto-opening the wicket/new-batsman context)
+  const [isPlayerChangeInProgress, setIsPlayerChangeInProgress] = useState(false);
   
   // State for player change functionality
   const [isPlayerChangeDialogOpen, setIsPlayerChangeDialogOpen] = useState(false);
@@ -245,13 +248,7 @@ const LiveScoring: React.FC<Props> = () => {
 
   // Helper function to get dialog context
   const getDialogContext = useCallback((): DialogContext => {
-    console.log('🔍 DEBUG getDialogContext called with:', {
-      changePlayerType,
-      isOverCompleted,
-      isWaitingForNewBatsman,
-      matchInningsLength: match?.innings?.length,
-      currentInnings
-    });
+    // debug info removed
 
     if (changePlayerType) {
       // Player change context
@@ -264,7 +261,7 @@ const LiveScoring: React.FC<Props> = () => {
           showOnlyNonStriker: false,
           gradientColor: 'linear-gradient(45deg, #9C27B0 30%, #BA68C8 90%)'
         };
-        console.log('🔍 DEBUG returning bowler change context:', context);
+  // returning bowler change context
         return context;
       } else if (changePlayerType === 'striker') {
         const context = {
@@ -275,7 +272,7 @@ const LiveScoring: React.FC<Props> = () => {
           showOnlyNonStriker: false,
           gradientColor: 'linear-gradient(45deg, #FF5722 30%, #FF8A65 90%)'
         };
-        console.log('🔍 DEBUG returning striker change context:', context);
+  // returning striker change context
         return context;
       } else if (changePlayerType === 'nonStriker') {
         const context = {
@@ -286,7 +283,7 @@ const LiveScoring: React.FC<Props> = () => {
           showOnlyNonStriker: true,
           gradientColor: 'linear-gradient(45deg, #607D8B 30%, #90A4AE 90%)'
         };
-        console.log('🔍 DEBUG returning nonStriker change context:', context);
+  // returning nonStriker change context
         return context;
       }
     }
@@ -300,7 +297,7 @@ const LiveScoring: React.FC<Props> = () => {
         showOnlyNonStriker: false,
         gradientColor: 'linear-gradient(45deg, #FF9800 30%, #FFB74D 90%)'
       };
-      console.log('🔍 DEBUG returning over completed context:', context);
+  // returning over completed context
       return context;
     } else if (isWaitingForNewBatsman) {
       const context = {
@@ -311,7 +308,7 @@ const LiveScoring: React.FC<Props> = () => {
         showOnlyNonStriker: false,
         gradientColor: 'linear-gradient(45deg, #f44336 30%, #e57373 90%)'
       };
-      console.log('🔍 DEBUG returning wicket context:', context);
+  // returning wicket context
       return context;
     } else {
       const context = {
@@ -322,7 +319,7 @@ const LiveScoring: React.FC<Props> = () => {
         showOnlyNonStriker: false,
         gradientColor: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)'
       };
-      console.log('🔍 DEBUG returning default match start context:', context);
+      // returning default match start context
       return context;
     }
   }, [isOverCompleted, isWaitingForNewBatsman, match, currentInnings, changePlayerType, changePlayerReason]);
@@ -330,32 +327,15 @@ const LiveScoring: React.FC<Props> = () => {
   // Helper function to check if required selections are made based on context
   const areRequiredSelectionsComplete = useCallback(() => {
     const context = getDialogContext();
-    console.log('🔍 DEBUG areRequiredSelectionsComplete:', {
-      context,
-      bowler,
-      striker,
-      nonStriker,
-      showOnlyBowler: context.showOnlyBowler,
-      showOnlyStriker: context.showOnlyStriker,
-      showOnlyNonStriker: (context as any).showOnlyNonStriker
-    });
 
     if (context.showOnlyBowler) {
-      const result = !!bowler;
-      console.log('🔍 DEBUG showOnlyBowler check:', result);
-      return result;
+      return !!bowler;
     } else if (context.showOnlyStriker) {
-      const result = !!striker && striker !== nonStriker;
-      console.log('🔍 DEBUG showOnlyStriker check:', result, { striker, nonStriker, different: striker !== nonStriker });
-      return result;
+      return !!striker && striker !== nonStriker;
     } else if ((context as any).showOnlyNonStriker) {
-      const result = !!nonStriker && striker !== nonStriker;
-      console.log('🔍 DEBUG showOnlyNonStriker check:', result, { striker, nonStriker, different: striker !== nonStriker });
-      return result;
+      return !!nonStriker && striker !== nonStriker;
     } else {
-      const result = arePlayersSelected();
-      console.log('🔍 DEBUG arePlayersSelected check:', result, { striker, nonStriker, bowler, strikerNotEqualNonStriker: striker !== nonStriker });
-      return result;
+      return arePlayersSelected();
     }
   }, [getDialogContext, bowler, striker, nonStriker, arePlayersSelected]);
 
@@ -653,7 +633,7 @@ const LiveScoring: React.FC<Props> = () => {
       
       // Sync currentInnings state with match data
       if (data && typeof data.currentInnings === 'number') {
-        console.log('FetchMatch - Setting currentInnings to:', data.currentInnings);
+        // Sync currentInnings from server data
         setCurrentInnings(data.currentInnings);
       } else {
         setCurrentInnings(0);
@@ -691,12 +671,7 @@ const LiveScoring: React.FC<Props> = () => {
           setIsOverInProgress(true);
           setIsOverCompleted(false);
           
-          // FIXED: Restore current over's ball-by-ball history when resuming match
-          console.log('Ball data check:', {
-            currentOverBalls: currentInning.currentOverBalls?.length || 0,
-            recentBalls: currentInning.recentBalls?.length || 0,
-            totalBalls: currentInning.balls
-          });
+          // FIXED: Restore current over's ball-by-ball history when resuming match (debug logs removed)
           
           // WORKAROUND: Check localStorage for current over data as backup
           const matchStorageKey = `currentOverBalls_${matchId}_${currentInnings}`;
@@ -892,7 +867,7 @@ const LiveScoring: React.FC<Props> = () => {
             await matchService.updateScore(match._id, cleanedMatch);
 
           } catch (error) {
-            console.log('Failed to save recentBalls initialization:', error);
+            console.error('Failed to save recentBalls initialization:', error);
           }
         }
       }
@@ -955,6 +930,8 @@ const LiveScoring: React.FC<Props> = () => {
   const handlePlayerChange = (playerType: 'striker' | 'nonStriker' | 'bowler') => {
     setChangePlayerType(playerType);
     setIsPlayerChangeDialogOpen(true);
+    // mark that a player-change flow has started
+    setIsPlayerChangeInProgress(true);
   };
 
   const handlePlayerChangeSubmit = () => {
@@ -968,9 +945,15 @@ const LiveScoring: React.FC<Props> = () => {
       setIsOverCompleted(false);
       setIsWaitingForNewBatsman(false);
     } else if (changePlayerType === 'striker') {
-      // For striker change, set only striker selection
+      // For striker change, only set waiting-for-new-batsman when the change
+      // is due to injury/retire_hurt. Tactical or other changes shouldn't trigger
+      // the wicket/new-batsman flow.
       setIsOverCompleted(false);
-      setIsWaitingForNewBatsman(true);
+      if (changePlayerReason === 'injury' || changePlayerReason === 'retire_hurt') {
+        setIsWaitingForNewBatsman(true);
+      } else {
+        setIsWaitingForNewBatsman(false);
+      }
     }
     // Note: For non-striker changes, we'll handle in the selection dialog context
   };
@@ -979,6 +962,8 @@ const LiveScoring: React.FC<Props> = () => {
     setIsPlayerChangeDialogOpen(false);
     setChangePlayerType(null);
     setChangePlayerReason('');
+    // canceling the change should clear the in-progress flag
+    setIsPlayerChangeInProgress(false);
   };
 
   // determine if the current user is the match creator (owner)
@@ -1000,30 +985,14 @@ const LiveScoring: React.FC<Props> = () => {
 
   // Auto-open player selection dialog when match loads if no players selected
   useEffect(() => {
-    console.log('🔍 DEBUG Auto-open useEffect triggered:', {
-      match: !!match,
-      canEdit,
-      arePlayersSelected: arePlayersSelected(),
-      isPlayerSelectionDialogOpen,
-      loading,
-      userDismissedDialog,
-      isOverInProgress,
-      striker,
-      nonStriker,
-      bowler
-    });
-
-  if (match && canEdit && !isPlayerSelectionDialogOpen && !loading && !userDismissedDialog && 
+    if (match && canEdit && !isPlayerSelectionDialogOpen && !loading && !userDismissedDialog &&
         (!arePlayersSelected() || (arePlayersSelected() && !isOverInProgress))) {
-      console.log('🔍 DEBUG Opening player selection dialog automatically');
       // Small delay to ensure UI has rendered
       const timer = setTimeout(() => {
         setIsPlayerSelectionDialogOpen(true);
       }, 500);
-      
+
       return () => clearTimeout(timer);
-    } else {
-      console.log('🔍 DEBUG NOT opening dialog - conditions not met');
     }
   }, [match, canEdit, arePlayersSelected, isPlayerSelectionDialogOpen, loading, userDismissedDialog, isOverInProgress, striker, nonStriker, bowler]);
 
@@ -1044,7 +1013,7 @@ const LiveScoring: React.FC<Props> = () => {
 
   // Auto-open player selection dialog when waiting for new batsman after wicket
   useEffect(() => {
-    if (isWaitingForNewBatsman && canEdit && !isPlayerSelectionDialogOpen) {
+    if (isWaitingForNewBatsman && !isPlayerChangeInProgress && canEdit && !isPlayerSelectionDialogOpen) {
       // Reset dismissed flag for wicket situations - this is a required selection
       setUserDismissedDialog(false);
       
@@ -1055,7 +1024,7 @@ const LiveScoring: React.FC<Props> = () => {
       
       return () => clearTimeout(timer);
     }
-  }, [isWaitingForNewBatsman, canEdit, isPlayerSelectionDialogOpen]);
+  }, [isWaitingForNewBatsman, canEdit, isPlayerSelectionDialogOpen, isPlayerChangeInProgress]);
 
   const handleBallOutcome = async (runs: number, isExtra: boolean = false) => {
     if (!match || !matchId) return;
@@ -1294,9 +1263,8 @@ const LiveScoring: React.FC<Props> = () => {
       if (newRecentBalls.length > 12) {
         newRecentBalls.splice(0, newRecentBalls.length - 12);
       }
-      currentInning.recentBalls = newRecentBalls;
-      match.innings[currentInnings].recentBalls = newRecentBalls;
-      console.log(`✅ Ball saved: recentBalls=${newRecentBalls.length}, currentOverBalls=${newCurrentOverBalls.length}`);
+  currentInning.recentBalls = newRecentBalls;
+  match.innings[currentInnings].recentBalls = newRecentBalls;
       
       // WORKAROUND: Also save to localStorage as backup until server schema is applied
       const matchStorageKey = `currentOverBalls_${matchId}_${currentInnings}`;
@@ -1429,7 +1397,7 @@ const LiveScoring: React.FC<Props> = () => {
           if (match && match.innings && match.innings[currentInnings]) {
             match.innings[currentInnings].currentOverBalls = [];
           }
-          console.log('Over completed - cleared currentOverBalls');
+          // Over completed - cleared currentOverBalls (log removed)
         }
         
         // Mark bowler's last bowling over
@@ -1567,10 +1535,10 @@ const LiveScoring: React.FC<Props> = () => {
 
       const cleanedMatch = cleanMatchData(updatedMatch);
 
-      console.log(`💾 Saving to server: recentBalls=${cleanedMatch.innings[currentInnings]?.recentBalls?.length || 0}, currentOverBalls=${cleanedMatch.innings[currentInnings]?.currentOverBalls?.length || 0}`);
-      const { data } = await matchService.updateScore(matchId, cleanedMatch);
-      
-      console.log(`📥 Server response: recentBalls=${data.innings[currentInnings]?.recentBalls?.length || 0}, currentOverBalls=${data.innings[currentInnings]?.currentOverBalls?.length || 0}`);
+  // Saving to server (debug logs removed)
+  const { data } = await matchService.updateScore(matchId, cleanedMatch);
+
+  // Server response received (debug logs removed)
       
       // Update local state with the response data to keep in sync
       setMatch(data);
@@ -1757,7 +1725,7 @@ const LiveScoring: React.FC<Props> = () => {
         if (match && match.innings && match.innings[currentInnings]) {
           match.innings[currentInnings].currentOverBalls = [];
         }
-        console.log('Over completed (extras) - cleared currentOverBalls');
+        // Over completed (extras) - cleared currentOverBalls (log removed)
         
         if (bowlerBowlingStats) {
           bowlerBowlingStats.lastBowledOver = completeInningsOvers;
@@ -1798,7 +1766,7 @@ const LiveScoring: React.FC<Props> = () => {
     // WORKAROUND: Also save to localStorage as backup until server schema is applied
     const matchStorageKey = `currentOverBalls_${matchId}_${currentInnings}`;
     localStorage.setItem(matchStorageKey, JSON.stringify(newCurrentOverBalls));
-    console.log('Saved extra ball currentOverBalls to localStorage as backup:', matchStorageKey, extraBall);
+  // Saved extra ball currentOverBalls to localStorage as backup (log removed)
     
     // Calculate overs and economy for bowler
     const totalBalls = bowlerBowlingStats.balls;
@@ -2076,14 +2044,14 @@ const LiveScoring: React.FC<Props> = () => {
     // WORKAROUND: Also save to localStorage as backup until server schema is applied
     const matchStorageKey = `currentOverBalls_${matchId}_${currentInnings}`;
     localStorage.setItem(matchStorageKey, JSON.stringify(newCurrentOverBalls));
-    console.log('Saved wicket ball currentOverBalls to localStorage as backup:', matchStorageKey, wicketBall);
+  // Saved wicket ball currentOverBalls to localStorage as backup (log removed)
 
     // Check if no more batsmen are available (for teams with less than 10 players)
     const availableBatsmen = getAvailableBatsmen();
     // Need at least 2 batsmen to continue (striker + non-striker)
     // Current striker is now out, so we need at least 2 remaining players
     const availableBatsmenCount = availableBatsmen.length;
-    console.log('Available batsmen after wicket:', availableBatsmenCount, availableBatsmen.map(p => p.name));
+  // Available batsmen after wicket computed (log removed)
     
     if (availableBatsmenCount < 2) {
       // Not enough batsmen to continue - innings ends
@@ -2600,7 +2568,7 @@ const LiveScoring: React.FC<Props> = () => {
             if (match && match.innings && match.innings[currentInnings]) {
               match.innings[currentInnings].currentOverBalls = [];
             }
-            console.log('Over completed - cleared currentOverBalls');
+            // Over completed - cleared currentOverBalls (log removed)
           }
         }
         
@@ -2660,7 +2628,7 @@ const LiveScoring: React.FC<Props> = () => {
       if (match && match.innings && match.innings[currentInnings]) {
         match.innings[currentInnings].currentOverBalls = [];
       }
-      console.log('New over started - cleared currentOverBalls');
+      // New over started - cleared currentOverBalls (log removed)
     }
     
     // Reset mid-over change permission after use
@@ -3697,7 +3665,7 @@ const LiveScoring: React.FC<Props> = () => {
                     <Box>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <strong>{playerName}</strong>
-                        {canEdit && !stat.isOut && (
+                        {canEdit && !stat.isOut && (playerId === striker || playerId === nonStriker) && (
                           <Tooltip title="Change Batsman">
                             <IconButton
                               size="small"
@@ -4957,30 +4925,69 @@ const LiveScoring: React.FC<Props> = () => {
           <Button 
             variant="contained" 
             onClick={() => {
-              console.log('🔍 DEBUG Dialog Continue button clicked:', {
-                areRequiredSelectionsComplete: areRequiredSelectionsComplete(),
-                changePlayerType,
-                isOverCompleted,
-                isWaitingForNewBatsman,
-                striker,
-                nonStriker,
-                bowler,
-                getDialogContext: getDialogContext()
-              });
+              // Dialog Continue clicked (debug info removed)
 
               if (areRequiredSelectionsComplete()) {
-                console.log('🔍 DEBUG Selections are complete, proceeding...');
+                // Selections are complete, proceeding
                 setUserDismissedDialog(false); // Reset flag when players are properly selected
                 setIsPlayerSelectionDialogOpen(false);
                 
                 // Handle different contexts
                 if (changePlayerType) {
-                  console.log('🔍 DEBUG Handling player change context');
-                  // Player change - reset the change state and continue
+                  // Handling player change context
+                  // Player change - sync local match batting stats so UI updates immediately
+                  if (match) {
+                    const updatedMatch = { ...match };
+                    updatedMatch.currentInnings = currentInnings;
+                    const currInning = updatedMatch.innings[currentInnings];
+                    if (!currInning.battingStats) currInning.battingStats = [];
+
+                    const ensureBattingStat = (playerId: string | undefined, isOnStrike: boolean) => {
+                      if (!playerId) return;
+                      let stat = currInning.battingStats.find((s: any) => (typeof s.player === 'string' ? s.player : s.player._id) === playerId);
+                      if (!stat) {
+                        currInning.battingStats.push({
+                          player: playerId,
+                          runs: 0,
+                          balls: 0,
+                          fours: 0,
+                          sixes: 0,
+                          isOut: false,
+                          strikeRate: 0,
+                          isOnStrike: isOnStrike
+                        });
+                      } else {
+                        stat.isOnStrike = isOnStrike;
+                      }
+                    };
+
+                    // Ensure striker/non-striker entries exist and mark strike
+                    ensureBattingStat(striker || undefined, true);
+                    ensureBattingStat(nonStriker || undefined, false);
+
+                    // Ensure all other batting stats have correct isOnStrike flag
+                    currInning.battingStats.forEach((s: any) => {
+                      const pid = typeof s.player === 'string' ? s.player : s.player._id;
+                      s.isOnStrike = pid === striker;
+                    });
+
+                    // Update local match state so MatchDetails and grids reflect immediately
+                    setMatch(updatedMatch);
+
+                    // Update local striker/non-striker summary stats
+                    const newStrikerStat = currInning.battingStats.find((st: any) => (typeof st.player === 'string' ? st.player : st.player._id) === striker);
+                    const newNonStrikerStat = currInning.battingStats.find((st: any) => (typeof st.player === 'string' ? st.player : st.player._id) === nonStriker);
+                    setStrikerStats({ runs: newStrikerStat?.runs || 0, balls: newStrikerStat?.balls || 0 });
+                    setNonStrikerStats({ runs: newNonStrikerStat?.runs || 0, balls: newNonStrikerStat?.balls || 0 });
+                  }
+
+                  // Player change completed - reset change dialog state
                   setChangePlayerType(null);
                   setChangePlayerReason('');
+                  // Player-change flow finished
+                  setIsPlayerChangeInProgress(false);
                 } else if (isOverCompleted) {
-                  console.log('🔍 DEBUG Handling over completion context');
+                  // Handling over completion context
                   // Over completion - reset the over completion state and clear current over
                   setIsOverCompleted(false);
                   setOverCompletionMessage('');
@@ -4997,20 +5004,19 @@ const LiveScoring: React.FC<Props> = () => {
                   // WORKAROUND: Also clear localStorage backup when over is completed
                   const matchStorageKey = `currentOverBalls_${matchId}_${currentInnings}`;
                   localStorage.setItem(matchStorageKey, JSON.stringify([]));
-                  console.log('Cleared currentOverBalls from localStorage for new over:', matchStorageKey);
                 } else if (isWaitingForNewBatsman) {
-                  console.log('🔍 DEBUG Handling wicket context');
+                  // Handling wicket context
                   // Wicket - reset the waiting state and continue
                   setIsWaitingForNewBatsman(false);
                 } else {
-                  console.log('🔍 DEBUG Handling match start/continue context');
+                  // Handling match start/continue context
                   // Match start/continue - start the match
                   setIsOverInProgress(true);
                   setIsOverCompleted(false);
                   setOverCompletionMessage('');
                 }
               } else {
-                console.log('🔍 DEBUG Selections are NOT complete, button should be disabled');
+                // Selections are NOT complete, button should be disabled
               }
             }}
             disabled={!areRequiredSelectionsComplete()}

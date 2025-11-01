@@ -4,6 +4,13 @@ import {
   Paper,
   Typography,
   Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Snackbar,
+  Alert,
   Card,
   CardContent,
   Chip,
@@ -32,6 +39,9 @@ const MatchOverview: React.FC = () => {
   const [teams, setTeams] = useState<{ [key: string]: Team }>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [emailToSend, setEmailToSend] = useState('');
+  const [emailStatus, setEmailStatus] = useState<{ open: boolean; message: string; severity: 'success' | 'error' } | null>(null);
 
   // Get user role for admin buttons
   const userRole = localStorage.getItem('userRole') || 'viewer';
@@ -47,7 +57,7 @@ const MatchOverview: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        console.log('MatchOverview: Fetching data for matchId:', matchId);
+  // Fetching data for matchId (debug log removed)
         
         if (!matchId) {
           setError('No match ID provided');
@@ -56,8 +66,8 @@ const MatchOverview: React.FC = () => {
         }
 
         // Fetch match details
-        const matchResponse = await matchService.getById(matchId);
-        console.log('MatchOverview: Match data fetched:', matchResponse.data);
+  const matchResponse = await matchService.getById(matchId);
+  // Match data fetched (debug log removed)
         setMatch(matchResponse.data);
 
         // Fetch all teams
@@ -346,11 +356,76 @@ const MatchOverview: React.FC = () => {
               >
                 View Summary
               </Button>
+              <Button
+                variant="outlined"
+                size="large"
+                startIcon={<SummarizeIcon />}
+                onClick={() => setEmailDialogOpen(true)}
+                sx={{ 
+                  minWidth: isMobile ? '100%' : '180px',
+                  py: 2,
+                  fontSize: '1rem',
+                  color: 'white',
+                  borderColor: 'rgba(255,255,255,0.5)',
+                  '&:hover': {
+                    borderColor: 'white',
+                    backgroundColor: 'rgba(255,255,255,0.1)',
+                  }
+                }}
+              >
+                Email Summary
+              </Button>
             </Stack>
           </Stack>
           
         </Box>
       </Paper>
+
+      <Dialog open={emailDialogOpen} onClose={() => setEmailDialogOpen(false)}>
+        <DialogTitle>Send Match Summary</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 1 }}>Enter recipient email address to send a match summary.</Typography>
+          <TextField
+            fullWidth
+            label="Email"
+            value={emailToSend}
+            onChange={(e) => setEmailToSend(e.target.value)}
+            type="email"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEmailDialogOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={async () => {
+              if (!matchId) return;
+              try {
+                setLoading(true);
+                const resp = await matchService.sendSummary(matchId, emailToSend);
+                // If server returns summary or success
+                setEmailStatus({ open: true, message: resp.data?.message || 'Summary sent', severity: 'success' });
+                setEmailDialogOpen(false);
+              } catch (err: any) {
+                console.error('Failed to send summary:', err);
+                const msg = err?.response?.data?.message || err?.message || 'Failed to send summary';
+                setEmailStatus({ open: true, message: msg, severity: 'error' });
+              } finally {
+                setLoading(false);
+              }
+            }}
+          >
+            Send
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar open={!!emailStatus?.open} autoHideDuration={4000} onClose={() => setEmailStatus(null)}>
+        {emailStatus ? (
+          <Alert onClose={() => setEmailStatus(null)} severity={emailStatus.severity}>
+            {emailStatus.message}
+          </Alert>
+        ) : undefined}
+      </Snackbar>
     </Box>
   );
 };

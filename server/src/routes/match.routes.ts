@@ -31,6 +31,9 @@ router.post('/:matchId/new-over', authMiddleware.requireAuth, matchController.st
 // PUT update current batsmen
 router.put('/:matchId/batsmen', authMiddleware.requireAuth, matchController.updateBatsmen);
 
+// POST send match summary via email (body: { email })
+router.post('/:matchId/send-summary', authMiddleware.requireAuth, matchController.sendSummary);
+
 // DELETE match
 router.delete('/:id', authMiddleware.requireAuth, matchController.delete);
 

@@ -259,7 +259,7 @@ const TeamList: React.FC = () => {
   };
 
   const handleSubmit = async (continueAdding: boolean = false) => {
-    console.log('Form submission started with newTeam:', newTeam); // Debug log
+  // Form submission started (debug log removed)
     
     if (!newTeam.name) {
       setError('Please fill in team name');
@@ -282,18 +282,17 @@ const TeamList: React.FC = () => {
       };
       
       // Only add captain if a valid one is selected
-      console.log('Captain value before processing:', `"${newTeam.captain}"`); // Debug log
+  // Captain value before processing (debug log removed)
       if (newTeam.captain && 
           newTeam.captain.trim() !== '' && 
           newTeam.captain !== 'undefined' && 
           newTeam.captain !== 'null') {
-        teamData.captain = newTeam.captain.trim();
-        console.log('Captain added to teamData:', teamData.captain); // Debug log
+  teamData.captain = newTeam.captain.trim();
       } else {
-        console.log('No captain selected, captain field omitted'); // Debug log
+        // No captain selected, captain field omitted (debug log removed)
       }
       
-      console.log('Sending team data:', JSON.stringify(teamData, null, 2)); // Better debug log
+  // Sending team data (debug log removed)
       
       let savedTeam: Team;
   if (editingTeam?._id) {
@@ -406,9 +405,8 @@ const TeamList: React.FC = () => {
       
       // Update players if there are changes
       if (playerUpdates.length > 0) {
-        console.log('Updating player teams:', playerUpdates);
+        // Updating player teams (debug logs removed)
         await playerService.updatePlayerTeams(playerUpdates);
-        console.log(`Updated ${playerUpdates.length} players' team assignments`);
       }
     } catch (error) {
       console.error('Error updating player teams:', error);
@@ -745,7 +743,7 @@ const TeamList: React.FC = () => {
                   value={newTeam.captain ? players.find(p => p._id === newTeam.captain) || null : null}
                   onChange={(event, newValue) => {
                     const value = newValue?._id || '';
-                    console.log('Captain selection changed to:', value); // Debug log
+                    // Captain selection changed (debug log removed)
                     setNewTeam({ ...newTeam, captain: value });
                   }}
                   renderInput={(params) => (

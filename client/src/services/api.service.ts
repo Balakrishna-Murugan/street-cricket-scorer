@@ -146,6 +146,7 @@ export const matchService = {
   update: (id: string, data: Partial<Match>) => api.put<Match>(`/matches/${id}`, data),
   updateScore: (matchId: string, data: Match) => api.put<Match>(`/matches/${matchId}/score`, data),
   delete: (id: string) => api.delete(`/matches/${id}`),
+  sendSummary: (matchId: string, email: string) => api.post(`/matches/${matchId}/send-summary`, { email }),
   
   // NEW ENHANCED BALL-BY-BALL TRACKING METHODS
   processBall: (matchId: string, ballData: BallData) => 

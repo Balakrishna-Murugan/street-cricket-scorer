@@ -174,9 +174,9 @@ const MatchSummary: React.FC = () => {
             >
               {/* Score Summary */}
               <Box sx={{ 
-                my: 2,
-                mx: 3,
-                p: 3, 
+                my: 1,
+                mx: 2,
+                p: 1, 
                 background: 'rgba(255, 255, 255, 0.1)', 
                 borderRadius: 2,
                 border: '2px solid rgba(255, 255, 255, 0.2)',
@@ -224,7 +224,7 @@ const MatchSummary: React.FC = () => {
               </Box>
 
               {/* Batting Section */}
-              <Box sx={{ px: 3, pb: 2 }}>
+              <Box sx={{ px: 1, pb: 1 }}>
                 <Typography 
                   variant="h6" 
                   sx={{ 
@@ -440,7 +440,7 @@ const MatchSummary: React.FC = () => {
 
 
               {/* Bowling Section */}
-              <Box sx={{ px: 3, pb: 3 }}>
+              <Box sx={{ px: 1, pb: 1 }}>
                 <Typography
                   variant="h6"
                   sx={{
@@ -530,7 +530,7 @@ const MatchSummary: React.FC = () => {
               </Box>
 
               {/* Fall of Wickets Section */}
-              <Box sx={{ px: 3, pb: 3 }}>
+              <Box sx={{ px: 1, pb: 1 }}>
                 <Typography
                   variant="h6"
                   sx={{
@@ -864,7 +864,7 @@ const MatchSummary: React.FC = () => {
                   {/* Batting Section */}
                   <Box sx={{ 
                     flex: 1,
-                    p: 3,
+                    p: 1,
                     background: 'rgba(255, 255, 255, 0.05)',
                     borderRight: { xs: 'none', md: '1px solid rgba(255, 255, 255, 0.1)' },
                     borderBottom: { xs: '1px solid rgba(255, 255, 255, 0.1)', md: 'none' }
@@ -970,7 +970,7 @@ const MatchSummary: React.FC = () => {
                   {/* Bowling Section */}
                   <Box sx={{ 
                     flex: 1,
-                    p: 3,
+                    p: 1,
                     background: 'rgba(255, 255, 255, 0.05)'
                   }}>
                     <Box sx={{ 

@@ -96,10 +96,10 @@ const Login: React.FC = () => {
     setError(null);
 
     try {
-      console.log('Client: Attempting login with:', { username, password: '***' });
+  // Attempting login (debug log removed)
       const loginData: LoginRequest = { username, password };
       const response = await authService.login(loginData);
-      console.log('Client: Login response received:', response.data);
+  // Login response received (debug log removed)
       
       // Store user data in localStorage
       localStorage.setItem('isAuthenticated', 'true');
@@ -129,10 +129,10 @@ const Login: React.FC = () => {
     setError(null);
 
     try {
-      console.log('Client: Attempting guest login with name:', guestName);
+  // Attempting guest login (debug log removed)
       const guestData: GuestLoginRequest = { name: guestName.trim() };
       const response = await authService.guestLogin(guestData);
-      console.log('Client: Guest login response received:', response.data);
+  // Guest login response received (debug log removed)
       
       // Store user data in localStorage
       localStorage.setItem('isAuthenticated', 'true');

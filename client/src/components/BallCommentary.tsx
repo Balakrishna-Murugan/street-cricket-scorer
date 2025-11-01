@@ -23,10 +23,11 @@ const BallCommentary: React.FC<BallCommentaryProps> = ({
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  // Helper to calculate over.ball for a given absolute ball index
+  // Helper to calculate over.ball for a given absolute ball index (1-based over and ball)
   const getOverBall = (absoluteBallIndex: number) => {
-    const over = Math.floor(absoluteBallIndex / 6);
-    const ballNum = absoluteBallIndex % 6;
+    // Use 0-based over numbering to match UI expectation (0.1, 0.2 ... 1.1)
+    const over = Math.floor(absoluteBallIndex / 6); // 0-based overs
+    const ballNum = (absoluteBallIndex % 6) + 1; // ball within over is 1-based
     return `${over}.${ballNum}`;
   };
 
@@ -183,7 +184,11 @@ const BallCommentary: React.FC<BallCommentaryProps> = ({
         </Typography>
         {[...last6Balls].map((ball, i) => {
           // Descending: most recent first
-          const absoluteBallIndex = firstBallIndex + (last6Balls.length - 1 - i);
+          // Prefer using ball.sequenceNumber (if present) which is 1-based absolute ball index in the innings
+          // otherwise fall back to array-based calculation
+          const absoluteBallIndex = ball.sequenceNumber && typeof ball.sequenceNumber === 'number'
+            ? ball.sequenceNumber - 1
+            : firstBallIndex + (last6Balls.length - 1 - i);
           return (
             <Typography 
               key={i} 

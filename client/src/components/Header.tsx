@@ -443,7 +443,7 @@ const Header: React.FC = () => {
                   key={crumb.path}
                   color="inherit"
                   onClick={() => {
-                    console.log('Breadcrumb clicked - navigating to:', crumb.path);
+                    // Breadcrumb clicked - navigating (debug log removed)
                     navigate(crumb.path);
                   }}
                   sx={{ 
