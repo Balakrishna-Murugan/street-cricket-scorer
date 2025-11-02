@@ -1045,18 +1045,26 @@ const LiveScoring: React.FC<Props> = () => {
 
   // Auto-open player selection dialog when over is completed and needs new bowler
   useEffect(() => {
-    if (isOverCompleted && canEdit && !isPlayerSelectionDialogOpen) {
+    // Only auto-open over-completion selection when no other player-change flow is active
+    if (
+      isOverCompleted &&
+      canEdit &&
+      !isPlayerSelectionDialogOpen &&
+      !isPlayerChangeInProgress &&
+      !changePlayerType &&
+      !isBowlerChangeDialogOpen
+    ) {
       // Reset dismissed flag for over completion - this is a required selection
       setUserDismissedDialog(false);
-      
+
       // Delay to allow UI to update the over completion alert first
       const timer = setTimeout(() => {
         setIsPlayerSelectionDialogOpen(true);
       }, 1000);
-      
+
       return () => clearTimeout(timer);
     }
-  }, [isOverCompleted, canEdit, isPlayerSelectionDialogOpen]);
+  }, [isOverCompleted, canEdit, isPlayerSelectionDialogOpen, isPlayerChangeInProgress, changePlayerType, isBowlerChangeDialogOpen]);
 
   // Auto-open player selection dialog when waiting for new batsman after wicket
   useEffect(() => {
