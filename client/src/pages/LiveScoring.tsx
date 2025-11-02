@@ -1068,21 +1068,17 @@ const LiveScoring: React.FC<Props> = () => {
 
   // Auto-open player selection dialog when waiting for new batsman after wicket
   useEffect(() => {
-    // IMPORTANT: Do NOT auto-open the main player-selection dialog for wicket flows.
-    // The main selection dialog should only be auto-opened at innings start.
-    // For wicket flows, show a short instruction so the scorer can deliberately open
-    // the selection UI (or use the player-change dialogs which are explicit flows).
+    // For wicket flows we should open a focused selection for the new batsman
+    // (only striker change) rather than the full innings-start main popup.
     if (isWaitingForNewBatsman && !isPlayerChangeInProgress && canEdit) {
       // Reset dismissed flag for wicket situations - this is a required selection
       setUserDismissedDialog(false);
 
-      // Notify the user to select a new batsman via the Select Players button.
-      // Do not auto-open the large selection dialog to avoid interrupting bowler/player-change flows.
-      try {
-        toast.showInfo('Wicket recorded — please select the new batsman using the "Select Players" button.');
-      } catch (e) {
-        // swallow if toast isn't available
-      }
+      // Start a focused player-change flow for striker replacement
+      setChangePlayerType('striker');
+      setChangePlayerReason('wicket');
+      setIsPlayerChangeInProgress(true);
+      setIsPlayerSelectionDialogOpen(true);
     }
   }, [isWaitingForNewBatsman, canEdit, isPlayerSelectionDialogOpen, isPlayerChangeInProgress, toast]);
 
