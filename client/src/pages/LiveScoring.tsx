@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Match, Player, BallOutcome, PlayerRef } from '../types';
 import { matchService, playerService } from '../services/api.service';
 import MatchDetails from '../components/MatchDetails';
+import InningsTransition from '../components/InningsTransition';
 import {
   Box,
   InputLabel,
@@ -101,6 +102,7 @@ const LiveScoring: React.FC<Props> = () => {
   const { matchId } = useParams();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const navigate = useNavigate();
   
   // Check user info and role for permissions
   const userRole = localStorage.getItem('userRole') || 'viewer';
@@ -189,6 +191,10 @@ const LiveScoring: React.FC<Props> = () => {
   const [changePlayerType, setChangePlayerType] = useState<'striker' | 'nonStriker' | 'bowler' | null>(null);
   const [changePlayerReason, setChangePlayerReason] = useState('');
   const [userDismissedDialog, setUserDismissedDialog] = useState(false); // Track if user manually cancelled
+  // Track whether we already auto-opened the dialog when entering the live scoring view
+  const [hasAutoOpenedOnEnter, setHasAutoOpenedOnEnter] = useState(false);
+  // Track whether we've already auto-handled insufficient batsmen to avoid duplicate actions
+  const [autoInsufficientHandled, setAutoInsufficientHandled] = useState(false);
 
   // State for alert visibility
   const [showSecondInningsAlert, setShowSecondInningsAlert] = useState(true);
@@ -361,7 +367,8 @@ const LiveScoring: React.FC<Props> = () => {
     const context = getDialogContext();
 
     if (context.showOnlyBowler) {
-      return !!bowler;
+      // If user is in a focused bowler-change flow, allow pending selection to satisfy requirement
+      return !!(bowler || pendingBowlerChange);
     } else if (context.showOnlyStriker) {
       return !!striker && striker !== nonStriker;
     } else if ((context as any).showOnlyNonStriker) {
@@ -369,7 +376,7 @@ const LiveScoring: React.FC<Props> = () => {
     } else {
       return arePlayersSelected();
     }
-  }, [getDialogContext, bowler, striker, nonStriker, arePlayersSelected]);
+  }, [getDialogContext, bowler, striker, nonStriker, arePlayersSelected, pendingBowlerChange]);
 
   // Function to handle starting/continuing match with player selection
   const handleStartOrContinueMatch = async () => {
@@ -1040,8 +1047,17 @@ const LiveScoring: React.FC<Props> = () => {
       }, 500);
 
       return () => clearTimeout(timer);
+    } else if (noSelectionsMade && !hasAutoOpenedOnEnter && !userDismissedDialog && !isPlayerSelectionDialogOpen && !loading && canEdit) {
+      // If we're entering the live scoring and selections are empty, open the main dialog
+      // even if some other transient flags exist. This ensures users landing on the page
+      // see the full striker/non-striker/bowler selector when no players are set.
+      setHasAutoOpenedOnEnter(true);
+      const timer2 = setTimeout(() => {
+        setIsPlayerSelectionDialogOpen(true);
+      }, 300);
+      return () => clearTimeout(timer2);
     }
-  }, [match, canEdit, isPlayerSelectionDialogOpen, loading, userDismissedDialog, striker, nonStriker, bowler, currentInnings, isOverCompleted, isWaitingForNewBatsman, changePlayerType, isPlayerChangeInProgress, isBowlerChangeDialogOpen]);
+  }, [match, canEdit, isPlayerSelectionDialogOpen, loading, userDismissedDialog, striker, nonStriker, bowler, currentInnings, isOverCompleted, isWaitingForNewBatsman, changePlayerType, isPlayerChangeInProgress, isBowlerChangeDialogOpen, hasAutoOpenedOnEnter]);
 
   // Auto-open player selection dialog when over is completed and needs new bowler
   useEffect(() => {
@@ -1052,19 +1068,131 @@ const LiveScoring: React.FC<Props> = () => {
       !isPlayerSelectionDialogOpen &&
       !isPlayerChangeInProgress &&
       !changePlayerType &&
-      !isBowlerChangeDialogOpen
+      !isBowlerChangeDialogOpen &&
+      !isMatchCompleted
     ) {
       // Reset dismissed flag for over completion - this is a required selection
       setUserDismissedDialog(false);
 
       // Delay to allow UI to update the over completion alert first
       const timer = setTimeout(() => {
+        // Open a focused bowler-change flow instead of the full main dialog.
+        // This prevents the full player-selection popup from appearing during bowler change.
+        setChangePlayerType('bowler');
+        setChangePlayerReason('over_completed');
+        setIsPlayerChangeInProgress(true);
         setIsPlayerSelectionDialogOpen(true);
       }, 1000);
 
       return () => clearTimeout(timer);
     }
-  }, [isOverCompleted, canEdit, isPlayerSelectionDialogOpen, isPlayerChangeInProgress, changePlayerType, isBowlerChangeDialogOpen]);
+  }, [isOverCompleted, canEdit, isPlayerSelectionDialogOpen, isPlayerChangeInProgress, changePlayerType, isBowlerChangeDialogOpen, isMatchCompleted]);
+  // include isMatchCompleted to ensure we don't auto-open over completion after match ended
+
+  // Auto-handle insufficient batsmen when selection dialog is open
+  useEffect(() => {
+    if (!match || !isPlayerSelectionDialogOpen || autoInsufficientHandled) return;
+
+    try {
+      const available = getAvailableBatsmen();
+      if (available.length < 2) {
+        // Mark as handled to avoid repeated attempts
+        setAutoInsufficientHandled(true);
+
+        (async () => {
+          const updatedMatch = { ...match } as Match;
+          updatedMatch.currentInnings = currentInnings;
+          const currentInning = updatedMatch.innings[currentInnings];
+
+          // If first innings, mark it completed and prepare second innings
+          if (currentInnings === 0) {
+            currentInning.isCompleted = true;
+            try {
+              // Prepare second innings if not present
+              if (!updatedMatch.innings[1]) {
+                const newInnings: any = {
+                  battingTeam: currentInning.bowlingTeam,
+                  bowlingTeam: currentInning.battingTeam,
+                  totalRuns: 0,
+                  wickets: 0,
+                  overs: 0,
+                  balls: 0,
+                  isCompleted: false,
+                  battingStats: [],
+                  bowlingStats: [],
+                  currentState: { currentOver: 0, currentBall: 0, lastBallRuns: 0 },
+                  extras: { wides: 0, noBalls: 0, byes: 0, legByes: 0, total: 0 },
+                  runRate: 0,
+                  currentOverBalls: []
+                };
+                updatedMatch.innings.push(newInnings);
+              }
+
+              const cleaned = cleanMatchData ? cleanMatchData(updatedMatch) : updatedMatch;
+              if (!matchId) {
+                console.error('Cannot auto-complete first innings: missing matchId');
+                toast.showError('Internal error: missing match id');
+                return;
+              }
+              const { data } = await matchService.updateScore(matchId, cleaned);
+              setMatch(data);
+              setIsFirstInningsComplete(true);
+              setOverCompletionMessage(`First innings skipped - not enough batsmen (${available.length} available). Click "Start Second Innings" to continue.`);
+              setIsOverCompleted(true);
+              // Close selection dialog (no players to select)
+              setIsPlayerSelectionDialogOpen(false);
+            } catch (err) {
+              console.error('Error auto completing first innings due to insufficient batsmen:', err);
+              toast.showError('Error auto completing first innings due to insufficient batsmen');
+            }
+          } else {
+            // Second innings - end match immediately
+            try {
+              updatedMatch.status = 'completed';
+              updatedMatch.innings[1].isCompleted = true;
+
+              const firstInnings = updatedMatch.innings[0];
+              const secondInnings = updatedMatch.innings[1];
+              const firstScore = firstInnings.totalRuns || 0;
+              const secondScore = secondInnings.totalRuns || 0;
+
+              if (firstScore > secondScore) {
+                const firstName = typeof firstInnings.battingTeam === 'object' && firstInnings.battingTeam ? firstInnings.battingTeam.name : 'Team 1';
+                updatedMatch.result = `${firstName} won by ${firstScore - secondScore} runs`;
+              } else if (secondScore > firstScore) {
+                const secondName = typeof secondInnings.battingTeam === 'object' && secondInnings.battingTeam ? secondInnings.battingTeam.name : 'Team 2';
+                updatedMatch.result = `${secondName} won by ${secondScore - firstScore} runs`;
+              } else {
+                updatedMatch.result = 'Match ended in a tie';
+              }
+
+              const cleaned = cleanMatchData ? cleanMatchData(updatedMatch) : updatedMatch;
+              if (!matchId) {
+                console.error('Cannot auto-end match: missing matchId');
+                toast.showError('Internal error: missing match id');
+                return;
+              }
+              const { data } = await matchService.updateScore(matchId, cleaned);
+              setMatch(data);
+              setIsMatchCompleted(true);
+              // Clear over-completed instructions since match is finished
+              setIsOverCompleted(false);
+              setOverCompletionMessage(updatedMatch.result || `Match completed - not enough batsmen for second innings (${available.length} available).`);
+              setIsPlayerSelectionDialogOpen(false);
+            } catch (err) {
+              console.error('Error auto ending match due to insufficient batsmen:', err);
+              toast.showError('Error auto ending match due to insufficient batsmen');
+            }
+          }
+        })();
+      }
+    } catch (e) {
+      console.error('Auto insufficient batsmen check failed:', e);
+    }
+  }, [match, isPlayerSelectionDialogOpen, autoInsufficientHandled, currentInnings, getAvailableBatsmen, matchId, cleanMatchData, toast]);
+
+  // If match becomes completed with a result, ensure the match-end dialog is opened
+  // removed match-end dialog effect; we now render a full-screen match-completed view when isMatchCompleted is true
 
   // Auto-open player selection dialog when waiting for new batsman after wicket
   useEffect(() => {
@@ -2820,6 +2948,15 @@ const LiveScoring: React.FC<Props> = () => {
     }
 
     // Persist bowler change immediately
+    // If we're in a focused bowler-change flow (user is in the player-change dialog
+    // and changePlayerType === 'bowler'), do NOT persist yet. Wait for the user to
+    // confirm via the dialog's Continue button.
+    if (isPlayerChangeInProgress && changePlayerType === 'bowler') {
+      // just update local selection so the dialog shows the chosen bowler
+      setPendingBowlerChange(newBowlerId);
+      return;
+    }
+
     (async () => {
       try {
         if (!match || !matchId) return;
@@ -3015,9 +3152,15 @@ const LiveScoring: React.FC<Props> = () => {
       setCurrentOverBalls([]);
       setIsOverInProgress(false);
       setIsOverCompleted(false);
-      
-      // Open player selection dialog for second innings
-      setIsPlayerSelectionDialogOpen(true);
+  // Clear any pending/active player-change flows so the main dialog shows
+  setChangePlayerType(null);
+  setChangePlayerReason('');
+  setIsPlayerChangeInProgress(false);
+  setPendingBowlerChange('');
+  setUserDismissedDialog(false);
+
+  // Open player selection dialog for second innings (full selection)
+  setIsPlayerSelectionDialogOpen(true);
       
     } catch (error) {
       console.error('Error starting second innings:', error);
@@ -3034,56 +3177,32 @@ const LiveScoring: React.FC<Props> = () => {
     const firstInningBattingTeam = typeof firstInning?.battingTeam === 'object' && firstInning.battingTeam
       ? firstInning.battingTeam.name 
       : 'Team 1';
-    const firstInningBowlingTeam = typeof firstInning?.bowlingTeam === 'object' && firstInning.bowlingTeam
-      ? firstInning.bowlingTeam.name 
-      : 'Team 2';
+
+    const message = `${firstInningBattingTeam}: ${firstInning?.totalRuns || 0}/${firstInning?.wickets || 0} • Overs: ${firstInning?.overs || 0} • Target: ${(firstInning?.totalRuns || 0) + 1} in ${match.overs} overs`;
 
     return (
-      <Box sx={{ maxWidth: 'lg', py: isMobile ? 1 : 3, px: isMobile ? 1 : 3, mx: 'auto' }}>
-        <Box sx={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)', p: isMobile ? 1 : 3 }}>
-          <Paper elevation={6} sx={{ p: 4, borderRadius: 3, textAlign: 'center' }}>
-            <Typography variant="h3" sx={{ mb: 3, color: '#2c3e50', fontWeight: 'bold' }}>
-              🏏 First Innings Complete!
-            </Typography>
-            
-            <Box sx={{ mb: 4, p: 3, backgroundColor: '#e8f5e8', borderRadius: 2 }}>
-              <Typography variant="h4" sx={{ mb: 2, color: '#2e7d32' }}>
-                {firstInningBattingTeam}: {firstInning?.totalRuns || 0}/{firstInning?.wickets || 0}
-              </Typography>
-              <Typography variant="h6" sx={{ color: '#4caf50' }}>
-                Overs: {firstInning?.overs || 0} | Run Rate: {(firstInning?.runRate || 0).toFixed(2)}
-              </Typography>
-            </Box>
+      <InningsTransition
+        title={'🏏 First Innings Complete!'}
+        message={message}
+        primaryLabel={'🚀 Start Second Innings'}
+        onPrimary={handleStartSecondInnings}
+        onClose={() => navigate('/matches')}
+        isMobile={isMobile}
+      />
+    );
+  }
 
-            <Typography variant="h5" sx={{ mb: 3, color: '#2c3e50' }}>
-              {firstInningBowlingTeam} to bat next
-            </Typography>
-
-            <Typography variant="body1" sx={{ mb: 4, color: '#666' }}>
-              Target: {(firstInning?.totalRuns || 0) + 1} runs in {match.overs} overs
-            </Typography>
-
-            <Button
-              variant="contained"
-              size="large"
-              sx={{
-                px: 6,
-                py: 2,
-                fontSize: '1.2rem',
-                borderRadius: 3,
-                background: 'linear-gradient(45deg, #4caf50 30%, #66bb6a 90%)',
-                '&:hover': {
-                  background: 'linear-gradient(45deg, #388e3c 30%, #4caf50 90%)',
-                  transform: 'translateY(-2px)',
-                },
-              }}
-              onClick={handleStartSecondInnings}
-            >
-              🚀 Start Second Innings
-            </Button>
-          </Paper>
-        </Box>
-      </Box>
+  // Full-screen match completed view (used when match is auto-ended or completed)
+  if (isMatchCompleted) {
+    return (
+      <InningsTransition
+        title={'🏆 Match Completed!'}
+        message={overCompletionMessage || (match && match.result) || 'Match completed.'}
+        primaryLabel={'View Match Summary'}
+        onPrimary={() => { if (matchId) navigate(`/matches/${matchId}/summary`); else navigate('/matches'); }}
+        onClose={() => navigate('/matches')}
+        isMobile={isMobile}
+      />
     );
   }
 
@@ -3544,7 +3663,7 @@ const LiveScoring: React.FC<Props> = () => {
             const usedInCurrentOver = isOverCompleted && bowlersUsedInCurrentOver.includes(option._id || '');
             return `${option.name}${usedInCurrentOver ? ' ⚠️ (Used in last over)' : ''}`;
           }}
-          value={players.find(p => p._id === bowler) || null}
+          value={players.find(p => p._id === (isPlayerChangeInProgress && changePlayerType === 'bowler' && pendingBowlerChange ? pendingBowlerChange : bowler)) || null}
           onChange={(event, newValue) => {
             if (newValue && newValue._id) {
               handleBowlerChange({ target: { value: newValue._id } } as SelectChangeEvent);
@@ -4584,6 +4703,8 @@ const LiveScoring: React.FC<Props> = () => {
           )}
         </DialogActions>
       </Dialog>
+      
+      {/* Match end dialog removed — full-screen match-completed view is used instead */}
 
       {/* Extra Runs Dialog for All Extras */}
       <Dialog 
@@ -5258,10 +5379,53 @@ const LiveScoring: React.FC<Props> = () => {
                   }
 
                   // Player change completed - reset change dialog state
-                  setChangePlayerType(null);
-                  setChangePlayerReason('');
-                  // Player-change flow finished
-                  setIsPlayerChangeInProgress(false);
+                    // If this was a bowler-change flow, persist the selected bowler now
+                    if (changePlayerType === 'bowler') {
+                      (async () => {
+                        try {
+                          if (!match || !matchId) return;
+                          const updatedMatch = { ...match } as Match;
+                          updatedMatch.currentInnings = currentInnings;
+                          const inning = updatedMatch.innings[currentInnings];
+                          if (!inning.bowlingStats) inning.bowlingStats = [];
+
+                          const newBowlerId = pendingBowlerChange || bowler;
+                          if (newBowlerId) {
+                            let bstat = inning.bowlingStats.find((b: any) => (typeof b.player === 'string' ? b.player : b.player._id) === newBowlerId);
+                            if (!bstat) {
+                              bstat = { player: newBowlerId, overs: 0, balls: 0, runs: 0, wickets: 0, wides: 0, noBalls: 0, economy: 0 };
+                              inning.bowlingStats.push(bstat as any);
+                            }
+
+                            let cleaned: Match;
+                            try {
+                              cleaned = cleanMatchData ? cleanMatchData(updatedMatch) : updatedMatch;
+                            } catch (e) {
+                              cleaned = updatedMatch;
+                            }
+
+                            const { data } = await matchService.updateScore(matchId, cleaned);
+                            setMatch(data);
+                          }
+                        } catch (err) {
+                          console.error('Failed to persist bowler selection from dialog:', err);
+                        }
+                      })();
+                    }
+
+                    setChangePlayerType(null);
+                    setChangePlayerReason('');
+                    // Player-change flow finished
+                    setIsPlayerChangeInProgress(false);
+
+                    // If a bowler change just completed, transition to over in-progress so scoring is enabled
+                    if (!isOverInProgress) {
+                      setIsOverInProgress(true);
+                    }
+                    setIsOverCompleted(false);
+                    setOverCompletionMessage('');
+                    setPendingBowlerChange('');
+                    setUserDismissedDialog(false);
                 } else if (isOverCompleted) {
                   // Handling over completion context
                   // Over completion - reset the over completion state and clear current over
