@@ -23,6 +23,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useParams } from 'react-router-dom';
 import { Match, Team, Player, BattingStats, BowlingStats } from '../types';
 import { matchService, teamService, playerService } from '../services/api.service';
+import { useToast } from '../components/ToastProvider';
 
 const MatchSummary: React.FC = () => {
   const { matchId } = useParams();
@@ -37,6 +38,7 @@ const MatchSummary: React.FC = () => {
   const [tabValue, setTabValue] = useState(0);
   const [expandedInnings, setExpandedInnings] = useState<{ [key: number]: boolean }>({ 0: true }); // First innings expanded by default
   const [expandedPerformers, setExpandedPerformers] = useState<{ [key: number]: boolean }>({ 0: true }); // First innings performers expanded by default
+  const toast = useToast();
 
   const fetchMatchData = useCallback(async () => {
     try {
@@ -63,12 +65,15 @@ const MatchSummary: React.FC = () => {
       }, {});
       setPlayers(playersMap);
     } catch (error) {
-      setError('Error fetching match data');
       console.error('Error:', error);
+      toast.showError('Error fetching match data');
     } finally {
       setLoading(false);
     }
-  }, [matchId]);
+  }, [matchId, toast]);
+  useEffect(() => {
+    if (error) toast.showError(error);
+  }, [error, toast]);
 
   useEffect(() => {
     fetchMatchData();

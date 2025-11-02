@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box,
-  Paper,
   Typography,
   Button,
   Dialog,
@@ -9,15 +8,15 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  Snackbar,
-  Alert,
+  Paper,
   Card,
   CardContent,
   Chip,
   useTheme,
   useMediaQuery,
-  Stack
+  Stack,
 } from '@mui/material';
+import { useToast } from '../components/ToastProvider';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Match, Team } from '../types';
 import { matchService, teamService } from '../services/api.service';
@@ -38,14 +37,24 @@ const MatchOverview: React.FC = () => {
   const [match, setMatch] = useState<Match | null>(null);
   const [teams, setTeams] = useState<{ [key: string]: Team }>({});
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
-  const [emailToSend, setEmailToSend] = useState('');
-  const [emailStatus, setEmailStatus] = useState<{ open: boolean; message: string; severity: 'success' | 'error' } | null>(null);
+  const [emailToSend, setEmailToSend] = useState<string>(() => {
+    try {
+      const raw = localStorage.getItem('user');
+      if (!raw) return '';
+      const parsed = JSON.parse(raw);
+      return parsed?.email || '';
+    } catch (e) {
+      return '';
+    }
+  });
+  // emailStatus removed in favor of global toast
 
   // Get user role for admin buttons
   const userRole = localStorage.getItem('userRole') || 'viewer';
   const currentUserId = localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')!)._id : null;
+  const currentUserEmail = localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')!).email : '';
   const isAdmin = userRole === 'admin';
   const isSuperAdmin = userRole === 'superadmin';
   const isPlayer = userRole === 'player';
@@ -54,13 +63,12 @@ const MatchOverview: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        setLoading(true);
-        setError(null);
+  setLoading(true);
 
   // Fetching data for matchId (debug log removed)
         
         if (!matchId) {
-          setError('No match ID provided');
+          toast.showError('No match ID provided');
           setLoading(false);
           return;
         }
@@ -79,7 +87,8 @@ const MatchOverview: React.FC = () => {
         setTeams(teamsMap);
       } catch (err) {
         console.error('Error fetching match data:', err);
-        setError(`Failed to load match data: ${err}`);
+        const msg = `Failed to load match data: ${err}`;
+        toast.showError(msg);
       } finally {
         setLoading(false);
       }
@@ -89,7 +98,7 @@ const MatchOverview: React.FC = () => {
     
     // Store in sessionStorage that user came from overview (for breadcrumb tracking)
     sessionStorage.setItem('lastMatchNavigation', 'overview');
-  }, [matchId]);
+  }, [matchId, toast]);
 
   const getTeamName = (team: string | { _id: string; name: string }): string => {
     if (typeof team === 'object' && team.name) {
@@ -148,16 +157,18 @@ const MatchOverview: React.FC = () => {
     );
   }
 
-  if (error || !match) {
+  if (!match) {
     return (
       <Box>
-        <Typography color="error">{error || 'Match not found'}</Typography>
+        <Typography color="error">Match not found</Typography>
       </Box>
     );
   }
 
   // Calculate if user can manage this match (inside render where match data is available)
   const canManageMatch = isAdmin || isSuperAdmin || ((isPlayer || isViewer) && match?.createdBy === currentUserId);
+
+  const isEmailValid = !!emailToSend && /^\S+@\S+\.\S+$/.test(emailToSend);
 
   return (
   <Box maxWidth="lg" sx={{ py: isMobile ? 1 : 3, px: isMobile ? 1 : 3, mx: 'auto' }}>
@@ -360,7 +371,11 @@ const MatchOverview: React.FC = () => {
                 variant="outlined"
                 size="large"
                 startIcon={<SummarizeIcon />}
-                onClick={() => setEmailDialogOpen(true)}
+                onClick={() => {
+                  // Prefill email when opening dialog
+                  setEmailToSend(currentUserEmail || '');
+                  setEmailDialogOpen(true);
+                }}
                 sx={{ 
                   minWidth: isMobile ? '100%' : '180px',
                   py: 2,
@@ -391,24 +406,26 @@ const MatchOverview: React.FC = () => {
             value={emailToSend}
             onChange={(e) => setEmailToSend(e.target.value)}
             type="email"
+            error={!isEmailValid && emailToSend.length > 0}
+            helperText={!isEmailValid && emailToSend.length > 0 ? 'Enter a valid email address' : ''}
           />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setEmailDialogOpen(false)}>Cancel</Button>
           <Button
             variant="contained"
+            disabled={!isEmailValid}
             onClick={async () => {
               if (!matchId) return;
               try {
                 setLoading(true);
                 const resp = await matchService.sendSummary(matchId, emailToSend);
-                // If server returns summary or success
-                setEmailStatus({ open: true, message: resp.data?.message || 'Summary sent', severity: 'success' });
+                toast.showSuccess(resp.data?.message || 'Summary sent');
                 setEmailDialogOpen(false);
               } catch (err: any) {
                 console.error('Failed to send summary:', err);
                 const msg = err?.response?.data?.message || err?.message || 'Failed to send summary';
-                setEmailStatus({ open: true, message: msg, severity: 'error' });
+                toast.showError(msg);
               } finally {
                 setLoading(false);
               }
@@ -418,14 +435,7 @@ const MatchOverview: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
-
-      <Snackbar open={!!emailStatus?.open} autoHideDuration={4000} onClose={() => setEmailStatus(null)}>
-        {emailStatus ? (
-          <Alert onClose={() => setEmailStatus(null)} severity={emailStatus.severity}>
-            {emailStatus.message}
-          </Alert>
-        ) : undefined}
-      </Snackbar>
+    
     </Box>
   );
 };

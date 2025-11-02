@@ -7,6 +7,7 @@ import {
   useMediaQuery
 } from '@mui/material';
 import { useParams } from 'react-router-dom';
+import { useToast } from '../components/ToastProvider';
 import { Match } from '../types';
 import { matchService } from '../services/api.service';
 import MatchCommentary from '../components/MatchCommentary';
@@ -19,6 +20,7 @@ const MatchCommentaryPage: React.FC = () => {
   const [match, setMatch] = useState<Match | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -31,14 +33,14 @@ const MatchCommentaryPage: React.FC = () => {
         setMatch(matchResponse.data);
       } catch (err) {
         console.error('Error fetching match data:', err);
-        setError('Failed to load match data');
+        toast.showError('Failed to load match data');
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, [matchId]);
+  }, [matchId, toast]);
 
   const handleRefresh = async () => {
     try {

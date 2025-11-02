@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useToast } from '../components/ToastProvider';
 import {
   Typography,
   Paper,
@@ -24,7 +25,6 @@ import {
   useMediaQuery,
   Autocomplete,
   Alert,
-  Snackbar,
   AlertTitle,
   Checkbox,
   Fab
@@ -92,7 +92,7 @@ const MatchList: React.FC = () => {
   const [editMatch, setEditMatch] = useState<Match | null>(null);
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const toast = useToast();
 
   // Get user ID from localStorage
   const userData = localStorage.getItem('user');
@@ -103,6 +103,7 @@ const MatchList: React.FC = () => {
   const isAdmin = userRole === 'admin';
   const isSuperAdmin = userRole === 'superadmin';
   const isViewer = userRole === 'viewer';
+  const isGuest = userRole === 'guest';
   const isPlayer = userRole === 'player';
   
   // State for multi-select delete functionality
@@ -218,12 +219,19 @@ const MatchList: React.FC = () => {
       
   await matchService.create(matchToCreate);
   // Show transient success message
-  setSuccess('Match created');
+  toast.showSuccess('Match created');
   handleClose();
   fetchMatches();
   setNewMatch(defaultMatch);
     } catch (error) {
       console.error('Error creating match:', error);
+      const server = (error as any)?.response?.data;
+      const msg = server?.message || 'Failed to create match. Please try again.';
+      // If server provides limit metadata, append it
+      const meta = server && (server.limit !== undefined || server.currentCount !== undefined)
+        ? ` (${server.limit !== undefined ? `limit: ${server.limit}` : ''}${server.currentCount !== undefined ? `, you have: ${server.currentCount}` : ''})`
+        : '';
+      toast.showError(msg + meta);
     }
   };
 
@@ -405,13 +413,13 @@ const MatchList: React.FC = () => {
               {(isAdmin || isSuperAdmin) ? 'Matches' : 'View Matches'}
             </Typography>
             <Box sx={{ display: 'flex', gap: 2 }}>
-              {(isAdmin || isSuperAdmin || isPlayer || (isViewer && matches.length === 0)) && (
+              {(isAdmin || isSuperAdmin || isPlayer || isViewer || isGuest || (isViewer && matches.length === 0)) && (
                 <Button 
                   variant="contained" 
                   color="primary" 
                   onClick={handleOpen}
                   startIcon={<AddIcon />}
-                  disabled={isViewer && matches.length >= 1} // Viewer can create max 1 match
+                  disabled={(isViewer && matches.length >= 1) || (isGuest && matches.length >= 1)} // Viewer/Guest can create max 1 match
                   sx={{ 
                     backgroundColor: 'rgba(255, 255, 255, 0.2)',
                     color: 'white',
@@ -800,7 +808,7 @@ const MatchList: React.FC = () => {
             fullWidth
             value={newMatch.overs}
             onChange={(e) => setNewMatch({ ...newMatch, overs: Number(e.target.value) })}
-            inputProps={{ min: 1, max: isViewer ? 2 : 100 }}
+            inputProps={{ min: 1, max: (isViewer || isGuest) ? 2 : 100 }}
             sx={{
               '& .MuiOutlinedInput-root': {
                 borderRadius: 2,
@@ -809,7 +817,7 @@ const MatchList: React.FC = () => {
                 },
               },
             }}
-            helperText={isViewer ? 'Viewer/demo matches are limited to a maximum of 2 overs' : ''}
+            helperText={(isViewer || isGuest) ? 'Viewer/Guest matches are limited to a maximum of 2 overs' : ''}
           />
           <TextField
             margin="dense"
@@ -1386,15 +1394,7 @@ const MatchList: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
-      <Snackbar
-        open={success !== null}
-        autoHideDuration={3000}
-        onClose={() => setSuccess(null)}
-      >
-        <Alert onClose={() => setSuccess(null)} severity="success">
-          {success}
-        </Alert>
-      </Snackbar>
+      {/* Toasts are handled globally by ToastProvider */}
     </Box>
   );
 };

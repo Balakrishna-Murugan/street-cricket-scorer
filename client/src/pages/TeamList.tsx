@@ -17,8 +17,6 @@ import {
   Box,
   Stack,
   IconButton,
-  Snackbar,
-  Alert,
   CircularProgress,
   Card,
   CardContent,
@@ -35,6 +33,7 @@ import {
   Checkbox,
   Fab
 } from '@mui/material';
+import { useToast } from '../components/ToastProvider';
 import Tooltip from '@mui/material/Tooltip';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -60,8 +59,8 @@ const TeamList: React.FC = () => {
   
   const [players, setPlayers] = useState<Player[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
-  const [success, setSuccess] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const toast = useToast();
   useEffect(() => {
     // Load current user from localStorage
     const userData = localStorage.getItem('user');
@@ -78,6 +77,7 @@ const TeamList: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [newTeam, setNewTeam] = useState<TeamFormData>(defaultTeam);
+  // error state previously mirrored to toast; explicit toast calls are used where needed.
   
   // Delete confirmation dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -125,13 +125,12 @@ const TeamList: React.FC = () => {
       }
     } catch (error) {
       console.error('Error fetching players:', error);
-      setError('Failed to fetch players');
+      toast.showError('Failed to fetch players');
     }
-  }, [teams, editingTeam]);
+  }, [teams, editingTeam, toast]);
 
   const fetchTeams = async () => {
     setLoading(true);
-    setError(null);
     try {
       let response;
       if (currentUser?.userRole === 'admin' || currentUser?.userRole === 'superadmin') {
@@ -141,7 +140,7 @@ const TeamList: React.FC = () => {
       }
       setTeams(response.data);
     } catch (error) {
-      setError('Failed to fetch teams. Please try again.');
+      toast.showError('Failed to fetch teams. Please try again.');
       console.error('Error fetching teams:', error);
     } finally {
       setLoading(false);
@@ -149,9 +148,11 @@ const TeamList: React.FC = () => {
   };
 
   useEffect(() => {
+    // Fetch only after currentUser is known so server-side filtering works
+    if (!currentUser) return;
     fetchTeams();
     fetchPlayers();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch players whenever teams data changes (but not when editingTeam changes to avoid loops)
   useEffect(() => {
@@ -169,7 +170,7 @@ const TeamList: React.FC = () => {
   // When user clicks Add, check team creation limits and either open dialog or show error
   const handleAddClick = () => {
     if ((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && teams.length >= 2) {
-      setError('Guest users can only create up to 2 teams');
+      toast.showError('You have reached the team creation limit (2). Please contact admin to add more.');
       return;
     }
     handleOpen();
@@ -241,7 +242,7 @@ const TeamList: React.FC = () => {
     } catch (error: any) {
       console.error('Error deleting team:', error);
       const message = error?.response?.data?.message || error?.message || 'Failed to delete team';
-      setError(message);
+      toast.showError(message);
     } finally {
       setLoading(false);
     }
@@ -268,7 +269,7 @@ const TeamList: React.FC = () => {
 
     // Enforce guest/viewer creation limit: max 2 teams
     if ((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && teams.length >= 2) {
-      setError('Guest/viewer users can create up to 2 teams');
+      toast.showError('You have reached the team creation limit (2). Please contact admin to add more.');
       return;
     }
 
@@ -311,7 +312,7 @@ const TeamList: React.FC = () => {
         if (continueAdding) {
           setEditingTeam(null);
           setNewTeam(defaultTeam);
-          setSuccess('Team updated');
+          toast.showSuccess('Team updated');
         } else {
           handleClose();
         }
@@ -323,7 +324,7 @@ const TeamList: React.FC = () => {
         if (continueAdding) {
           // Clear form for next create but keep dialog open
           setNewTeam(defaultTeam);
-          setSuccess('Team created');
+          toast.showSuccess('Team created');
         } else {
           handleClose();
         }
@@ -336,14 +337,13 @@ const TeamList: React.FC = () => {
       console.error('Error saving team:', error); // Debug log
       const server = error?.response?.data;
       if (server && server.message) {
-        if (server.limit !== undefined) {
-          setError(`${server.message} (limit: ${server.limit}, you have: ${server.currentCount || 0})`);
-        } else {
-          setError(editingTeam ? `Failed to update team: ${server.message}` : `Failed to create team: ${server.message}`);
-        }
+        const meta = server && (server.limit !== undefined || server.currentCount !== undefined)
+          ? ` (${server.limit !== undefined ? `limit: ${server.limit}` : ''}${server.currentCount !== undefined ? `, you have: ${server.currentCount}` : ''})`
+          : '';
+        toast.showError(`${editingTeam ? 'Failed to update team: ' : 'Failed to create team: '}${server.message}${meta}`);
       } else {
         const errorMessage = error.response?.data?.message || error.message || 'Unknown error occurred';
-        setError(editingTeam ? `Failed to update team: ${errorMessage}` : `Failed to create team: ${errorMessage}`);
+        toast.showError(editingTeam ? `Failed to update team: ${errorMessage}` : `Failed to create team: ${errorMessage}`);
       }
     } finally {
       setLoading(false);
@@ -443,7 +443,7 @@ const TeamList: React.FC = () => {
               Teams
             </Typography>
             {((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && teams.length >= 2) ? (
-              <Tooltip title="Guest users can only create up to 2 teams" arrow>
+              <Tooltip title="You have reached the team creation limit (2). Please contact admin to add more." arrow>
                 <span>
                   <Button
                     variant="contained"
@@ -467,7 +467,7 @@ const TeamList: React.FC = () => {
             )}
             {(currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && teams.length >= 2 && (
               <Typography variant="caption" color="error" sx={{ ml: 2 }}>
-                Guest users can only create up to 2 teams.
+                You have reached the team creation limit (2). Please contact admin to add more.
               </Typography>
             )}
           </Box>
@@ -851,25 +851,7 @@ const TeamList: React.FC = () => {
         </DialogActions>
       </Dialog>
 
-      <Snackbar 
-        open={error !== null} 
-        autoHideDuration={6000} 
-        onClose={() => setError(null)}
-      >
-        <Alert onClose={() => setError(null)} severity="error">
-          {error}
-        </Alert>
-      </Snackbar>
-
-          <Snackbar
-            open={success !== null}
-            autoHideDuration={3000}
-            onClose={() => setSuccess(null)}
-          >
-            <Alert onClose={() => setSuccess(null)} severity="success">
-              {success}
-            </Alert>
-          </Snackbar>
+      {/* Toasts are handled globally by ToastProvider */}
 
       {/* Delete Confirmation Dialog */}
       <Dialog 

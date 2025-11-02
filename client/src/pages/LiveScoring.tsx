@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { Match, Player, BallOutcome, PlayerRef } from '../types';
 import { matchService, playerService } from '../services/api.service';
@@ -13,6 +13,7 @@ import {
   AlertTitle,
   TextField,
   Autocomplete,
+  Chip,
   useTheme,
   useMediaQuery,
   IconButton,
@@ -33,6 +34,7 @@ import {
   MenuItem,
   SelectChangeEvent,
 } from '@mui/material';
+import { useToast } from '../components/ToastProvider';
 // ...existing code...
 
 // ...existing code...
@@ -118,6 +120,8 @@ const LiveScoring: React.FC<Props> = () => {
   const [match, setMatch] = useState<Match | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
+  // Legacy local error mirroring removed — please use toast.showError(...) directly for transient errors.
   const [currentInnings, setCurrentInnings] = useState<number>(0);
   const [striker, setStriker] = useState<string>('');
   const [nonStriker, setNonStriker] = useState<string>('');
@@ -198,6 +202,34 @@ const LiveScoring: React.FC<Props> = () => {
   // Undo functionality state
   const [undoHistory, setUndoHistory] = useState<UndoAction[]>([]);
   const [canUndo, setCanUndo] = useState(false);
+
+  // Cricket stats: maiden over and hat-trick detection
+  const [maidenOverInfo, setMaidenOverInfo] = useState<{ bowlerId?: string; bowlerName?: string } | null>(null);
+  const [maidenCounts, setMaidenCounts] = useState<Record<string, number>>({});
+  const [hatTrickInfo, setHatTrickInfo] = useState<{ bowlerId?: string; bowlerName?: string } | null>(null);
+  const [consecutiveWicketsByBowler, setConsecutiveWicketsByBowler] = useState<Record<string, number>>({});
+
+  // Helper: detect maiden overs and update state + notify
+  const detectMaidenForOver = useCallback((bowlerId: string | undefined, overBalls: BallOutcome[] = []) => {
+    if (!bowlerId || !overBalls || overBalls.length === 0) return;
+
+    try {
+      // If any ball in the over had a wide/no-ball, it's not a maiden
+      const hasIllegalExtras = overBalls.some(b => b.extras && (b.extras.type === 'wide' || b.extras.type === 'no-ball'));
+      const totalRuns = overBalls.reduce((s, b) => s + (b.runs || 0), 0);
+
+      if (!hasIllegalExtras && totalRuns === 0) {
+        const bowlerName = players.find(p => p._id === bowlerId)?.name || '';
+        // increment maiden counts
+        setMaidenCounts(prev => ({ ...prev, [bowlerId]: (prev[bowlerId] || 0) + 1 }));
+        setMaidenOverInfo({ bowlerId, bowlerName });
+        toast.showSuccess(`${bowlerName || 'Bowler'} bowled a maiden over!`);
+      }
+    } catch (e) {
+      // swallow errors from detection
+      console.error('Maiden detection error', e);
+    }
+  }, [players, toast]);
 
   // Helper function to check if all required players are selected
   const arePlayersSelected = useCallback(() => {
@@ -406,10 +438,11 @@ const LiveScoring: React.FC<Props> = () => {
           setOverCompletionMessage(`First innings skipped - not enough batsmen (${availableBatsmen.length} available). Click "Start Second Innings" to continue.`);
           setIsOverCompleted(true);
           
-          setError(''); // Clear any existing errors
+          // Clear any existing errors (local inline validation) — keep as-is
+          setError('');
           
         } catch (error: any) {
-          setError('Error completing first innings due to insufficient batsmen');
+          toast.showError('Error completing first innings due to insufficient batsmen');
           console.error('Error:', error);
         }
         return;
@@ -488,10 +521,11 @@ const LiveScoring: React.FC<Props> = () => {
           setOverCompletionMessage(`Match completed - not enough batsmen to continue second innings (${availableBatsmen.length} available). ${updatedMatch.result}`);
           setIsOverCompleted(true);
           
-          setError(''); // Clear any existing errors
+          // Clear any existing errors (local inline validation) — keep as-is
+          setError('');
           
         } catch (error: any) {
-          setError('Error ending match due to insufficient batsmen');
+          toast.showError('Error ending match due to insufficient batsmen');
           console.error('Error:', error);
         }
         return;
@@ -620,10 +654,10 @@ const LiveScoring: React.FC<Props> = () => {
       const { data } = await playerService.getAll();
       setPlayers(data);
     } catch (error) {
-      setError('Error fetching players');
+      toast.showError('Error fetching players');
       console.error('Error:', error);
     }
-  }, []);
+  }, [toast]);
 
   const fetchMatch = useCallback(async () => {
     try {
@@ -803,12 +837,12 @@ const LiveScoring: React.FC<Props> = () => {
         }
       }
     } catch (error) {
-      setError('Error fetching match details');
+  toast.showError('Error fetching match details');
       console.error('Error:', error);
     } finally {
       setLoading(false);
     }
-  }, [matchId, currentInnings, fetchPlayers]);
+  }, [matchId, currentInnings, fetchPlayers, toast]);
 
   useEffect(() => {
     fetchMatch();
@@ -985,8 +1019,21 @@ const LiveScoring: React.FC<Props> = () => {
 
   // Auto-open player selection dialog when match loads if no players selected
   useEffect(() => {
-    if (match && canEdit && !isPlayerSelectionDialogOpen && !loading && !userDismissedDialog &&
-        (!arePlayersSelected() || (arePlayersSelected() && !isOverInProgress))) {
+    // Only auto-open the full player-selection dialog when the innings is just starting
+    // (no players selected, no balls bowled). Other flows (wicket, over-complete, player-change)
+    // use their dedicated dialogs and effects.
+    if (!match || !canEdit || isPlayerSelectionDialogOpen || loading || userDismissedDialog) return;
+
+    const current = match.innings && match.innings.length > 0 ? match.innings[currentInnings] : undefined;
+    const noSelectionsMade = (!striker && !nonStriker && !bowler) &&
+      (!current || !current.battingStats || current.battingStats.length === 0) &&
+      ((current?.balls || 0) === 0);
+
+    // Guard: if any other flow is active (over completion, waiting for new batsman after wicket,
+    // an explicit player-change flow, or mid-over bowler-change dialog), do NOT auto-open the full dialog.
+    const otherFlowActive = isOverCompleted || isWaitingForNewBatsman || !!changePlayerType || isPlayerChangeInProgress || isBowlerChangeDialogOpen;
+
+    if (noSelectionsMade && !otherFlowActive) {
       // Small delay to ensure UI has rendered
       const timer = setTimeout(() => {
         setIsPlayerSelectionDialogOpen(true);
@@ -994,7 +1041,7 @@ const LiveScoring: React.FC<Props> = () => {
 
       return () => clearTimeout(timer);
     }
-  }, [match, canEdit, arePlayersSelected, isPlayerSelectionDialogOpen, loading, userDismissedDialog, isOverInProgress, striker, nonStriker, bowler]);
+  }, [match, canEdit, isPlayerSelectionDialogOpen, loading, userDismissedDialog, striker, nonStriker, bowler, currentInnings, isOverCompleted, isWaitingForNewBatsman, changePlayerType, isPlayerChangeInProgress, isBowlerChangeDialogOpen]);
 
   // Auto-open player selection dialog when over is completed and needs new bowler
   useEffect(() => {
@@ -1030,7 +1077,7 @@ const LiveScoring: React.FC<Props> = () => {
     if (!match || !matchId) return;
 
     if (!isOverInProgress) {
-      setError('Please start a new over first');
+      toast.showError('Please start a new over first');
       return;
     }
 
@@ -1041,7 +1088,7 @@ const LiveScoring: React.FC<Props> = () => {
 
     // Check if currentInning exists
     if (!currentInning) {
-      setError('Current inning not found');
+  toast.showError('Current inning not found');
       return;
     }
 
@@ -1216,6 +1263,11 @@ const LiveScoring: React.FC<Props> = () => {
           balls: newBalls
         };
       });
+
+      // Reset consecutive wickets counter for the bowler on a legal non-wicket delivery
+      try {
+        setConsecutiveWicketsByBowler(prev => ({ ...prev, [bowler]: 0 }));
+      } catch (e) { /* ignore */ }
 
       // Update innings totals
       currentInning.totalRuns += runs;
@@ -1402,7 +1454,12 @@ const LiveScoring: React.FC<Props> = () => {
         
         // Mark bowler's last bowling over
         if (bowlerBowlingStats) {
-          bowlerBowlingStats.lastBowledOver = completeInningsOvers;
+            bowlerBowlingStats.lastBowledOver = completeInningsOvers;
+            // Detect maiden for the completed over (use currentInning.currentOverBalls if available)
+            try {
+              const overBallsForMaiden: BallOutcome[] = currentInning.currentOverBalls || [];
+              detectMaidenForOver(typeof bowlerBowlingStats.player === 'string' ? bowlerBowlingStats.player : (bowlerBowlingStats.player as any)?._id, overBallsForMaiden);
+            } catch (e) { /* ignore */ }
         }
       }
 
@@ -1546,7 +1603,7 @@ const LiveScoring: React.FC<Props> = () => {
       // Track action for undo
       addToUndoHistory(undoAction);
     } catch (error: any) {
-      setError('Error updating match');
+      toast.showError('Error updating match');
       console.error('Error updating match:', error?.response?.data || error?.message || error);
     }
   };
@@ -1555,7 +1612,7 @@ const LiveScoring: React.FC<Props> = () => {
     if (!match || !matchId) return;
 
     if (!isOverInProgress) {
-      setError('Please start a new over first');
+      toast.showError('Please start a new over first');
       return;
     }
 
@@ -1728,8 +1785,12 @@ const LiveScoring: React.FC<Props> = () => {
         // Over completed (extras) - cleared currentOverBalls (log removed)
         
         if (bowlerBowlingStats) {
-          bowlerBowlingStats.lastBowledOver = completeInningsOvers;
-        }
+            bowlerBowlingStats.lastBowledOver = completeInningsOvers;
+            try {
+              const overBallsForMaiden: BallOutcome[] = currentInning.currentOverBalls || [];
+              detectMaidenForOver(typeof bowlerBowlingStats.player === 'string' ? bowlerBowlingStats.player : (bowlerBowlingStats.player as any)?._id, overBallsForMaiden);
+            } catch (e) { /* ignore */ }
+          }
       }
     }
     
@@ -1797,6 +1858,13 @@ const LiveScoring: React.FC<Props> = () => {
         });
       }
     }
+
+    // Reset consecutive wicket counter for byes/leg-byes (these are legal deliveries)
+    try {
+      if (type === 'bye' || type === 'leg-bye') {
+        setConsecutiveWicketsByBowler(prev => ({ ...prev, [bowler]: 0 }));
+      }
+    } catch (e) { /* ignore */ }
 
     try {
       const cleanMatchData = (match: Match): Match => {
@@ -1866,7 +1934,7 @@ const LiveScoring: React.FC<Props> = () => {
       const { data } = await matchService.updateScore(matchId, cleanedMatch);
       setMatch(data);
     } catch (error: any) {
-      setError('Error updating extras');
+      toast.showError('Error updating extras');
       console.error('Error updating extras:', error?.response?.data || error?.message || error);
     }
   };
@@ -1875,7 +1943,7 @@ const LiveScoring: React.FC<Props> = () => {
     if (!match || !matchId) return;
 
     if (!isOverInProgress) {
-      setError('Please start a new over first');
+      toast.showError('Please start a new over first');
       return;
     }
 
@@ -1998,6 +2066,20 @@ const LiveScoring: React.FC<Props> = () => {
     // Update innings totals
     currentInning.wickets += 1;
     currentInning.balls = (currentInning.balls || 0) + 1;
+
+    // HAT-TRICK detection: update consecutive wickets by bowler
+    try {
+      const prevConsec = consecutiveWicketsByBowler[bowler] || 0;
+      const newConsec = prevConsec + 1;
+      setConsecutiveWicketsByBowler(prev => ({ ...prev, [bowler]: newConsec }));
+      if (newConsec >= 3) {
+        const bowlerName = players.find(p => p._id === bowler)?.name || '';
+        setHatTrickInfo({ bowlerId: bowler, bowlerName });
+        toast.showSuccess(`${bowlerName || 'Bowler'} achieved a HAT-TRICK!`);
+        // reset counter after triggering
+        setConsecutiveWicketsByBowler(prev => ({ ...prev, [bowler]: 0 }));
+      }
+    } catch (e) { console.error('Hat-trick detection error', e); }
     
     // Calculate innings overs properly
     const totalInningsBalls = currentInning.balls;
@@ -2072,7 +2154,7 @@ const LiveScoring: React.FC<Props> = () => {
           await matchService.updateScore(matchId, cleanedMatch);
           setMatch(updatedMatch);
         } catch (error: any) {
-          setError('Error saving innings completion');
+          toast.showError('Error saving innings completion');
           console.error('Error:', error);
         }
         return;
@@ -2099,7 +2181,7 @@ const LiveScoring: React.FC<Props> = () => {
           await matchService.updateScore(matchId, cleanedMatch);
           setMatch(updatedMatch);
         } catch (error: any) {
-          setError('Error saving match completion');
+          toast.showError('Error saving match completion');
           console.error('Error:', error);
         }
         return;
@@ -2125,7 +2207,7 @@ const LiveScoring: React.FC<Props> = () => {
           await matchService.updateScore(matchId, cleanedMatch);
           setMatch(updatedMatch);
         } catch (error: any) {
-          setError('Error saving innings completion');
+          toast.showError('Error saving innings completion');
           console.error('Error:', error);
         }
         return;
@@ -2152,7 +2234,7 @@ const LiveScoring: React.FC<Props> = () => {
           await matchService.updateScore(matchId, cleanedMatch);
           setMatch(updatedMatch);
         } catch (error: any) {
-          setError('Error saving match completion');
+          toast.showError('Error saving match completion');
           console.error('Error:', error);
         }
         return;
@@ -2165,6 +2247,10 @@ const LiveScoring: React.FC<Props> = () => {
       // Mark that over is logically complete but don't trigger over completion UI yet
       if (bowlerBowlingStats) {
         bowlerBowlingStats.lastBowledOver = completeInningsOvers;
+        try {
+          const overBallsForMaiden: BallOutcome[] = currentInning.currentOverBalls || [];
+          detectMaidenForOver(typeof bowlerBowlingStats.player === 'string' ? bowlerBowlingStats.player : (bowlerBowlingStats.player as any)?._id, overBallsForMaiden);
+        } catch (e) { /* ignore */ }
       }
       // Over completion state will be set in handleBatsmanChange after new striker is selected
     }
@@ -2266,7 +2352,7 @@ const LiveScoring: React.FC<Props> = () => {
       setStrikerStats({ runs: 0, balls: 0 });
       setWicketDetails(null);
     } catch (error: any) {
-      setError('Error recording wicket');
+  toast.showError('Error recording wicket');
       console.error('Error recording wicket:', error?.response?.data || error?.message || error);
     }
   };
@@ -2469,7 +2555,7 @@ const LiveScoring: React.FC<Props> = () => {
       const { data } = await matchService.updateScore(matchId, cleanedMatch);
       setMatch(data);
     } catch (error: any) {
-      setError('Error undoing action');
+  toast.showError('Error undoing action');
       console.error('Error undoing action:', error?.response?.data || error?.message || error);
     }
   };
@@ -2585,10 +2671,97 @@ const LiveScoring: React.FC<Props> = () => {
         }
       }
     }
+
+    // Persist selection immediately so returning users see the chosen striker
+    (async () => {
+      try {
+        if (!match || !matchId) return;
+        const updatedMatch = { ...match } as Match;
+        updatedMatch.currentInnings = currentInnings;
+        const inning = updatedMatch.innings[currentInnings];
+
+        // Ensure battingStats array exists
+        if (!inning.battingStats) inning.battingStats = [];
+
+        // Ensure striker exists in battingStats
+        const ensureBattingStat = (playerId: string) => {
+          if (!playerId) return;
+          let stat = inning.battingStats.find((s: any) => (typeof s.player === 'string' ? s.player : s.player._id) === playerId);
+          if (!stat) {
+            stat = { player: playerId, runs: 0, balls: 0, fours: 0, sixes: 0, isOut: false, strikeRate: 0, isOnStrike: false };
+            inning.battingStats.push(stat as any);
+          }
+          return stat;
+        };
+
+        ensureBattingStat(newStriker);
+        ensureBattingStat(nonStriker || '');
+
+        // Mark isOnStrike flags
+        inning.battingStats.forEach((s: any) => {
+          const pid = typeof s.player === 'string' ? s.player : s.player._id;
+          s.isOnStrike = pid === newStriker;
+        });
+
+        let cleaned: Match;
+        try {
+          cleaned = cleanMatchData ? cleanMatchData(updatedMatch) : updatedMatch;
+        } catch (e) {
+          cleaned = updatedMatch;
+        }
+
+        const { data } = await matchService.updateScore(matchId, cleaned);
+        setMatch(data);
+      } catch (err) {
+        console.error('Failed to persist striker selection:', err);
+      }
+    })();
   };
 
   const handleNonStrikerChange = (event: SelectChangeEvent) => {
-    setNonStriker(event.target.value);
+    const newNon = event.target.value;
+    setNonStriker(newNon);
+
+    // Persist non-striker selection immediately
+    (async () => {
+      try {
+        if (!match || !matchId) return;
+        const updatedMatch = { ...match } as Match;
+        updatedMatch.currentInnings = currentInnings;
+        const inning = updatedMatch.innings[currentInnings];
+        if (!inning.battingStats) inning.battingStats = [];
+
+        const ensureBattingStat = (playerId: string) => {
+          if (!playerId) return;
+          let stat = inning.battingStats.find((s: any) => (typeof s.player === 'string' ? s.player : s.player._id) === playerId);
+          if (!stat) {
+            stat = { player: playerId, runs: 0, balls: 0, fours: 0, sixes: 0, isOut: false, strikeRate: 0, isOnStrike: false };
+            inning.battingStats.push(stat as any);
+          }
+          return stat;
+        };
+
+        ensureBattingStat(striker || '');
+        ensureBattingStat(newNon);
+
+        inning.battingStats.forEach((s: any) => {
+          const pid = typeof s.player === 'string' ? s.player : s.player._id;
+          s.isOnStrike = pid === striker;
+        });
+
+        let cleaned: Match;
+        try {
+          cleaned = cleanMatchData ? cleanMatchData(updatedMatch) : updatedMatch;
+        } catch (e) {
+          cleaned = updatedMatch;
+        }
+
+        const { data } = await matchService.updateScore(matchId, cleaned);
+        setMatch(data);
+      } catch (err) {
+        console.error('Failed to persist non-striker selection:', err);
+      }
+    })();
   };
 
   const handleBowlerChange = (event: SelectChangeEvent) => {
@@ -2636,6 +2809,36 @@ const LiveScoring: React.FC<Props> = () => {
       setAllowBowlerChange(false);
       setBowlerChangeReason('');
     }
+
+    // Persist bowler change immediately
+    (async () => {
+      try {
+        if (!match || !matchId) return;
+        const updatedMatch = { ...match } as Match;
+        updatedMatch.currentInnings = currentInnings;
+        const inning = updatedMatch.innings[currentInnings];
+        if (!inning.bowlingStats) inning.bowlingStats = [];
+
+        // Ensure bowler exists in bowlingStats
+        let bstat = inning.bowlingStats.find((b: any) => (typeof b.player === 'string' ? b.player : b.player._id) === newBowlerId);
+        if (!bstat) {
+          bstat = { player: newBowlerId, overs: 0, balls: 0, runs: 0, wickets: 0, wides: 0, noBalls: 0, economy: 0 };
+          inning.bowlingStats.push(bstat as any);
+        }
+
+        let cleaned: Match;
+        try {
+          cleaned = cleanMatchData ? cleanMatchData(updatedMatch) : updatedMatch;
+        } catch (e) {
+          cleaned = updatedMatch;
+        }
+
+        const { data } = await matchService.updateScore(matchId, cleaned);
+        setMatch(data);
+      } catch (err) {
+        console.error('Failed to persist bowler selection:', err);
+      }
+    })();
   };
 
   const handleAllowBowlerChange = (reason: string) => {
@@ -2700,7 +2903,7 @@ const LiveScoring: React.FC<Props> = () => {
     });
     
     if (teamPlayers.length < 2) {
-      setError(`Second innings cannot start - only ${teamPlayers.length} available batsmen. Match will end.`);
+  toast.showError(`Second innings cannot start - only ${teamPlayers.length} available batsmen. Match will end.`);
       setIsMatchCompleted(true);
       setOverCompletionMessage(`Match completed - not enough batsmen for second innings (${teamPlayers.length} available).`);
       setIsOverCompleted(true);
@@ -2876,6 +3079,19 @@ const LiveScoring: React.FC<Props> = () => {
   }
 
   const currentInning = match.innings[currentInnings];
+  // Calculate required run rate for second innings (runs per over)
+  const requiredRunRate: number | null = (currentInnings === 1 && match.innings.length > 1) ? (() => {
+    const target = (match.innings[0]?.totalRuns || 0) + 1;
+    const currentScore = match.innings[1]?.totalRuns || 0;
+    const runsRemaining = Math.max(0, target - currentScore);
+    const totalBalls = (match.overs || 0) * 6;
+    const ballsBowled = match.innings[1]?.balls || 0;
+    const ballsRemaining = totalBalls - ballsBowled;
+    if (ballsRemaining <= 0) return null;
+    const oversRemaining = ballsRemaining / 6;
+    const rrr = runsRemaining / oversRemaining;
+    return Number.isFinite(rrr) ? rrr : null;
+  })() : null;
   
   // If currentInning is undefined (during innings transition), show loading or return early
   if (!currentInning) {
@@ -3057,8 +3273,35 @@ const LiveScoring: React.FC<Props> = () => {
           </Typography>
         </Alert>
       )}
+    
+        {/* Mobile compact Need / Req RR summary */}
+        {isMobile && currentInnings === 1 && match.innings[0] && (
+          (() => {
+            const target = (match.innings[0]?.totalRuns || 0) + 1;
+            const currentScore = match.innings[1]?.totalRuns || 0;
+            const runsRemaining = Math.max(0, target - currentScore);
+            const totalBalls = (match.overs || 0) * 6;
+            const ballsBowled = match.innings[1]?.balls || 0;
+            const ballsRemaining = Math.max(0, totalBalls - ballsBowled);
 
-      {/* Score Summary */}
+            return (
+              <Box sx={{ mb: 2, px: 1 }}>
+                <Paper sx={{ p: 1, textAlign: 'center', borderRadius: 2 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+                    Need {runsRemaining} in {ballsRemaining} balls
+                  </Typography>
+                  {requiredRunRate !== null && (
+                    <Typography variant="body2" sx={{ color: '#1976d2', mt: 0.5 }}>
+                      Req RR: {requiredRunRate.toFixed(2)}
+                    </Typography>
+                  )}
+                </Paper>
+              </Box>
+            );
+          })()
+        )}
+
+        {/* Score Summary */}
   <Paper sx={{ p: isMobile ? 1 : 3, mb: isMobile ? 2 : 3, mx: isMobile ? 0 : 'auto' }} component="div">
         {/* Comprehensive Innings Display - Hidden on mobile */}
         {match.innings.length > 1 && !isMobile && (
@@ -3093,6 +3336,11 @@ const LiveScoring: React.FC<Props> = () => {
                   {currentInnings === 1 && match.innings[0] && (
                     <span style={{ marginLeft: 8, fontWeight: 'bold', color: '#d32f2f' }}>
                       Need {((match.innings[0].totalRuns || 0) + 1) - (match.innings[1]?.totalRuns || 0)} more
+                    </span>
+                  )}
+                  {currentInnings === 1 && requiredRunRate !== null && (
+                    <span style={{ marginLeft: 12, fontWeight: 'bold', color: '#1976d2' }}>
+                      • Req RR: {requiredRunRate !== null ? requiredRunRate.toFixed(2) : 'N/A'}
                     </span>
                   )}
                 </Typography>
@@ -3133,6 +3381,23 @@ const LiveScoring: React.FC<Props> = () => {
             balls: bowlerStats.balls || 0
           }}
         />
+        {/* Quick live stats: maiden & hat-trick */}
+        <Box sx={{ mt: 2, mb: 2, display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+          {maidenOverInfo && maidenOverInfo.bowlerId && (
+            <Chip
+              label={`${maidenOverInfo.bowlerName || 'Bowler'}: Maiden (${maidenCounts[maidenOverInfo.bowlerId] || 1})`}
+              color="success"
+              size={isMobile ? 'small' : 'medium'}
+            />
+          )}
+          {hatTrickInfo && hatTrickInfo.bowlerId && (
+            <Chip
+              label={`${hatTrickInfo.bowlerName || 'Bowler'}: HAT-TRICK!`}
+              color="error"
+              size={isMobile ? 'small' : 'medium'}
+            />
+          )}
+        </Box>
       </Paper>
 
       {/* Player Selection - Hidden from main UI, only shown in dialog when needed */}
@@ -4762,7 +5027,8 @@ const LiveScoring: React.FC<Props> = () => {
               value={players.find(p => p._id === striker) || null}
               onChange={(event, newValue) => {
                 if (newValue && newValue._id) {
-                  setStriker(newValue._id);
+                  // Persist selection through the existing handler so it is saved to server
+                  handleBatsmanChange({ target: { value: newValue._id } } as SelectChangeEvent);
                 }
               }}
               renderInput={(params) => (
@@ -4813,7 +5079,8 @@ const LiveScoring: React.FC<Props> = () => {
               value={players.find(p => p._id === nonStriker) || null}
               onChange={(event, newValue) => {
                 if (newValue && newValue._id) {
-                  setNonStriker(newValue._id);
+                  // Persist selection through the existing handler so it is saved to server
+                  handleNonStrikerChange({ target: { value: newValue._id } } as SelectChangeEvent);
                 }
               }}
               renderInput={(params) => (
@@ -4854,7 +5121,8 @@ const LiveScoring: React.FC<Props> = () => {
               value={players.find(p => p._id === bowler) || null}
               onChange={(event, newValue) => {
                 if (newValue && newValue._id) {
-                  setBowler(newValue._id);
+                  // Persist selection through the existing handler so it is saved to server
+                  handleBowlerChange({ target: { value: newValue._id } } as SelectChangeEvent);
                 }
               }}
               renderInput={(params) => (
@@ -4883,8 +5151,7 @@ const LiveScoring: React.FC<Props> = () => {
               setIsPlayerSelectionDialogOpen(false);
               setUserDismissedDialog(true); // Prevent auto-popup after user cancels
               // Provide user feedback
-              setError('Auto-popup disabled. Use "Select Players" button when needed.');
-              setTimeout(() => setError(''), 2500);
+              toast.showError('Auto-popup disabled. Use "Select Players" button when needed.');
             }}
             variant="outlined"
             sx={{ 

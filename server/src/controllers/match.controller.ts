@@ -27,10 +27,16 @@ export const matchController = {
           return res.status(403).json({ message: 'Guest/viewer users can create only 1 match' });
         }
 
-        // Enforce guest/viewer overs cap: maximum 2 overs per match (i.e., less than 3 overs)
-        const requestedOvers = Number(req.body.overs) || 2;
-        const cappedOvers = Math.min(2, Math.max(1, Math.floor(requestedOvers)));
-        req.body.overs = cappedOvers;
+        // Strict validation: Guest/viewer users are not allowed to create matches with more than 2 overs.
+        // Return a clear error instead of silently capping so the client can show a helpful message.
+        const requestedOvers = Number(req.body.overs) || 0;
+        if (requestedOvers > 2) {
+          return res.status(403).json({ message: 'Guest/viewer users may not create matches with more than 2 overs' });
+        }
+
+        // Normalize overs to a sensible integer between 1 and 2 (default to 2 if not provided)
+        const normalized = requestedOvers > 0 ? Math.max(1, Math.floor(requestedOvers)) : 2;
+        req.body.overs = Math.min(2, normalized);
       }
 
       const match = new Match({
@@ -374,11 +380,93 @@ export const matchController = {
           }
         });
 
+        // Build a simple HTML summary with basic inline CSS similar to the "View Summary" screen
+        const buildInningsHtml = (inning: any, idx: number) => {
+          const heading = idx === 0 ? '1st Innings' : '2nd Innings';
+          const batsmenRows = (inning.battingStats || []).map((b: any) => `
+            <tr>
+              <td style="padding:6px;border:1px solid #ddd">${b.player?.name || b.player || '—'}</td>
+              <td style="padding:6px;border:1px solid #ddd;text-align:right">${b.runs || 0}</td>
+              <td style="padding:6px;border:1px solid #ddd;text-align:right">${b.balls || 0}</td>
+              <td style="padding:6px;border:1px solid #ddd;text-align:right">${b.fours || 0}</td>
+              <td style="padding:6px;border:1px solid #ddd;text-align:right">${b.sixes || 0}</td>
+            </tr>`).join('') || '<tr><td style="padding:6px;border:1px solid #ddd" colspan="5">No batting data</td></tr>';
+
+          const bowlersRows = (inning.bowlingStats || []).map((b: any) => `
+            <tr>
+              <td style="padding:6px;border:1px solid #ddd">${b.player?.name || b.player || '—'}</td>
+              <td style="padding:6px;border:1px solid #ddd;text-align:right">${b.overs || 0}</td>
+              <td style="padding:6px;border:1px solid #ddd;text-align:right">${b.runs || 0}</td>
+              <td style="padding:6px;border:1px solid #ddd;text-align:right">${b.wickets || 0}</td>
+            </tr>`).join('') || '<tr><td style="padding:6px;border:1px solid #ddd" colspan="4">No bowling data</td></tr>';
+
+          const extrasHtml = inning.extras ? `
+            <p style="margin:6px 0;font-size:13px"><strong>Extras:</strong> Wides: ${inning.extras.wides || 0}, No-balls: ${inning.extras.noBalls || 0}, Byes: ${inning.extras.byes || 0}, Leg byes: ${inning.extras.legByes || 0}, Total: ${inning.extras.total || 0}</p>
+          ` : '';
+
+          return `
+            <h3 style="margin-bottom:6px">${heading}: ${inning.totalRuns}/${inning.wickets} (${inning.overs} ov)</h3>
+            ${extrasHtml}
+            <div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:12px">
+              <div style="flex:1;min-width:260px">
+                <h4 style="margin:6px 0">Batsmen</h4>
+                <table style="border-collapse:collapse;width:100%;font-size:13px">
+                  <thead>
+                    <tr>
+                      <th style="padding:6px;border:1px solid #ddd;text-align:left">Player</th>
+                      <th style="padding:6px;border:1px solid #ddd">R</th>
+                      <th style="padding:6px;border:1px solid #ddd">B</th>
+                      <th style="padding:6px;border:1px solid #ddd">4s</th>
+                      <th style="padding:6px;border:1px solid #ddd">6s</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${batsmenRows}
+                  </tbody>
+                </table>
+              </div>
+              <div style="flex:1;min-width:220px">
+                <h4 style="margin:6px 0">Bowlers</h4>
+                <table style="border-collapse:collapse;width:100%;font-size:13px">
+                  <thead>
+                    <tr>
+                      <th style="padding:6px;border:1px solid #ddd;text-align:left">Player</th>
+                      <th style="padding:6px;border:1px solid #ddd">O</th>
+                      <th style="padding:6px;border:1px solid #ddd">R</th>
+                      <th style="padding:6px;border:1px solid #ddd">W</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${bowlersRows}
+                  </tbody>
+                </table>
+              </div>
+            </div>`;
+        };
+
+        const inningsHtml = (match.innings || []).map((inn: any, idx: number) => buildInningsHtml(inn, idx)).join('<hr style="border:none;border-top:1px solid #eee;margin:12px 0"/>');
+
+        const html = `
+          <div style="font-family:Segoe UI, Roboto, Helvetica, Arial, sans-serif;color:#222">
+            <div style="background:linear-gradient(135deg,#020e43 0%,#764ba2 100%);color:white;padding:16px;border-radius:6px">
+              <h2 style="margin:0">${(match.team1 as any)?.name || 'Team 1'} vs ${(match.team2 as any)?.name || 'Team 2'}</h2>
+              <div style="margin-top:6px;font-size:13px;opacity:0.95">${new Date(match.date).toLocaleString()}</div>
+            </div>
+            <div style="padding:12px;margin-top:12px;background:#fafafa;border-radius:6px;border:1px solid #f0f0f0">
+              <h3 style="margin-top:0">Match Summary</h3>
+              <p style="margin:6px 0"><strong>Status:</strong> ${match.status}</p>
+              ${match.result ? `<p style="margin:6px 0"><strong>Result:</strong> ${match.result}</p>` : ''}
+              ${inningsHtml}
+            </div>
+            <div style="margin-top:12px;font-size:12px;color:#666">This summary was generated by Street Cricket Scorer</div>
+          </div>`;
+
         const mailOptions = {
           from: process.env.EMAIL_FROM || smtpUser,
           to: email,
           subject: `Match Summary: ${(match.team1 as any)?.name || ''} vs ${(match.team2 as any)?.name || ''}`,
-          text: summaryText
+          text: summaryText,
+          html
         };
 
         const info = await transporter.sendMail(mailOptions);

@@ -17,8 +17,6 @@ import {
   Box,
   Stack,
   IconButton,
-  Snackbar,
-  Alert,
   CircularProgress,
   Card,
   CardContent,
@@ -30,6 +28,7 @@ import {
   Autocomplete,
   Fab
 } from '@mui/material';
+import { useToast } from '../components/ToastProvider';
 import Tooltip from '@mui/material/Tooltip';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -57,10 +56,10 @@ const PlayerList: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   const [newPlayer, setNewPlayer] = useState<Omit<Player, '_id'>>(defaultPlayer);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const toast = useToast();
   useEffect(() => {
     // Load current user from localStorage
     const userData = localStorage.getItem('user');
@@ -83,19 +82,13 @@ const PlayerList: React.FC = () => {
 
 
   useEffect(() => {
+    // Wait until currentUser is loaded before fetching resources so the
+    // backend receives the user-id header and can filter correctly.
+    if (!currentUser) return;
     fetchPlayers();
     fetchTeams();
-    // Load current user from localStorage
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      try {
-        setCurrentUser(JSON.parse(userData));
-      } catch (e) {
-        setCurrentUser(null);
-      }
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [currentUser]);
 
 
 
@@ -115,7 +108,6 @@ const PlayerList: React.FC = () => {
 
   const fetchPlayers = async () => {
     setLoading(true);
-    setError(null);
     try {
       let response;
       if (currentUser?.userRole === 'admin' || currentUser?.userRole === 'superadmin') {
@@ -125,7 +117,7 @@ const PlayerList: React.FC = () => {
       }
       setPlayers(response.data);
     } catch (error) {
-      setError('Failed to fetch players. Please try again.');
+      toast.showError('Failed to fetch players. Please try again.');
       console.error('Error fetching players:', error);
     } finally {
       setLoading(false);
@@ -142,7 +134,7 @@ const PlayerList: React.FC = () => {
   const handleAddClick = () => {
     // If guest/viewer and reached limit, show error instead of opening dialog
     if ((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && players.length >= 12) {
-      setError('Guest users can only create up to 12 players');
+      toast.showError('You have reached the player creation limit (12). Please contact admin to add more.');
       return;
     }
     handleOpen();
@@ -208,7 +200,7 @@ const PlayerList: React.FC = () => {
     } catch (error: any) {
       console.error('Error deleting player:', error);
       const message = error?.response?.data?.message || error?.message || 'Failed to delete player';
-      setError(message);
+      toast.showError(message);
     } finally {
       setLoading(false);
     }
@@ -228,12 +220,12 @@ const PlayerList: React.FC = () => {
   // Promote player to admin
   const handlePromoteToAdmin = async (playerId: string) => {
     if (!currentUser?._id) {
-      setError('User not authenticated');
+      toast.showError('User not authenticated');
       return;
     }
 
     if (currentUser.userRole !== 'superadmin') {
-      setError('Only superadmins can promote players');
+      toast.showError('Only superadmins can promote players');
       return;
     }
 
@@ -241,13 +233,13 @@ const PlayerList: React.FC = () => {
     setError(null);
     try {
   // Promoting player (debug log removed)
-  await playerService.promoteToAdmin(playerId, currentUser._id);
-  fetchPlayers(); // Refresh the list to show updated roles
-  setSuccess('Player promoted to admin successfully');
+    await playerService.promoteToAdmin(playerId, currentUser._id);
+    fetchPlayers(); // Refresh the list to show updated roles
+    toast.showSuccess('Player promoted to admin successfully');
     } catch (error: any) {
       console.error('Error promoting player:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Failed to promote player to admin';
-      setError(`Failed to promote player: ${errorMessage}`);
+      toast.showError(`Failed to promote player: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -256,12 +248,12 @@ const PlayerList: React.FC = () => {
   // Demote admin to player
   const handleDemoteFromAdmin = async (playerId: string) => {
     if (!currentUser?._id) {
-      setError('User not authenticated');
+      toast.showError('User not authenticated');
       return;
     }
 
     if (currentUser.userRole !== 'superadmin') {
-      setError('Only superadmins can demote admins');
+      toast.showError('Only superadmins can demote admins');
       return;
     }
 
@@ -269,13 +261,13 @@ const PlayerList: React.FC = () => {
     setError(null);
     try {
   // Demoting player (debug log removed)
-  await playerService.demoteFromAdmin(playerId, currentUser._id);
-  fetchPlayers(); // Refresh the list to show updated roles
-  setSuccess('Admin demoted to player successfully');
+    await playerService.demoteFromAdmin(playerId, currentUser._id);
+    fetchPlayers(); // Refresh the list to show updated roles
+    toast.showSuccess('Admin demoted to player successfully');
     } catch (error: any) {
       console.error('Error demoting admin:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Failed to demote admin';
-      setError(`Failed to demote admin: ${errorMessage}`);
+      toast.showError(`Failed to demote admin: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -289,7 +281,7 @@ const PlayerList: React.FC = () => {
 
     // If guest/viewer and reached limit, block create
     if ((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && players.length >= 12) {
-      setError('Guest users can only create up to 12 players');
+      toast.showError('You have reached the player creation limit (12). Please contact admin to add more.');
       return;
     }
 
@@ -323,7 +315,7 @@ const PlayerList: React.FC = () => {
           // Clear form for next create but keep dialog open
           setNewPlayer(defaultPlayer);
           // Show transient success snackbar for Create & Continue
-          setSuccess('Player created');
+          toast.showSuccess('Player created');
         } else {
           handleClose();
         }
@@ -336,12 +328,20 @@ const PlayerList: React.FC = () => {
       const server = error?.response?.data;
       if (server && server.message) {
         if (server.limit !== undefined) {
-          setError(`${server.message} (limit: ${server.limit}, you have: ${server.currentCount || 0})`);
+          toast.showError(`${server.message} (limit: ${server.limit}, you have: ${server.currentCount || 0})`);
         } else {
-          setError(server.message);
+          toast.showError(server.message);
         }
       } else {
-        setError(editingPlayer ? 'Failed to update player' : 'Failed to create player');
+        const server = (error as any)?.response?.data;
+        if (server && server.message) {
+          const meta = server && (server.limit !== undefined || server.currentCount !== undefined)
+            ? ` (${server.limit !== undefined ? `limit: ${server.limit}` : ''}${server.currentCount !== undefined ? `, you have: ${server.currentCount}` : ''})`
+            : '';
+          toast.showError(server.message + meta);
+        } else {
+          toast.showError(editingPlayer ? 'Failed to update player' : 'Failed to create player');
+        }
       }
     } finally {
       setLoading(false);
@@ -378,7 +378,7 @@ const PlayerList: React.FC = () => {
             </Typography>
             {/* Show tooltip when limit reached */}
             {((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && players.length >= 12) ? (
-              <Tooltip title="Guest users can only create up to 12 players" arrow>
+              <Tooltip title="You have reached the player creation limit (12). Please contact admin to add more." arrow>
                 <span>
                   <Button
                     variant="contained"
@@ -402,7 +402,7 @@ const PlayerList: React.FC = () => {
             )}
             {(currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && players.length >= 12 && (
               <Typography variant="caption" color="error" sx={{ ml: 2 }}>
-                Guest users can only create up to 12 players.
+                You have reached the player creation limit (12). Please contact admin to add more.
               </Typography>
             )}
           </Box>
@@ -909,25 +909,7 @@ const PlayerList: React.FC = () => {
         </DialogActions>
       </Dialog>
 
-      <Snackbar
-        open={error !== null}
-        autoHideDuration={6000}
-        onClose={() => setError(null)}
-      >
-        <Alert onClose={() => setError(null)} severity="error">
-          {error}
-        </Alert>
-      </Snackbar>
-
-      <Snackbar
-        open={success !== null}
-        autoHideDuration={3000}
-        onClose={() => setSuccess(null)}
-      >
-        <Alert onClose={() => setSuccess(null)} severity="success">
-          {success}
-        </Alert>
-      </Snackbar>
+      {/* Toasts are handled globally by ToastProvider */}
 
       {/* Delete Confirmation Dialog */}
       <Dialog 

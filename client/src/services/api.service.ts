@@ -10,6 +10,24 @@ const api = axios.create({
   },
 });
 
+// Attach user-id header automatically from localStorage when available
+api.interceptors.request.use((config) => {
+  try {
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      const parsed = JSON.parse(userData);
+      if (parsed && parsed._id) {
+        // config.headers is typed; cast to a loose map to set a custom header
+        const headers = config.headers as Record<string, any>;
+        headers['user-id'] = parsed._id;
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+  return config;
+}, (error) => Promise.reject(error));
+
 // Attach user-id header automatically from localStorage if available
 api.interceptors.request.use((config) => {
   try {

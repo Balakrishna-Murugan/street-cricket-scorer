@@ -25,6 +25,7 @@ import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import { authService, LoginRequest, RegisterRequest, GuestLoginRequest } from '../services/api.service';
 import internalLogo from '../assets/internal_logo_bala_saro.svg';
+import { useToast } from '../components/ToastProvider';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -36,6 +37,9 @@ const Login: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const toast = useToast();
+
+  // Error-to-toast mirroring removed; server/client errors use toast directly where appropriate.
   
   // Guest login state
   const [guestName, setGuestName] = useState('');
@@ -88,7 +92,7 @@ const Login: React.FC = () => {
 
   const handleLogin = async () => {
     if (!username || !password) {
-      setError('Please enter both username and password');
+      toast.showError('Please enter both username and password');
       return;
     }
 
@@ -112,7 +116,7 @@ const Login: React.FC = () => {
       console.error('Client: Login error:', error);
       console.error('Client: Error response:', error.response?.data);
       console.error('Client: Error status:', error.response?.status);
-      setError(error.response?.data?.message || 'Login failed. Please try again.');
+      toast.showError(error.response?.data?.message || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -121,7 +125,7 @@ const Login: React.FC = () => {
   // Handle guest login
   const handleGuestLogin = async () => {
     if (!guestName.trim()) {
-      setError('Please enter your name for guest login');
+      toast.showError('Please enter your name for guest login');
       return;
     }
 
@@ -145,7 +149,7 @@ const Login: React.FC = () => {
       console.error('Client: Guest login error:', error);
       console.error('Client: Guest error response:', error.response?.data);
       console.error('Client: Guest error status:', error.response?.status);
-      setError(error.response?.data?.message || 'Guest login failed. Please try again.');
+      toast.showError(error.response?.data?.message || 'Guest login failed. Please try again.');
     } finally {
       setLoading(false);
       setShowGuestDialog(false);
