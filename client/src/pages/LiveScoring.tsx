@@ -3178,17 +3178,35 @@ const LiveScoring: React.FC<Props> = () => {
       ? firstInning.battingTeam.name 
       : 'Team 1';
 
-    const message = `${firstInningBattingTeam}: ${firstInning?.totalRuns || 0}/${firstInning?.wickets || 0} • Overs: ${firstInning?.overs || 0} • Target: ${(firstInning?.totalRuns || 0) + 1} in ${match.overs} overs`;
+    const target = (firstInning?.totalRuns || 0) + 1;
+    const oversBowled = firstInning?.overs || 0;
+    const runRate = firstInning?.runRate || (oversBowled > 0 ? ((firstInning?.totalRuns || 0) / oversBowled) : 0);
+    const requiredRunRate = match.overs && match.overs > 0 ? (target / match.overs) : null;
+
+    const details = (
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{firstInningBattingTeam} — {firstInning?.totalRuns || 0}/{firstInning?.wickets || 0}</Typography>
+        <Typography variant="body2">Overs: {oversBowled} • Run Rate: {Number(runRate).toFixed(2)}</Typography>
+        <Typography variant="body2">Target: {target} runs in {match.overs} overs</Typography>
+        {requiredRunRate !== null && (
+          <Typography variant="body2" sx={{ color: '#d84315', fontWeight: 600 }}>Required run rate to win: {Number(requiredRunRate).toFixed(2)} runs per over</Typography>
+        )}
+        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+          Tip: The required run rate is the average runs per over the chasing team must score to reach the target within the allotted overs.
+        </Typography>
+      </Box>
+    );
 
     return (
       <InningsTransition
         title={'🏏 First Innings Complete!'}
-        message={message}
         primaryLabel={'🚀 Start Second Innings'}
         onPrimary={handleStartSecondInnings}
         onClose={() => navigate('/matches')}
         isMobile={isMobile}
-      />
+      >
+        {details}
+      </InningsTransition>
     );
   }
 
