@@ -21,6 +21,9 @@ import {
   Tooltip,
   Typography,
   Paper,
+  Grid,
+  LinearProgress,
+  Avatar,
   Button,
   Table,
   TableBody,
@@ -3183,16 +3186,65 @@ const LiveScoring: React.FC<Props> = () => {
     const runRate = firstInning?.runRate || (oversBowled > 0 ? ((firstInning?.totalRuns || 0) / oversBowled) : 0);
     const requiredRunRate = match.overs && match.overs > 0 ? (target / match.overs) : null;
 
+    // Build a richer details panel including top batsmen and bowlers
+    const battingStats = Array.isArray(firstInning?.battingStats) ? firstInning.battingStats : [];
+    const bowlingStats = Array.isArray(firstInning?.bowlingStats) ? firstInning.bowlingStats : [];
+
+    const topBatsmen = [...battingStats]
+      .sort((a: any, b: any) => (b.runs || 0) - (a.runs || 0))
+      .slice(0, 3);
+
+    const topBowlers = [...bowlingStats]
+      .sort((a: any, b: any) => (b.wickets || 0) - (a.wickets || 0) || ((a.runs || 0) - (b.runs || 0)))
+      .slice(0, 3);
+
+    const rrPercent = requiredRunRate && requiredRunRate > 0 ? Math.min(100, (runRate / requiredRunRate) * 100) : 0;
+
     const details = (
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{firstInningBattingTeam} — {firstInning?.totalRuns || 0}/{firstInning?.wickets || 0}</Typography>
-        <Typography variant="body2">Overs: {oversBowled} • Run Rate: {Number(runRate).toFixed(2)}</Typography>
-        <Typography variant="body2">Target: {target} runs in {match.overs} overs</Typography>
-        {requiredRunRate !== null && (
-          <Typography variant="body2" sx={{ color: '#d84315', fontWeight: 600 }}>Required run rate to win: {Number(requiredRunRate).toFixed(2)} runs per over</Typography>
-        )}
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <Box>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{firstInningBattingTeam} — {firstInning?.totalRuns || 0}/{firstInning?.wickets || 0}</Typography>
+          <Typography variant="body2">Overs: {oversBowled} • Run Rate: {Number(runRate).toFixed(2)}</Typography>
+          <Typography variant="body2">Target: {target} runs in {match.overs} overs</Typography>
+          {requiredRunRate !== null && (
+            <Box sx={{ mt: 1 }}>
+              <Typography variant="body2" sx={{ color: '#d84315', fontWeight: 600 }}>Required RR: {Number(requiredRunRate).toFixed(2)} r/o</Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 0.5 }}>
+                <Box sx={{ width: '100%' }}>
+                  <LinearProgress variant="determinate" value={rrPercent} sx={{ height: 10, borderRadius: 2 }} />
+                </Box>
+                <Typography variant="caption">{Number(rrPercent).toFixed(0)}%</Typography>
+              </Box>
+            </Box>
+          )}
+        </Box>
+
+        <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+          <Box sx={{ minWidth: 220 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Top Batsmen</Typography>
+            {topBatsmen.length === 0 && <Typography variant="body2" color="text.secondary">No batting stats</Typography>}
+            {topBatsmen.map((b: any, idx: number) => (
+              <Box key={`bat_${idx}`} sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5 }}>
+                <Typography variant="body2">{typeof b.player === 'object' ? (b.player.name || 'Player') : b.player}</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>{b.runs || 0} ({b.balls || 0})</Typography>
+              </Box>
+            ))}
+          </Box>
+
+          <Box sx={{ minWidth: 220 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Top Bowlers</Typography>
+            {topBowlers.length === 0 && <Typography variant="body2" color="text.secondary">No bowling stats</Typography>}
+            {topBowlers.map((bw: any, idx: number) => (
+              <Box key={`bowl_${idx}`} sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5 }}>
+                <Typography variant="body2">{typeof bw.player === 'object' ? (bw.player.name || 'Player') : bw.player}</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>{(bw.overs || 0).toFixed ? (bw.overs || 0) : bw.overs} o • {bw.wickets || 0} wk</Typography>
+              </Box>
+            ))}
+          </Box>
+        </Box>
+
         <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-          Tip: The required run rate is the average runs per over the chasing team must score to reach the target within the allotted overs.
+          Tip: The required run rate indicates how quickly the chasing side must score on average per over to reach the target.
         </Typography>
       </Box>
     );
