@@ -136,6 +136,16 @@ const MatchList: React.FC = () => {
 
   const handleOpen = () => setOpen(true);
   const handleClose = () => setOpen(false);
+
+  // When user clicks Add, show toast if limited (viewer/guest/player) and already has a match
+  const handleAddClick = () => {
+    const isLimited = isViewer || isGuest || isPlayer;
+    if (isLimited && matches.length >= 1) {
+      toast.showError('You have reached the match creation limit (1). Please contact admin to add more.');
+      return;
+    }
+    handleOpen();
+  };
   
   const handleEditOpen = (match: Match) => {
     setEditMatch(match);
@@ -417,9 +427,8 @@ const MatchList: React.FC = () => {
                 <Button 
                   variant="contained" 
                   color="primary" 
-                  onClick={handleOpen}
+                  onClick={handleAddClick}
                   startIcon={<AddIcon />}
-                  disabled={(isViewer && matches.length >= 1) || (isGuest && matches.length >= 1)} // Viewer/Guest can create max 1 match
                   sx={{ 
                     backgroundColor: 'rgba(255, 255, 255, 0.2)',
                     color: 'white',
@@ -480,8 +489,7 @@ const MatchList: React.FC = () => {
       {(isAdmin || isSuperAdmin || isPlayer || (isViewer && matches.length === 0)) && isMobile && (
         <Fab 
           aria-label="add"
-          onClick={handleOpen}
-          disabled={isViewer && matches.length >= 1} // Viewer can create max 1 match
+          onClick={handleAddClick}
           sx={{
             position: 'fixed',
             bottom: 24,
