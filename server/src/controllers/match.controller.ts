@@ -15,28 +15,35 @@ export const matchController = {
       }
 
       // Enforce guest/viewer creation limit and overs cap
-      const userRole = typeof req.user?.userRole === 'string' ? req.user.userRole.toLowerCase() : undefined;
-      const isGuestUser = req.user?.isGuest === true || userRole === 'guest';
-      const isViewerUser = userRole === 'viewer';
+  const userRole = typeof req.user?.userRole === 'string' ? req.user.userRole.toLowerCase() : undefined;
+  const isNonAdmin = !(userRole === 'admin' || userRole === 'superadmin');
 
-      if (isGuestUser || isViewerUser) {
+  if (isNonAdmin) {
         // Ensure createdBy is set
         const creatorId = req.user._id;
         const existingCount = await Match.countDocuments({ createdBy: creatorId });
         if (existingCount >= 1) {
-          return res.status(403).json({ message: 'Guest/viewer users can create only 1 match' });
+          return res.status(403).json({ message: 'Non-admin users can create only 1 match' });
         }
 
-        // Strict validation: Guest/viewer users are not allowed to create matches with more than 2 overs.
+        // Strict validation: Non-admin users are not allowed to create matches with more than 2 overs.
         // Return a clear error instead of silently capping so the client can show a helpful message.
         const requestedOvers = Number(req.body.overs) || 0;
         if (requestedOvers > 2) {
-          return res.status(403).json({ message: 'Guest/viewer users may not create matches with more than 2 overs' });
+          return res.status(403).json({ message: 'Non-admin users may not create matches with more than 2 overs' });
         }
 
         // Normalize overs to a sensible integer between 1 and 2 (default to 2 if not provided)
         const normalized = requestedOvers > 0 ? Math.max(1, Math.floor(requestedOvers)) : 2;
         req.body.overs = Math.min(2, normalized);
+      }
+
+      // Prevent duplicate match names per user (allow same name across different users)
+      if (req.body.name && req.user && req.user._id) {
+        const existingMatch = await Match.findOne({ name: req.body.name.trim(), createdBy: req.user._id });
+        if (existingMatch) {
+          return res.status(400).json({ message: 'Match name already exists for this user' });
+        }
       }
 
       const match = new Match({

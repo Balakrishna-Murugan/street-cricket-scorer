@@ -140,6 +140,10 @@ const TeamList: React.FC = () => {
         response = await teamService.getAll(currentUser?._id);
       }
       setTeams(response.data);
+      // Notify user via toast if they've reached their team creation limit (header background may hide inline text)
+      if ((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && response.data.length >= TEAM_LIMIT) {
+        toast.showError(`You have reached the team creation limit (${TEAM_LIMIT}). Please contact admin to add more.`);
+      }
     } catch (error) {
       toast.showError('Failed to fetch teams. Please try again.');
       console.error('Error fetching teams:', error);

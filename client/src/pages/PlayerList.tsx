@@ -117,6 +117,10 @@ const PlayerList: React.FC = () => {
         response = await playerService.getAll(currentUser?._id);
       }
       setPlayers(response.data);
+      // Notify user via toast if they've reached their creation limit (UX: header may hide the message)
+      if ((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && response.data.length >= PLAYER_LIMIT) {
+        toast.showError(`You have reached the player creation limit (${PLAYER_LIMIT}). Please contact admin to add more.`);
+      }
     } catch (error) {
       toast.showError('Failed to fetch players. Please try again.');
       console.error('Error fetching players:', error);
@@ -133,12 +137,7 @@ const PlayerList: React.FC = () => {
 
   // When user clicks Add, check creation limits and either open dialog or show error
   const handleAddClick = () => {
-    // Opening the dialog is allowed; actual team-specific validation happens on submit.
-    // But if there are no teams at all, prevent opening since player must belong to a team.
-    if (!teams || teams.length === 0) {
-      toast.showError('No teams available. Please create a team first.');
-      return;
-    }
+    // Opening the dialog is allowed; team selection is optional now.
     handleOpen();
   };
 
@@ -281,18 +280,16 @@ const PlayerList: React.FC = () => {
       return;
     }
 
-    // If guest/viewer and reached limit for the selected team, block create
-    const teamId = newPlayer.teams?.[0];
-    if (!teamId) {
-      toast.showError('Please select a team for the player.');
-      return;
-    }
+    // Team selection is optional now; do not block create when no team selected
 
     if (currentUser && (currentUser.userRole === 'guest' || currentUser.userRole === 'viewer')) {
-      const teamPlayerCount = players.filter(p => (p.teams || []).some(t => (typeof t === 'string' ? t : (t as any)?._id) === teamId)).length;
-      if (teamPlayerCount >= PLAYER_LIMIT) {
-        toast.showError(`This team already has ${PLAYER_LIMIT} players. Cannot add more.`);
-        return;
+      const selTeamId = getSelectedTeamId();
+      if (selTeamId) {
+        const teamPlayerCount = players.filter(p => (p.teams || []).some(t => (typeof t === 'string' ? t : (t as any)?._id) === selTeamId)).length;
+        if (teamPlayerCount >= PLAYER_LIMIT) {
+          toast.showError(`This team already has ${PLAYER_LIMIT} players. Cannot add more.`);
+          return;
+        }
       }
     }
 
@@ -422,11 +419,7 @@ const PlayerList: React.FC = () => {
                 Add Player
               </Button>
             )}
-            {(currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && players.length >= PLAYER_LIMIT && (
-              <Typography variant="caption" color="error" sx={{ ml: 2 }}>
-                You have reached the player creation limit ({PLAYER_LIMIT}). Please contact admin to add more.
-              </Typography>
-            )}
+            {/* Show toast for limit reached instead of persistent header message */}
           </Box>
         </Paper>
       )}

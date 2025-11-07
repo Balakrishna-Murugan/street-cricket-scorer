@@ -11,12 +11,20 @@ export const playerController = {
         req.body.createdBy = req.user._id;
       }
 
-      // Enforce guest/viewer creation limit: max 12 players
+      // Enforce creation limits for non-admin users: max 6 players per user
       const creatorRole = req.user?.userRole;
-      if (creatorRole === 'guest' || creatorRole === 'viewer') {
+      if (!(creatorRole === 'admin' || creatorRole === 'superadmin')) {
         const existingCount = await Player.countDocuments({ createdBy: req.user._id });
-        if (existingCount >= 12) {
-          return res.status(403).json({ message: 'Guest/viewer users can create up to 12 players' });
+        if (existingCount >= 6) {
+          return res.status(403).json({ message: 'Non-admin users can create up to 6 players' });
+        }
+      }
+
+      // Prevent duplicate player names per user (allow same name across different users)
+      if (req.body.name && req.user && req.user._id) {
+        const existingPlayer = await Player.findOne({ name: req.body.name.trim(), createdBy: req.user._id });
+        if (existingPlayer) {
+          return res.status(400).json({ message: 'Player name already exists for this user' });
         }
       }
 
