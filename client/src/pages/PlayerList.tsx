@@ -52,6 +52,7 @@ const PlayerList: React.FC = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   
   const [players, setPlayers] = useState<Player[]>([]);
+  const PLAYER_LIMIT = 6; // Matches server-side non-admin player limit
   const [teams, setTeams] = useState<Team[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -132,9 +133,10 @@ const PlayerList: React.FC = () => {
 
   // When user clicks Add, check creation limits and either open dialog or show error
   const handleAddClick = () => {
-    // If guest/viewer and reached limit, show error instead of opening dialog
-    if ((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && players.length >= 12) {
-      toast.showError('You have reached the player creation limit (12). Please contact admin to add more.');
+    // Opening the dialog is allowed; actual team-specific validation happens on submit.
+    // But if there are no teams at all, prevent opening since player must belong to a team.
+    if (!teams || teams.length === 0) {
+      toast.showError('No teams available. Please create a team first.');
       return;
     }
     handleOpen();
@@ -279,10 +281,19 @@ const PlayerList: React.FC = () => {
       return;
     }
 
-    // If guest/viewer and reached limit, block create
-    if ((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && players.length >= 12) {
-      toast.showError('You have reached the player creation limit (12). Please contact admin to add more.');
+    // If guest/viewer and reached limit for the selected team, block create
+    const teamId = newPlayer.teams?.[0];
+    if (!teamId) {
+      toast.showError('Please select a team for the player.');
       return;
+    }
+
+    if (currentUser && (currentUser.userRole === 'guest' || currentUser.userRole === 'viewer')) {
+      const teamPlayerCount = players.filter(p => (p.teams || []).some(t => (typeof t === 'string' ? t : (t as any)?._id) === teamId)).length;
+      if (teamPlayerCount >= PLAYER_LIMIT) {
+        toast.showError(`This team already has ${PLAYER_LIMIT} players. Cannot add more.`);
+        return;
+      }
     }
 
     setLoading(true);
@@ -348,6 +359,17 @@ const PlayerList: React.FC = () => {
     }
   };
 
+  const getTeamPlayerCount = (teamId?: string) => {
+    if (!teamId) return 0;
+    return players.filter(p => (p.teams || []).some(t => (typeof t === 'string' ? t : (t as any)?._id) === teamId)).length;
+  };
+
+  const getSelectedTeamId = () => {
+    const t = newPlayer.teams?.[0];
+    if (!t) return undefined;
+    return typeof t === 'string' ? t : (t as any)?._id;
+  };
+
   return (
   <Container maxWidth="lg" sx={{ py: isMobile ? 2 : 3, px: { xs: 1, sm: 3 } }}>
       {/* Header with Navy Gradient Theme */}
@@ -377,8 +399,8 @@ const PlayerList: React.FC = () => {
               Players
             </Typography>
             {/* Show tooltip when limit reached */}
-            {((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && players.length >= 12) ? (
-              <Tooltip title="You have reached the player creation limit (12). Please contact admin to add more." arrow>
+            {((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && players.length >= PLAYER_LIMIT) ? (
+              <Tooltip title={`You have reached the player creation limit (${PLAYER_LIMIT}). Please contact admin to add more.`} arrow>
                 <span>
                   <Button
                     variant="contained"
@@ -400,9 +422,9 @@ const PlayerList: React.FC = () => {
                 Add Player
               </Button>
             )}
-            {(currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && players.length >= 12 && (
+            {(currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && players.length >= PLAYER_LIMIT && (
               <Typography variant="caption" color="error" sx={{ ml: 2 }}>
-                You have reached the player creation limit (12). Please contact admin to add more.
+                You have reached the player creation limit ({PLAYER_LIMIT}). Please contact admin to add more.
               </Typography>
             )}
           </Box>
@@ -831,6 +853,21 @@ const PlayerList: React.FC = () => {
                 </Box>
               )}
             />
+            {/* Show inline warning when selected team already has PLAYER_LIMIT players (for guests/viewers) */}
+            {newPlayer.teams?.[0] && (currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && (
+              (() => {
+                const selTeamId = newPlayer.teams[0];
+                const count = players.filter(p => (p.teams || []).some(t => (typeof t === 'string' ? t : (t as any)?._id) === selTeamId)).length;
+                if (count >= PLAYER_LIMIT) {
+                  return (
+                    <Typography variant="caption" color="error" sx={{ mt: 1 }}>
+                      This team already has {count} players (limit: {PLAYER_LIMIT}). You cannot add more players to this team.
+                    </Typography>
+                  );
+                }
+                return null;
+              })()
+            )}
           </Stack>
         </DialogContent>
         <DialogActions sx={{ p: 3, pt: 0 }}>
@@ -863,7 +900,12 @@ const PlayerList: React.FC = () => {
             <Button
               onClick={() => handleSubmit(true)}
               variant="contained"
-              disabled={loading || !newPlayer.name || newPlayer.age <= 0 || ((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && players.length >= 12)}
+              disabled={
+                loading || !newPlayer.name || newPlayer.age <= 0 || (
+                  (currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') &&
+                    getTeamPlayerCount(getSelectedTeamId()) >= PLAYER_LIMIT
+                )
+              }
               size={isMobile ? "small" : "medium"}
               sx={{
                 mr: 1,
@@ -886,7 +928,12 @@ const PlayerList: React.FC = () => {
           <Button 
             onClick={() => handleSubmit(false)} 
             variant="contained" 
-            disabled={loading || !newPlayer.name || newPlayer.age <= 0}
+            disabled={
+              loading || !newPlayer.name || newPlayer.age <= 0 || (
+                (currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') &&
+                getTeamPlayerCount(getSelectedTeamId()) >= PLAYER_LIMIT
+              )
+            }
             size={isMobile ? "small" : "medium"}
             sx={{
               py: 1.5,

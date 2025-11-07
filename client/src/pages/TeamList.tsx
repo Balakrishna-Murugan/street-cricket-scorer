@@ -59,6 +59,7 @@ const TeamList: React.FC = () => {
   
   const [players, setPlayers] = useState<Player[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
+  const TEAM_LIMIT = 2; // Matches server-side non-admin team limit
   const [currentUser, setCurrentUser] = useState<any>(null);
   const toast = useToast();
   useEffect(() => {
@@ -169,8 +170,8 @@ const TeamList: React.FC = () => {
 
   // When user clicks Add, check team creation limits and either open dialog or show error
   const handleAddClick = () => {
-    if ((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && teams.length >= 2) {
-      toast.showError('You have reached the team creation limit (2). Please contact admin to add more.');
+    if ((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && teams.length >= TEAM_LIMIT) {
+      toast.showError(`You have reached the team creation limit (${TEAM_LIMIT}). Please contact admin to add more.`);
       return;
     }
     handleOpen();
@@ -267,9 +268,9 @@ const TeamList: React.FC = () => {
       return;
     }
 
-    // Enforce guest/viewer creation limit: max 2 teams
-    if ((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && teams.length >= 2) {
-      toast.showError('You have reached the team creation limit (2). Please contact admin to add more.');
+    // Enforce guest/viewer creation limit: max TEAM_LIMIT teams
+    if ((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && teams.length >= TEAM_LIMIT) {
+      toast.showError(`You have reached the team creation limit (${TEAM_LIMIT}). Please contact admin to add more.`);
       return;
     }
 
