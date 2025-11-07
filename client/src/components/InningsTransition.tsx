@@ -9,9 +9,11 @@ interface Props {
   onPrimary?: () => void;
   onClose?: () => void;
   isMobile?: boolean;
+  // Accept children for richer content (details panel)
+  children?: React.ReactNode;
 }
 
-const InningsTransition: React.FC<Props> = ({ title, message, matchId, primaryLabel, onPrimary, onClose, isMobile }) => {
+const InningsTransition: React.FC<Props> = ({ title, message, matchId, primaryLabel, onPrimary, onClose, isMobile, children }) => {
   return (
     <Box sx={{ maxWidth: 'lg', py: isMobile ? 1 : 3, px: isMobile ? 1 : 3, mx: 'auto' }}>
       <Box sx={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f5f7fa 0%, #c3e6cb 100%)', p: isMobile ? 1 : 3 }}>
@@ -21,6 +23,13 @@ const InningsTransition: React.FC<Props> = ({ title, message, matchId, primaryLa
           {message && (
             <Box sx={{ mb: 3 }}>
               <Typography variant="h6" sx={{ color: '#444' }}>{message}</Typography>
+            </Box>
+          )}
+
+          {/* Render richer content if provided */}
+          {children && (
+            <Box sx={{ mb: 3, textAlign: 'left' }}>
+              {children}
             </Box>
           )}
 

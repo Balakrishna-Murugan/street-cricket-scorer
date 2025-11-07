@@ -21,6 +21,7 @@ import {
   Tooltip,
   Typography,
   Paper,
+  // removed LinearProgress to keep InningsTransition lightweight
   Button,
   Table,
   TableBody,
@@ -3178,17 +3179,29 @@ const LiveScoring: React.FC<Props> = () => {
       ? firstInning.battingTeam.name 
       : 'Team 1';
 
-    const message = `${firstInningBattingTeam}: ${firstInning?.totalRuns || 0}/${firstInning?.wickets || 0} • Overs: ${firstInning?.overs || 0} • Target: ${(firstInning?.totalRuns || 0) + 1} in ${match.overs} overs`;
+    const target = (firstInning?.totalRuns || 0) + 1;
+    const requiredRunRate = match.overs && match.overs > 0 ? (target / match.overs) : null;
+
+    const details = (
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+        <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{firstInningBattingTeam} — {firstInning?.totalRuns || 0}/{firstInning?.wickets || 0}</Typography>
+        <Typography variant="body2">Target: {target} runs in {match.overs} overs</Typography>
+        {requiredRunRate !== null && (
+          <Typography variant="body2" sx={{ color: '#d84315', fontWeight: 600 }}>Required RR: {Number(requiredRunRate).toFixed(2)} r/o</Typography>
+        )}
+      </Box>
+    );
 
     return (
       <InningsTransition
         title={'🏏 First Innings Complete!'}
-        message={message}
         primaryLabel={'🚀 Start Second Innings'}
         onPrimary={handleStartSecondInnings}
         onClose={() => navigate('/matches')}
         isMobile={isMobile}
-      />
+      >
+        {details}
+      </InningsTransition>
     );
   }
 

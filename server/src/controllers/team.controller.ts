@@ -34,12 +34,20 @@ export const teamController = {
         teamData.createdBy = req.user._id;
       }
 
-      // Enforce guest/viewer creation limit: max 2 teams
+      // Enforce creation limits for non-admin users: max 2 teams per user
       const creatorRole = req.user?.userRole;
-      if (creatorRole === 'guest' || creatorRole === 'viewer') {
+      if (!(creatorRole === 'admin' || creatorRole === 'superadmin')) {
         const existingCount = await Team.countDocuments({ createdBy: req.user._id });
         if (existingCount >= 2) {
-          return res.status(403).json({ message: 'Guest/viewer users can create up to 2 teams' });
+          return res.status(403).json({ message: 'Non-admin users can create up to 2 teams' });
+        }
+      }
+
+      // Prevent duplicate team names per user (allow same name across different users)
+      if (teamData.name && req.user && req.user._id) {
+        const existingTeam = await Team.findOne({ name: teamData.name.trim(), createdBy: req.user._id });
+        if (existingTeam) {
+          return res.status(400).json({ message: 'Team name already exists for this user' });
         }
       }
 
