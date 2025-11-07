@@ -13,10 +13,22 @@ export const playerController = {
 
       // Enforce creation limits for non-admin users: max 6 players per user
       const creatorRole = req.user?.userRole;
-      if (!(creatorRole === 'admin' || creatorRole === 'superadmin')) {
+      const isAdmin = creatorRole === 'admin' || creatorRole === 'superadmin';
+      if (!isAdmin) {
+        // Total players created by this user
         const existingCount = await Player.countDocuments({ createdBy: req.user._id });
-        if (existingCount >= 6) {
-          return res.status(403).json({ message: 'Non-admin users can create up to 6 players' });
+        const PLAYER_LIMIT = 6;
+        if (existingCount >= PLAYER_LIMIT) {
+          return res.status(403).json({ message: `Non-admin users can create up to ${PLAYER_LIMIT} players`, limit: PLAYER_LIMIT, currentCount: existingCount });
+        }
+
+        // If a team is selected for this player, enforce per-user-per-team limit as well
+        const teamId = Array.isArray(req.body.teams) && req.body.teams.length > 0 ? (typeof req.body.teams[0] === 'string' ? req.body.teams[0] : req.body.teams[0]?._id) : null;
+        if (teamId) {
+          const teamCount = await Player.countDocuments({ createdBy: req.user._id, teams: teamId });
+          if (teamCount >= PLAYER_LIMIT) {
+            return res.status(403).json({ message: `You have reached the player creation limit (${PLAYER_LIMIT}) for the selected team`, limit: PLAYER_LIMIT, currentCount: teamCount });
+          }
         }
       }
 
