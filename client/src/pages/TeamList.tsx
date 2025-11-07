@@ -141,7 +141,7 @@ const TeamList: React.FC = () => {
       }
       setTeams(response.data);
       // Notify user via toast if they've reached their team creation limit (header background may hide inline text)
-      if ((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && response.data.length >= TEAM_LIMIT) {
+      if ((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer' || currentUser?.userRole === 'player') && response.data.length >= TEAM_LIMIT) {
         toast.showError(`You have reached the team creation limit (${TEAM_LIMIT}). Please contact admin to add more.`);
       }
     } catch (error) {
@@ -174,7 +174,7 @@ const TeamList: React.FC = () => {
 
   // When user clicks Add, check team creation limits and either open dialog or show error
   const handleAddClick = () => {
-    if ((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && teams.length >= TEAM_LIMIT) {
+    if ((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer' || currentUser?.userRole === 'player') && teams.length >= TEAM_LIMIT) {
       toast.showError(`You have reached the team creation limit (${TEAM_LIMIT}). Please contact admin to add more.`);
       return;
     }
@@ -273,7 +273,7 @@ const TeamList: React.FC = () => {
     }
 
     // Enforce guest/viewer creation limit: max TEAM_LIMIT teams
-    if ((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && teams.length >= TEAM_LIMIT) {
+    if ((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer' || currentUser?.userRole === 'player') && teams.length >= TEAM_LIMIT) {
       toast.showError(`You have reached the team creation limit (${TEAM_LIMIT}). Please contact admin to add more.`);
       return;
     }
