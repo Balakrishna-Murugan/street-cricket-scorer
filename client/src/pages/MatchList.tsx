@@ -30,6 +30,7 @@ import {
   Fab
 } from '@mui/material';
 import { Match, Team } from '../types';
+import FormField from '../components/FormField';
 import { matchService, teamService } from '../services/api.service';
 import { useNavigate } from 'react-router-dom';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -85,6 +86,7 @@ const MatchList: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [matches, setMatches] = useState<Match[]>([]);
+  const [loading, setLoading] = useState(false);
   const [teams, setTeams] = useState<Team[]>([]);
   const [open, setOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -112,11 +114,14 @@ const MatchList: React.FC = () => {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   const fetchMatches = useCallback(async () => {
+    setLoading(true);
     try {
       const response = await matchService.getAll(currentUserId || undefined);
       setMatches(response.data);
     } catch (error: any) {
       console.error('MatchList: Error fetching matches:', error);
+    } finally {
+      setLoading(false);
     }
   }, [currentUserId]);
 
@@ -165,6 +170,21 @@ const MatchList: React.FC = () => {
       if (!currentUserId) {
         console.error('User not authenticated - currentUserId is null');
         alert('You must be logged in to create a match. Please log in again.');
+        return;
+      }
+
+      // Validate that both teams are selected and each has at least two members
+      if (!newMatch.team1 || !newMatch.team2) {
+        toast.showError('Both Team 1 and Team 2 must be selected');
+        return;
+      }
+
+      const team1Obj = teams.find(t => t._id === newMatch.team1);
+      const team2Obj = teams.find(t => t._id === newMatch.team2);
+      const team1Count = team1Obj ? (team1Obj.members?.length || 0) : 0;
+      const team2Count = team2Obj ? (team2Obj.members?.length || 0) : 0;
+      if (team1Count < 2 || team2Count < 2) {
+        toast.showError('Both teams must have at least 2 members to create a match');
         return;
       }
 
@@ -624,6 +644,10 @@ const MatchList: React.FC = () => {
               </Card>
           ))}
         </Stack>
+      ) : !loading && matches.length === 0 ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 6 }}>
+          <Typography variant="h6" color="text.secondary">No matches have been created yet.</Typography>
+        </Box>
       ) : (
         // Desktop Table Layout
         <TableContainer component={Paper}>
@@ -809,22 +833,20 @@ const MatchList: React.FC = () => {
               </Box>
             )}
           />
-          <TextField
-            margin="dense"
+          <FormField
             label="Number of Overs"
             type="number"
-            fullWidth
-            value={newMatch.overs}
-            onChange={(e) => setNewMatch({ ...newMatch, overs: Number(e.target.value) })}
-            inputProps={{ min: 1, max: (isViewer || isGuest) ? 2 : 100 }}
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                borderRadius: 2,
-                '&:hover fieldset': {
-                  borderColor: theme.palette.primary.main,
-                },
-              },
+            value={newMatch.overs || ''}
+            onChange={(e: any) => {
+              const v = e.target.value;
+              if (v === '') {
+                setNewMatch({ ...newMatch, overs: '' as any });
+              } else {
+                const cleaned = v.replace(/[^0-9]/g, '');
+                setNewMatch({ ...newMatch, overs: Number(cleaned) as any });
+              }
             }}
+            inputProps={{ min: 1, max: (isViewer || isGuest) ? 2 : 100 }}
             helperText={(isViewer || isGuest) ? 'Viewer/Guest matches are limited to a maximum of 2 overs' : ''}
           />
           <TextField
