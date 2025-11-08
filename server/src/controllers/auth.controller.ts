@@ -100,7 +100,8 @@ export const authController = {
         password: hashedPassword,
         age: age || 25,
         role: role || 'batsman',
-        userRole: userRole || 'player',
+        // Registered users created via sign-up should be regular 'user'
+        userRole: userRole || 'user',
         isGuest: false
       });
 
@@ -150,7 +151,8 @@ export const authController = {
         age: 25,
         role: 'batsman',
         isGuest: true,
-        userRole: 'viewer',
+        // Guest users created via guest login link should have role 'guest'
+        userRole: 'guest',
         // Guest limitations
         guestLimitations: {
           maxMatches: 1,

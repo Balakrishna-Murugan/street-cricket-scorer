@@ -15,28 +15,56 @@ export const matchController = {
       }
 
       // Enforce guest/viewer creation limit and overs cap
-      const userRole = typeof req.user?.userRole === 'string' ? req.user.userRole.toLowerCase() : undefined;
-      const isGuestUser = req.user?.isGuest === true || userRole === 'guest';
-      const isViewerUser = userRole === 'viewer';
+  const userRole = typeof req.user?.userRole === 'string' ? req.user.userRole.toLowerCase() : undefined;
+  const isNonAdmin = !(userRole === 'admin' || userRole === 'superadmin');
 
-      if (isGuestUser || isViewerUser) {
+  if (isNonAdmin) {
         // Ensure createdBy is set
         const creatorId = req.user._id;
         const existingCount = await Match.countDocuments({ createdBy: creatorId });
         if (existingCount >= 1) {
-          return res.status(403).json({ message: 'Guest/viewer users can create only 1 match' });
+          return res.status(403).json({ message: 'Non-admin users can create only 1 match' });
         }
 
-        // Strict validation: Guest/viewer users are not allowed to create matches with more than 2 overs.
+        // Strict validation: Non-admin users are not allowed to create matches with more than 2 overs.
         // Return a clear error instead of silently capping so the client can show a helpful message.
         const requestedOvers = Number(req.body.overs) || 0;
         if (requestedOvers > 2) {
-          return res.status(403).json({ message: 'Guest/viewer users may not create matches with more than 2 overs' });
+          return res.status(403).json({ message: 'Non-admin users may not create matches with more than 2 overs' });
         }
 
         // Normalize overs to a sensible integer between 1 and 2 (default to 2 if not provided)
         const normalized = requestedOvers > 0 ? Math.max(1, Math.floor(requestedOvers)) : 2;
         req.body.overs = Math.min(2, normalized);
+      }
+
+      // Prevent duplicate match names per user (allow same name across different users)
+      if (req.body.name && req.user && req.user._id) {
+        const existingMatch = await Match.findOne({ name: req.body.name.trim(), createdBy: req.user._id });
+        if (existingMatch) {
+          return res.status(400).json({ message: 'Match name already exists for this user' });
+        }
+      }
+
+      // Validate that both teams exist and have at least 2 members each
+      if (!req.body.team1 || !req.body.team2) {
+        return res.status(400).json({ message: 'Both team1 and team2 must be provided' });
+      }
+
+      if (!mongoose.Types.ObjectId.isValid(req.body.team1) || !mongoose.Types.ObjectId.isValid(req.body.team2)) {
+        return res.status(400).json({ message: 'Invalid team ID format' });
+      }
+
+      const team1 = await Team.findById(req.body.team1);
+      const team2 = await Team.findById(req.body.team2);
+      if (!team1 || !team2) {
+        return res.status(404).json({ message: 'One or both teams not found' });
+      }
+
+      const team1Count = (team1.members && team1.members.length) || 0;
+      const team2Count = (team2.members && team2.members.length) || 0;
+      if (team1Count < 2 || team2Count < 2) {
+        return res.status(403).json({ message: 'Both teams must have at least 2 members to create a match' });
       }
 
       const match = new Match({
@@ -195,6 +223,15 @@ export const matchController = {
       // Validate ObjectId format
       if (!mongoose.Types.ObjectId.isValid(updateData.team1) || !mongoose.Types.ObjectId.isValid(updateData.team2)) {
         return res.status(400).json({ message: 'Invalid team ID format' });
+      }
+
+      // Ensure both teams have at least 2 members
+      const team1Check = await Team.findById(updateData.team1);
+      const team2Check = await Team.findById(updateData.team2);
+      const t1count = (team1Check?.members && team1Check.members.length) || 0;
+      const t2count = (team2Check?.members && team2Check.members.length) || 0;
+      if (t1count < 2 || t2count < 2) {
+        return res.status(403).json({ message: 'Both teams must have at least 2 members to create/update a match' });
       }
 
       if (updateData.tossWinner && !mongoose.Types.ObjectId.isValid(updateData.tossWinner)) {
@@ -361,29 +398,10 @@ export const matchController = {
 
       const summaryText = summaryLines.join('\n');
 
-      // If SMTP is configured (via env vars), attempt to send email using nodemailer
-      const smtpHost = process.env.SMTP_HOST;
-      const smtpUser = process.env.SMTP_USER;
-      const smtpPass = process.env.SMTP_PASS;
-
-      if (smtpHost && smtpUser && smtpPass) {
-        // dynamic import nodemailer to avoid hard dependency if not configured
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const nodemailer = require('nodemailer');
-        const transporter = nodemailer.createTransport({
-          host: smtpHost,
-          port: Number(process.env.SMTP_PORT) || 587,
-          secure: process.env.SMTP_SECURE === 'true',
-          auth: {
-            user: smtpUser,
-            pass: smtpPass
-          }
-        });
-
-        // Build a simple HTML summary with basic inline CSS similar to the "View Summary" screen
-        const buildInningsHtml = (inning: any, idx: number) => {
-          const heading = idx === 0 ? '1st Innings' : '2nd Innings';
-          const batsmenRows = (inning.battingStats || []).map((b: any) => `
+      // Build a simple HTML summary so both SMTP and SendGrid API paths can reuse it
+      const buildInningsHtml = (inning: any, idx: number) => {
+        const heading = idx === 0 ? '1st Innings' : '2nd Innings';
+        const batsmenRows = (inning.battingStats || []).map((b: any) => `
             <tr>
               <td style="padding:6px;border:1px solid #ddd">${b.player?.name || b.player || '—'}</td>
               <td style="padding:6px;border:1px solid #ddd;text-align:right">${b.runs || 0}</td>
@@ -392,7 +410,7 @@ export const matchController = {
               <td style="padding:6px;border:1px solid #ddd;text-align:right">${b.sixes || 0}</td>
             </tr>`).join('') || '<tr><td style="padding:6px;border:1px solid #ddd" colspan="5">No batting data</td></tr>';
 
-          const bowlersRows = (inning.bowlingStats || []).map((b: any) => `
+        const bowlersRows = (inning.bowlingStats || []).map((b: any) => `
             <tr>
               <td style="padding:6px;border:1px solid #ddd">${b.player?.name || b.player || '—'}</td>
               <td style="padding:6px;border:1px solid #ddd;text-align:right">${b.overs || 0}</td>
@@ -400,11 +418,11 @@ export const matchController = {
               <td style="padding:6px;border:1px solid #ddd;text-align:right">${b.wickets || 0}</td>
             </tr>`).join('') || '<tr><td style="padding:6px;border:1px solid #ddd" colspan="4">No bowling data</td></tr>';
 
-          const extrasHtml = inning.extras ? `
+        const extrasHtml = inning.extras ? `
             <p style="margin:6px 0;font-size:13px"><strong>Extras:</strong> Wides: ${inning.extras.wides || 0}, No-balls: ${inning.extras.noBalls || 0}, Byes: ${inning.extras.byes || 0}, Leg byes: ${inning.extras.legByes || 0}, Total: ${inning.extras.total || 0}</p>
           ` : '';
 
-          return `
+        return `
             <h3 style="margin-bottom:6px">${heading}: ${inning.totalRuns}/${inning.wickets} (${inning.overs} ov)</h3>
             ${extrasHtml}
             <div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:12px">
@@ -442,11 +460,11 @@ export const matchController = {
                 </table>
               </div>
             </div>`;
-        };
+      };
 
-        const inningsHtml = (match.innings || []).map((inn: any, idx: number) => buildInningsHtml(inn, idx)).join('<hr style="border:none;border-top:1px solid #eee;margin:12px 0"/>');
+      const inningsHtml = (match.innings || []).map((inn: any, idx: number) => buildInningsHtml(inn, idx)).join('<hr style="border:none;border-top:1px solid #eee;margin:12px 0"/>');
 
-        const html = `
+      const html = `
           <div style="font-family:Segoe UI, Roboto, Helvetica, Arial, sans-serif;color:#222">
             <div style="background:linear-gradient(135deg,#020e43 0%,#764ba2 100%);color:white;padding:16px;border-radius:6px">
               <h2 style="margin:0">${(match.team1 as any)?.name || 'Team 1'} vs ${(match.team2 as any)?.name || 'Team 2'}</h2>
@@ -460,6 +478,49 @@ export const matchController = {
             </div>
             <div style="margin-top:12px;font-size:12px;color:#666">This summary was generated by Street Cricket Scorer</div>
           </div>`;
+
+      // Prefer SendGrid Web API if configured (avoids SMTP egress issues)
+      const sendgridKey = process.env.SENDGRID_API_KEY;
+      if (sendgridKey) {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const sg = require('@sendgrid/mail');
+        sg.setApiKey(sendgridKey);
+
+        const msg = {
+          to: email,
+          from: process.env.EMAIL_FROM || (process.env.SMTP_USER || 'no-reply@streetcricket.app'),
+          subject: `Match Summary: ${(match.team1 as any)?.name || ''} vs ${(match.team2 as any)?.name || ''}`,
+          text: summaryText,
+          html
+        };
+
+        try {
+          const resp = await sg.send(msg);
+          return res.json({ message: 'Summary sent (sendgrid)', info: resp });
+        } catch (err: any) {
+          console.error('Error sending match summary via SendGrid:', err.response || err);
+          // fall through to try SMTP if configured
+        }
+      }
+
+      // If SendGrid not configured or failed, fall back to SMTP if available
+      const smtpHost = process.env.SMTP_HOST;
+      const smtpUser = process.env.SMTP_USER;
+      const smtpPass = process.env.SMTP_PASS;
+
+      if (smtpHost && smtpUser && smtpPass) {
+        // dynamic import nodemailer to avoid hard dependency if not configured
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const nodemailer = require('nodemailer');
+        const transporter = nodemailer.createTransport({
+          host: smtpHost,
+          port: Number(process.env.SMTP_PORT) || 587,
+          secure: process.env.SMTP_SECURE === 'true',
+          auth: {
+            user: smtpUser,
+            pass: smtpPass
+          }
+        });
 
         const mailOptions = {
           from: process.env.EMAIL_FROM || smtpUser,

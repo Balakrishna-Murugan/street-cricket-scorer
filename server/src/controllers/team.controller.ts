@@ -34,12 +34,20 @@ export const teamController = {
         teamData.createdBy = req.user._id;
       }
 
-      // Enforce guest/viewer creation limit: max 2 teams
+      // Enforce creation limits for non-admin users: max 2 teams per user
       const creatorRole = req.user?.userRole;
-      if (creatorRole === 'guest' || creatorRole === 'viewer') {
+      if (!(creatorRole === 'admin' || creatorRole === 'superadmin')) {
         const existingCount = await Team.countDocuments({ createdBy: req.user._id });
         if (existingCount >= 2) {
-          return res.status(403).json({ message: 'Guest/viewer users can create up to 2 teams' });
+          return res.status(403).json({ message: 'Non-admin users can create up to 2 teams' });
+        }
+      }
+
+      // Prevent duplicate team names per user (allow same name across different users)
+      if (teamData.name && req.user && req.user._id) {
+        const existingTeam = await Team.findOne({ name: teamData.name.trim(), createdBy: req.user._id });
+        if (existingTeam) {
+          return res.status(400).json({ message: 'Team name already exists for this user' });
         }
       }
 
@@ -126,17 +134,16 @@ export const teamController = {
       if (!existing) {
         return res.status(404).json({ message: 'Team not found' });
       }
-
-      const inProgressMatches = await Match.find({
-        $or: [{ team1: existing._id }, { team2: existing._id }],
-        status: 'in-progress'
+      // Return any matches referencing this team (all statuses)
+      const matches = await Match.find({
+        $or: [{ team1: existing._id }, { team2: existing._id }]
       }).populate('team1', 'name').populate('team2', 'name');
 
-      if (!inProgressMatches || inProgressMatches.length === 0) {
+      if (!matches || matches.length === 0) {
         return res.json({ conflicts: [] });
       }
 
-      const conflicts = inProgressMatches.map((m: any) => {
+      const conflicts = matches.map((m: any) => {
         const t1 = m.team1?.name || 'Team1';
         const t2 = m.team2?.name || 'Team2';
         const dateStr = m.date ? new Date(m.date).toISOString().split('T')[0] : '';
@@ -212,13 +219,13 @@ export const teamController = {
       }
 
       // Prevent deletion if this team is part of an in-progress match
-      const inProgressMatches = await Match.find({
-        $or: [{ team1: existing._id }, { team2: existing._id }],
-        status: 'in-progress'
+      // Prevent deletion if this team is referenced by any match
+      const linkedMatches = await Match.find({
+        $or: [{ team1: existing._id }, { team2: existing._id }]
       }).populate('team1', 'name').populate('team2', 'name');
 
-      if (inProgressMatches && inProgressMatches.length > 0) {
-        const conflicts = inProgressMatches.map((m: any) => {
+      if (linkedMatches && linkedMatches.length > 0) {
+        const conflicts = linkedMatches.map((m: any) => {
           const t1 = m.team1?.name || 'Team1';
           const t2 = m.team2?.name || 'Team2';
           const dateStr = m.date ? new Date(m.date).toISOString().split('T')[0] : '';
@@ -226,7 +233,7 @@ export const teamController = {
         });
 
         return res.status(403).json({
-          message: 'Team cannot be deleted while a match involving the team is in progress',
+          message: 'Team cannot be deleted while it is linked to one or more matches',
           conflicts
         });
       }
