@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
-import { Match, Player, BallOutcome } from '../types';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Match, Player, BallOutcome, PlayerRef } from '../types';
 import { matchService, playerService } from '../services/api.service';
 import MatchDetails from '../components/MatchDetails';
 import InningsTransition from '../components/InningsTransition';
@@ -191,6 +191,13 @@ const LiveScoring: React.FC<Props> = () => {
   const [isPlayerChangeDialogOpen, setIsPlayerChangeDialogOpen] = useState(false);
   const [changePlayerType, setChangePlayerType] = useState<'striker' | 'nonStriker' | 'bowler' | null>(null);
   const [changePlayerReason, setChangePlayerReason] = useState('');
+
+  // Track whether the user manually dismissed the player selection dialog
+  const [userDismissedDialog, setUserDismissedDialog] = useState(false);
+  // Track whether we've auto-opened the selection dialog on initial enter
+  const [hasAutoOpenedOnEnter, setHasAutoOpenedOnEnter] = useState(false);
+  // Prevent repeated auto-handling of insufficient batsmen
+  const [autoInsufficientHandled, setAutoInsufficientHandled] = useState(false);
 
   // Undo functionality state
   const [undoHistory, setUndoHistory] = useState<UndoAction[]>([]);
@@ -3052,30 +3059,6 @@ const LiveScoring: React.FC<Props> = () => {
       >
         {details}
       </InningsTransition>
-    );
-  }
-
-            <Button
-              variant="contained"
-              size="large"
-              sx={{
-                px: 6,
-                py: 2,
-                fontSize: '1.2rem',
-                borderRadius: 3,
-                background: 'linear-gradient(45deg, #4caf50 30%, #66bb6a 90%)',
-                '&:hover': {
-                  background: 'linear-gradient(45deg, #388e3c 30%, #4caf50 90%)',
-                  transform: 'translateY(-2px)',
-                },
-              }}
-              onClick={handleStartSecondInnings}
-            >
-              🏏 Start Second Innings
-            </Button>
-          </Paper>
-        </Box>
-      </Container>
     );
   }
 
