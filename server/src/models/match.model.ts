@@ -210,6 +210,7 @@ export interface IMatch {
     bowlerOversCount: Map<string, number>; // Track overs bowled by each bowler
     availableBowlers: mongoose.Types.ObjectId[]; // Bowlers who can bowl next over
   };
+  createdBy: mongoose.Types.ObjectId; // User who created the match
 }
 
 const matchSchema = new mongoose.Schema<IMatch>({
@@ -280,6 +281,11 @@ const matchSchema = new mongoose.Schema<IMatch>({
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Player'
     }]
+  },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Player',
+    required: true
   }
 }, { timestamps: true });
 

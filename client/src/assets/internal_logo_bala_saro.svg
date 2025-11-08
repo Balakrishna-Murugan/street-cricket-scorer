@@ -1,0 +1,23 @@
+<!--
+  Internal hidden motif SVG
+  Owners: Bala + Saro
+  Hidden date: 09/08/2021 encoded in the comment and title metadata
+  This SVG is intentionally simple; the date and names are stored in comments and <desc>.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240" role="img" aria-labelledby="title desc">
+  <title id="title">BS Monogram (internal)</title>
+  <desc id="desc">Monogram combining letters B and S. Internal code: 090821 | BALA+SARO</desc>
+  <defs>
+    <linearGradient id="g" x1="0" x2="1">
+      <stop offset="0%" stop-color="#0b6623" />
+      <stop offset="100%" stop-color="#f4c542" />
+    </linearGradient>
+  </defs>
+  <rect width="240" height="240" rx="24" fill="#07203a" />
+  <!-- subtle cricket-ball seam formed by the S curve; the B is mirrored to form bat-like shape -->
+  <g transform="translate(40,40)">
+    <path d="M20 20 C40 0, 80 0, 100 20 C120 40, 120 80, 100 100 C80 120, 40 120, 20 100 C0 80, 0 40, 20 20 Z" fill="url(#g)" opacity="0.95" />
+    <text x="50" y="75" font-family="Segoe UI, Arial" font-size="68" fill="#07203a" font-weight="700" text-anchor="middle">B</text>
+    <text x="90" y="150" font-family="Segoe UI, Arial" font-size="68" fill="#07203a" font-weight="700" text-anchor="middle" transform="rotate(-20,90,150)">S</text>
+  </g>
+</svg>

@@ -1,17 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box,
-  Paper,
   Typography,
   Button,
-  Container,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Paper,
   Card,
   CardContent,
   Chip,
   useTheme,
   useMediaQuery,
-  Stack
+  Stack,
 } from '@mui/material';
+import { useToast } from '../components/ToastProvider';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Match, Team } from '../types';
 import { matchService, teamService } from '../services/api.service';
@@ -32,30 +37,45 @@ const MatchOverview: React.FC = () => {
   const [match, setMatch] = useState<Match | null>(null);
   const [teams, setTeams] = useState<{ [key: string]: Team }>({});
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [emailToSend, setEmailToSend] = useState<string>(() => {
+    try {
+      const raw = localStorage.getItem('user');
+      if (!raw) return '';
+      const parsed = JSON.parse(raw);
+      return parsed?.email || '';
+    } catch (e) {
+      return '';
+    }
+  });
+  // emailStatus removed in favor of global toast
 
   // Get user role for admin buttons
   const userRole = localStorage.getItem('userRole') || 'viewer';
+  const currentUserId = localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')!)._id : null;
+  const currentUserEmail = localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')!).email : '';
   const isAdmin = userRole === 'admin';
   const isSuperAdmin = userRole === 'superadmin';
+  const isPlayer = userRole === 'player';
+  const isViewer = userRole === 'viewer';
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        setLoading(true);
-        setError(null);
+  setLoading(true);
 
-        console.log('MatchOverview: Fetching data for matchId:', matchId);
+  // Fetching data for matchId (debug log removed)
         
         if (!matchId) {
-          setError('No match ID provided');
+          toast.showError('No match ID provided');
           setLoading(false);
           return;
         }
 
         // Fetch match details
-        const matchResponse = await matchService.getById(matchId);
-        console.log('MatchOverview: Match data fetched:', matchResponse.data);
+  const matchResponse = await matchService.getById(matchId);
+  // Match data fetched (debug log removed)
         setMatch(matchResponse.data);
 
         // Fetch all teams
@@ -67,7 +87,8 @@ const MatchOverview: React.FC = () => {
         setTeams(teamsMap);
       } catch (err) {
         console.error('Error fetching match data:', err);
-        setError(`Failed to load match data: ${err}`);
+        const msg = `Failed to load match data: ${err}`;
+        toast.showError(msg);
       } finally {
         setLoading(false);
       }
@@ -77,7 +98,7 @@ const MatchOverview: React.FC = () => {
     
     // Store in sessionStorage that user came from overview (for breadcrumb tracking)
     sessionStorage.setItem('lastMatchNavigation', 'overview');
-  }, [matchId]);
+  }, [matchId, toast]);
 
   const getTeamName = (team: string | { _id: string; name: string }): string => {
     if (typeof team === 'object' && team.name) {
@@ -128,23 +149,38 @@ const MatchOverview: React.FC = () => {
 
   if (loading) {
     return (
-      <Container>
-        <Typography>Loading match details...</Typography>
-      </Container>
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
+        <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          🏏 <span className="loading-spinner">⏳</span> Loading Match Details...
+        </Typography>
+      </Box>
     );
   }
 
-  if (error || !match) {
+  if (!match) {
     return (
-      <Container>
-        <Typography color="error">{error || 'Match not found'}</Typography>
-      </Container>
+      <Box>
+        <Typography color="error">Match not found</Typography>
+      </Box>
     );
   }
+
+  // Calculate if user can manage this match (inside render where match data is available)
+  const canManageMatch = isAdmin || isSuperAdmin || ((isPlayer || isViewer) && match?.createdBy === currentUserId);
+
+  const isEmailValid = !!emailToSend && /^\S+@\S+\.\S+$/.test(emailToSend);
 
   return (
-    <Container maxWidth="lg" sx={{ py: 3 }}>
-      <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
+  <Box maxWidth="lg" sx={{ py: isMobile ? 1 : 3, px: isMobile ? 1 : 3, mx: 'auto' }}>
+      <Paper 
+        elevation={3} 
+        sx={{ 
+          p: isMobile ? 1 : 3, 
+          mb: 3,
+          background: 'linear-gradient(135deg, #020e43 0%, #764ba2 100%)',
+          color: 'white'
+        }}
+      >
         {/* Match Header */}
         <Box sx={{ textAlign: 'center', mb: 4 }}>
           <Typography 
@@ -222,9 +258,6 @@ const MatchOverview: React.FC = () => {
 
         {/* Navigation Buttons */}
         <Box sx={{ textAlign: 'center' }}>
-          <Typography variant="h6" gutterBottom sx={{ mb: 3 }}>
-            Choose what you want to do:
-          </Typography>
           
           <Stack 
             direction={isMobile ? "column" : "row"} 
@@ -232,53 +265,11 @@ const MatchOverview: React.FC = () => {
             justifyContent="center"
             alignItems="center"
           >
-            {/* View Options - Always Available */}
-            <Stack 
-              direction={isMobile ? "column" : "row"} 
-              spacing={2}
-            >
-              <Button
-                variant="contained"
-                size="large"
-                startIcon={<SummarizeIcon />}
-                onClick={() => navigate(`/matches/${matchId}/summary`)}
-                sx={{ 
-                  minWidth: isMobile ? '100%' : '180px',
-                  py: 2,
-                  fontSize: '1rem'
-                }}
-              >
-                View Summary
-              </Button>
-              
-              <Button
-                variant="outlined"
-                size="large"
-                startIcon={<CommentIcon />}
-                onClick={() => navigate(`/matches/${matchId}/commentary`)}
-                sx={{ 
-                  minWidth: isMobile ? '100%' : '180px',
-                  py: 2,
-                  fontSize: '1rem'
-                }}
-              >
-                Live Commentary
-              </Button>
-            </Stack>
-
-            {/* Admin Actions - Only for Admins and SuperAdmins */}
-            {(isAdmin || isSuperAdmin) && (
+            {/* Admin/Player Actions - For Admins, SuperAdmins, and match creators */}  
+            {canManageMatch && (
               <Stack 
                 direction={isMobile ? "column" : "row"} 
                 spacing={2}
-                sx={{ 
-                  borderLeft: !isMobile ? '2px solid #e0e0e0' : 'none',
-                  borderTop: isMobile ? '2px solid #e0e0e0' : 'none',
-                  pl: !isMobile ? 3 : 0,
-                  pt: isMobile ? 3 : 0,
-                  ml: !isMobile ? 3 : 0,
-                  mt: isMobile ? 3 : 0
-                }}
               >
                 {match.status === 'upcoming' && (
                   <Button
@@ -290,10 +281,14 @@ const MatchOverview: React.FC = () => {
                     sx={{ 
                       minWidth: isMobile ? '100%' : '180px',
                       py: 2,
-                      fontSize: '1rem'
+                      fontSize: '1rem',
+                      background: 'linear-gradient(45deg, #4CAF50 30%, #8BC34A 90%)',
+                      '&:hover': {
+                        background: 'linear-gradient(45deg, #388E3C 30%, #689F38 90%)',
+                      }
                     }}
                   >
-                    Start Match
+                    ⏳ Start Match
                   </Button>
                 )}
                 
@@ -307,25 +302,141 @@ const MatchOverview: React.FC = () => {
                     sx={{ 
                       minWidth: isMobile ? '100%' : '180px',
                       py: 2,
-                      fontSize: '1rem'
+                      fontSize: '1rem',
+                      background: 'linear-gradient(45deg, #FF9800 30%, #FFB74D 90%)',
+                      '&:hover': {
+                        background: 'linear-gradient(45deg, #F57C00 30%, #FFA726 90%)',
+                      }
                     }}
                   >
-                    Continue Match
+                    ⏳ Continue Match
                   </Button>
                 )}
               </Stack>
             )}
+
+            {/* View Options - Always Available */}
+            <Stack 
+              direction={isMobile ? "column" : "row"} 
+              spacing={2}
+              sx={{ 
+                borderLeft: !isMobile && (isAdmin || isSuperAdmin) ? '2px solid rgba(255,255,255,0.3)' : 'none',
+                borderTop: isMobile && (isAdmin || isSuperAdmin) ? '2px solid rgba(255,255,255,0.3)' : 'none',
+                pl: !isMobile && (isAdmin || isSuperAdmin) ? 3 : 0,
+                pt: isMobile && (isAdmin || isSuperAdmin) ? 3 : 0,
+                ml: !isMobile && (isAdmin || isSuperAdmin) ? 3 : 0,
+                mt: isMobile && (isAdmin || isSuperAdmin) ? 3 : 0
+              }}
+            >
+              <Button
+                variant="outlined"
+                size="large"
+                startIcon={<CommentIcon />}
+                onClick={() => navigate(`/matches/${matchId}/commentary`)}
+                sx={{ 
+                  minWidth: isMobile ? '100%' : '180px',
+                  py: 2,
+                  fontSize: '1rem',
+                  color: 'white',
+                  borderColor: 'rgba(255,255,255,0.5)',
+                  '&:hover': {
+                    borderColor: 'white',
+                    backgroundColor: 'rgba(255,255,255,0.1)',
+                  }
+                }}
+              >
+                Live Commentary
+              </Button>
+              
+              <Button
+                variant="outlined"
+                size="large"
+                startIcon={<SummarizeIcon />}
+                onClick={() => navigate(`/matches/${matchId}/summary`)}
+                sx={{ 
+                  minWidth: isMobile ? '100%' : '180px',
+                  py: 2,
+                  fontSize: '1rem',
+                  color: 'white',
+                  borderColor: 'rgba(255,255,255,0.5)',
+                  '&:hover': {
+                    borderColor: 'white',
+                    backgroundColor: 'rgba(255,255,255,0.1)',
+                  }
+                }}
+              >
+                View Summary
+              </Button>
+              <Button
+                variant="outlined"
+                size="large"
+                startIcon={<SummarizeIcon />}
+                onClick={() => {
+                  // Prefill email when opening dialog
+                  setEmailToSend(currentUserEmail || '');
+                  setEmailDialogOpen(true);
+                }}
+                sx={{ 
+                  minWidth: isMobile ? '100%' : '180px',
+                  py: 2,
+                  fontSize: '1rem',
+                  color: 'white',
+                  borderColor: 'rgba(255,255,255,0.5)',
+                  '&:hover': {
+                    borderColor: 'white',
+                    backgroundColor: 'rgba(255,255,255,0.1)',
+                  }
+                }}
+              >
+                Email Summary
+              </Button>
+            </Stack>
           </Stack>
           
-          <Typography variant="body2" color="textSecondary" sx={{ mt: 3 }}>
-            {(isAdmin || isSuperAdmin) 
-              ? "View match details, commentary, or manage the match"
-              : "View detailed statistics and scores, or watch the ball-by-ball commentary"
-            }
-          </Typography>
         </Box>
       </Paper>
-    </Container>
+
+      <Dialog open={emailDialogOpen} onClose={() => setEmailDialogOpen(false)}>
+        <DialogTitle>Send Match Summary</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 1 }}>Enter recipient email address to send a match summary.</Typography>
+          <TextField
+            fullWidth
+            label="Email"
+            value={emailToSend}
+            onChange={(e) => setEmailToSend(e.target.value)}
+            type="email"
+            error={!isEmailValid && emailToSend.length > 0}
+            helperText={!isEmailValid && emailToSend.length > 0 ? 'Enter a valid email address' : ''}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEmailDialogOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={!isEmailValid}
+            onClick={async () => {
+              if (!matchId) return;
+              try {
+                setLoading(true);
+                const resp = await matchService.sendSummary(matchId, emailToSend);
+                toast.showSuccess(resp.data?.message || 'Summary sent');
+                setEmailDialogOpen(false);
+              } catch (err: any) {
+                console.error('Failed to send summary:', err);
+                const msg = err?.response?.data?.message || err?.message || 'Failed to send summary';
+                toast.showError(msg);
+              } finally {
+                setLoading(false);
+              }
+            }}
+          >
+            Send
+          </Button>
+        </DialogActions>
+      </Dialog>
+    
+    </Box>
   );
 };
 

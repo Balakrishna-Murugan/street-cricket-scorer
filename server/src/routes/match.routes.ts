@@ -1,36 +1,40 @@
 import express from 'express';
 import { matchController } from '../controllers/match.controller';
+import { authMiddleware } from '../middleware/auth.middleware';
 
 const router = express.Router();
 
 // GET all matches
-router.get('/', matchController.getAll);
+router.get('/', authMiddleware.requireAuth, matchController.getAll);
 
 // GET match by ID
-router.get('/:id', matchController.getById);
+router.get('/:id', authMiddleware.requireAuth, matchController.getById);
 
 // POST create new match
-router.post('/', matchController.create);
+router.post('/', authMiddleware.requireAuth, matchController.create);
 
 // PUT update match
-router.put('/:id', matchController.update);
+router.put('/:id', authMiddleware.requireAuth, matchController.update);
 
 // PUT update match score (legacy)
-router.put('/:matchId/score', matchController.updateScore);
+router.put('/:matchId/score', authMiddleware.requireAuth, matchController.updateScore);
 
 // POST process a single ball (NEW ENHANCED ENDPOINT)
-router.post('/:matchId/ball', matchController.processBall);
+router.post('/:matchId/ball', authMiddleware.requireAuth, matchController.processBall);
 
 // GET bowler rotation options
-router.get('/:matchId/bowler-rotation', matchController.getBowlerRotation);
+router.get('/:matchId/bowler-rotation', authMiddleware.requireAuth, matchController.getBowlerRotation);
 
 // POST start new over
-router.post('/:matchId/new-over', matchController.startNewOver);
+router.post('/:matchId/new-over', authMiddleware.requireAuth, matchController.startNewOver);
 
 // PUT update current batsmen
-router.put('/:matchId/batsmen', matchController.updateBatsmen);
+router.put('/:matchId/batsmen', authMiddleware.requireAuth, matchController.updateBatsmen);
+
+// POST send match summary via email (body: { email })
+router.post('/:matchId/send-summary', authMiddleware.requireAuth, matchController.sendSummary);
 
 // DELETE match
-router.delete('/:id', matchController.delete);
+router.delete('/:id', authMiddleware.requireAuth, matchController.delete);
 
 export const matchRoutes = router;

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Public copy of internal logo for app branding
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240" role="img" aria-labelledby="title desc">
+  <title id="title">Street Cricket Scorer</title>
+  <desc id="desc">Street Cricket Scorer app icon</desc>
+  <defs>
+    <linearGradient id="g" x1="0" x2="1">
+      <stop offset="0%" stop-color="#0b6623" />
+      <stop offset="100%" stop-color="#f4c542" />
+    </linearGradient>
+  </defs>
+  <rect width="240" height="240" rx="24" fill="#07203a" />
+  <g transform="translate(40,40)">
+    <path d="M20 20 C40 0, 80 0, 100 20 C120 40, 120 80, 100 100 C80 120, 40 120, 20 100 C0 80, 0 40, 20 20 Z" fill="url(#g)" opacity="0.95" />
+    <text x="50" y="75" font-family="Segoe UI, Arial" font-size="68" fill="#07203a" font-weight="700" text-anchor="middle">B</text>
+    <text x="90" y="150" font-family="Segoe UI, Arial" font-size="68" fill="#07203a" font-weight="700" text-anchor="middle" transform="rotate(-20,90,150)">S</text>
+  </g>
+</svg>

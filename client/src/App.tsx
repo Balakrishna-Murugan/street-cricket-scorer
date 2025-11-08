@@ -7,12 +7,12 @@ import PlayerList from './pages/PlayerList';
 import MatchList from './pages/MatchList';
 import MatchOverview from './pages/MatchOverview';
 import LiveScoring from './pages/LiveScoring';
+import MatchAccessGuard from './components/MatchAccessGuard';
 import MatchSummary from './pages/MatchSummary';
 import MatchCommentaryPage from './pages/MatchCommentaryPage';
 import Login from './pages/Login';
 import Header from './components/Header';
 import AuthGuard from './components/AuthGuard';
-import AdminGuard from './components/AdminGuard';
 
 const theme = createTheme({
   palette: {
@@ -123,12 +123,12 @@ function App() {
                   }}>
                     <Routes>
                       <Route path="/" element={<HomePage />} />
-                      <Route path="/teams" element={<AdminGuard><TeamList /></AdminGuard>} />
-                      <Route path="/players" element={<AdminGuard><PlayerList /></AdminGuard>} />
+                      <Route path="/teams" element={<TeamList />} />
+                      <Route path="/players" element={<PlayerList />} />
                       <Route path="/matches" element={<MatchList />} />
                       <Route path="/matches/:matchId" element={<MatchOverview />} />
                       <Route path="/matches/:matchId/overview" element={<MatchOverview />} />
-                      <Route path="/matches/:matchId/live" element={<AdminGuard><LiveScoring /></AdminGuard>} />
+                      <Route path="/matches/:matchId/live" element={<MatchAccessGuard><LiveScoring /></MatchAccessGuard>} />
                       <Route path="/matches/:matchId/summary" element={<MatchSummary />} />
                       <Route path="/matches/:matchId/commentary" element={<MatchCommentaryPage />} />
                     </Routes>

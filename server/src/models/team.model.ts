@@ -5,6 +5,7 @@ export interface ITeam {
   captain?: mongoose.Types.ObjectId;
   members: mongoose.Types.ObjectId[];
   logo?: string;
+  createdBy?: mongoose.Types.ObjectId;
 }
 
 const teamSchema = new mongoose.Schema<ITeam>({
@@ -25,6 +26,12 @@ const teamSchema = new mongoose.Schema<ITeam>({
   }],
   logo: {
     type: String
+  }
+  ,
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Player',
+    required: false
   }
 }, {
   timestamps: true
