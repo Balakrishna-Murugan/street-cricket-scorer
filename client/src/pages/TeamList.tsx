@@ -175,6 +175,8 @@ const TeamList: React.FC = () => {
   // When user clicks Add, check team creation limits and either open dialog or show error
   const handleAddClick = () => {
     if ((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer' || currentUser?.userRole === 'player') && teams.length >= TEAM_LIMIT) {
+      // If editing an existing team, allow the dialog (we are updating, not creating)
+      // Only prevent opening create dialog when not editing
       toast.showError(`You have reached the team creation limit (${TEAM_LIMIT}). Please contact admin to add more.`);
       return;
     }
@@ -273,7 +275,8 @@ const TeamList: React.FC = () => {
     }
 
     // Enforce guest/viewer creation limit: max TEAM_LIMIT teams
-    if ((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer' || currentUser?.userRole === 'player') && teams.length >= TEAM_LIMIT) {
+    // Only block when creating a new team (not when editing an existing team)
+    if (!editingTeam && (currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer' || currentUser?.userRole === 'player') && teams.length >= TEAM_LIMIT) {
       toast.showError(`You have reached the team creation limit (${TEAM_LIMIT}). Please contact admin to add more.`);
       return;
     }
@@ -510,6 +513,10 @@ const TeamList: React.FC = () => {
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
           <CircularProgress />
+        </Box>
+      ) : !loading && teams.length === 0 ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 6 }}>
+          <Typography variant="h6" color="text.secondary">No teams have been created yet.</Typography>
         </Box>
       ) : isMobile ? (
         // Mobile Card Layout
@@ -805,7 +812,7 @@ const TeamList: React.FC = () => {
             <Button
               onClick={() => handleSubmit(true)}
               variant="contained"
-              disabled={loading || !newTeam.name || ((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer') && teams.length >= 2)}
+              disabled={loading || !newTeam.name}
               size={isMobile ? "small" : "medium"}
               sx={{
                 mr: 1,

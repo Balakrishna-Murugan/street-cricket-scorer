@@ -73,7 +73,7 @@ const playerSchema = new mongoose.Schema<IPlayer>({
   },
   userRole: {
     type: String,
-    enum: ['player', 'admin', 'superadmin', 'viewer'],
+    enum: ['player', 'admin', 'superadmin', 'viewer', 'guest'],
     default: 'player'
   },
   createdBy: {
