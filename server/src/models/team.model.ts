@@ -12,7 +12,6 @@ const teamSchema = new mongoose.Schema<ITeam>({
   name: {
     type: String,
     required: true,
-    unique: true,
     trim: true
   },
   captain: {
@@ -36,5 +35,8 @@ const teamSchema = new mongoose.Schema<ITeam>({
 }, {
   timestamps: true
 });
+
+// Ensure uniqueness of team name per creator (allow same name across different users)
+teamSchema.index({ name: 1, createdBy: 1 }, { unique: true, partialFilterExpression: { createdBy: { $exists: true } } });
 
 export const Team = mongoose.model<ITeam>('Team', teamSchema);
