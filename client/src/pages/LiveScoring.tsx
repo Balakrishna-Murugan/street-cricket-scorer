@@ -2986,42 +2986,7 @@ const LiveScoring: React.FC<Props> = () => {
       }
       
       // Save the innings transition to server
-      const cleanMatchData = (match: Match): Match => {
-        return {
-          ...match,
-          team1: typeof match.team1 === 'object' ? match.team1._id : match.team1,
-          team2: typeof match.team2 === 'object' ? match.team2._id : match.team2,
-          currentInnings: updatedMatch.currentInnings, // Use the updated currentInnings
-          innings: match.innings.map(inning => ({
-            battingTeam: typeof inning.battingTeam === 'object' ? inning.battingTeam._id : inning.battingTeam,
-            bowlingTeam: typeof inning.bowlingTeam === 'object' ? inning.bowlingTeam._id : inning.bowlingTeam,
-            totalRuns: inning.totalRuns,
-            wickets: inning.wickets,
-            overs: inning.overs,
-            balls: inning.balls || 0,
-            isCompleted: inning.isCompleted || false,
-            battingStats: inning.battingStats || [],
-            bowlingStats: inning.bowlingStats || [],
-            currentState: inning.currentState || {
-              currentOver: 0,
-              currentBall: 0,
-              lastBallRuns: 0
-            },
-            extras: inning.extras || {
-              wides: 0,
-              noBalls: 0,
-              byes: 0,
-              legByes: 0,
-              total: 0
-            },
-            runRate: inning.runRate || 0,
-            requiredRunRate: inning.requiredRunRate,
-            currentOverBalls: inning.currentOverBalls || [],
-            recentBalls: inning.recentBalls || []
-          }))
-        };
-      };
-
+      // Reuse the shared `cleanMatchData` helper (defined earlier) to prepare the payload
       const cleanedMatch = cleanMatchData(updatedMatch);
       const { data } = await matchService.updateScore(matchId, cleanedMatch);
       
