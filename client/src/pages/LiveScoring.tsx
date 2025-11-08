@@ -398,42 +398,7 @@ const LiveScoring: React.FC<Props> = () => {
           // Mark first innings as completed due to insufficient batsmen
           updatedMatch.innings[0].isCompleted = true;
           
-          // Prepare clean match data for saving
-          const cleanMatchData = (match: Match): Match => {
-            return {
-              ...match,
-              team1: typeof match.team1 === 'object' ? match.team1._id : match.team1,
-              team2: typeof match.team2 === 'object' ? match.team2._id : match.team2,
-              currentInnings: match.currentInnings || 0,
-              innings: match.innings.map(inning => ({
-                battingTeam: typeof inning.battingTeam === 'object' ? inning.battingTeam._id : inning.battingTeam,
-                bowlingTeam: typeof inning.bowlingTeam === 'object' ? inning.bowlingTeam._id : inning.bowlingTeam,
-                totalRuns: inning.totalRuns,
-                wickets: inning.wickets,
-                overs: inning.overs,
-                balls: inning.balls || 0,
-                isCompleted: inning.isCompleted || false,
-                battingStats: inning.battingStats || [],
-                bowlingStats: inning.bowlingStats || [],
-                currentState: inning.currentState || {
-                  currentOver: 0,
-                  currentBall: 0,
-                  lastBallRuns: 0
-                },
-                extras: inning.extras || {
-                  wides: 0,
-                  noBalls: 0,
-                  byes: 0,
-                  legByes: 0,
-                  total: 0
-                },
-                runRate: inning.runRate || 0,
-                requiredRunRate: inning.requiredRunRate,
-                currentOverBalls: inning.currentOverBalls || [],
-                recentBalls: inning.recentBalls || []
-              }))
-            };
-          };
+          // Use the shared cleanMatchData helper (defined at module scope) for saving
 
           // Save the updated match with first innings completed
           const cleanedMatch = cleanMatchData(updatedMatch);
@@ -482,42 +447,7 @@ const LiveScoring: React.FC<Props> = () => {
             updatedMatch.result = 'Match ended in a tie';
           }
           
-          // Save the completed match
-          const cleanMatchData = (match: Match): Match => {
-            return {
-              ...match,
-              team1: typeof match.team1 === 'object' ? match.team1._id : match.team1,
-              team2: typeof match.team2 === 'object' ? match.team2._id : match.team2,
-              currentInnings: match.currentInnings || 0,
-              innings: match.innings.map(inning => ({
-                battingTeam: typeof inning.battingTeam === 'object' ? inning.battingTeam._id : inning.battingTeam,
-                bowlingTeam: typeof inning.bowlingTeam === 'object' ? inning.bowlingTeam._id : inning.bowlingTeam,
-                totalRuns: inning.totalRuns,
-                wickets: inning.wickets,
-                overs: inning.overs,
-                balls: inning.balls || 0,
-                isCompleted: inning.isCompleted || false,
-                battingStats: inning.battingStats || [],
-                bowlingStats: inning.bowlingStats || [],
-                currentState: inning.currentState || {
-                  currentOver: 0,
-                  currentBall: 0,
-                  lastBallRuns: 0
-                },
-                extras: inning.extras || {
-                  wides: 0,
-                  noBalls: 0,
-                  byes: 0,
-                  legByes: 0,
-                  total: 0
-                },
-                runRate: inning.runRate || 0,
-                requiredRunRate: inning.requiredRunRate,
-                currentOverBalls: inning.currentOverBalls || [],
-                recentBalls: inning.recentBalls || []
-              }))
-            };
-          };
+          // Use the shared cleanMatchData helper (defined at module scope) for saving
 
           const cleanedMatch = cleanMatchData(updatedMatch);
           await matchService.updateScore(matchId, cleanedMatch);
@@ -1528,44 +1458,8 @@ const LiveScoring: React.FC<Props> = () => {
             updatedMatch.innings.push(newInnings);
             // Keep currentInnings as 0 until user starts second innings
             
-            // Save match with prepared second innings
+            // Save match with prepared second innings using shared cleanMatchData helper
             try {
-              const cleanMatchData = (match: Match): Match => {
-                return {
-                  ...match,
-                  team1: typeof match.team1 === 'object' ? match.team1._id : match.team1,
-                  team2: typeof match.team2 === 'object' ? match.team2._id : match.team2,
-                  currentInnings: match.currentInnings || 0,
-                  innings: match.innings.map(inning => ({
-                    battingTeam: typeof inning.battingTeam === 'object' ? inning.battingTeam._id : inning.battingTeam,
-                    bowlingTeam: typeof inning.bowlingTeam === 'object' ? inning.bowlingTeam._id : inning.bowlingTeam,
-                    totalRuns: inning.totalRuns,
-                    wickets: inning.wickets,
-                    overs: inning.overs,
-                    balls: inning.balls || 0,
-                    isCompleted: inning.isCompleted || false,
-                    battingStats: inning.battingStats || [],
-                    bowlingStats: inning.bowlingStats || [],
-                    currentState: inning.currentState || {
-                      currentOver: 0,
-                      currentBall: 0,
-                      lastBallRuns: 0
-                    },
-                    extras: inning.extras || {
-                      wides: 0,
-                      noBalls: 0,
-                      byes: 0,
-                      legByes: 0,
-                      total: 0
-                    },
-                    runRate: inning.runRate || 0,
-                    requiredRunRate: inning.requiredRunRate,
-                    currentOverBalls: inning.currentOverBalls || [],
-                    recentBalls: inning.recentBalls || []
-                  }))
-                };
-              };
-
               const cleanedMatch = cleanMatchData(updatedMatch);
               await matchService.updateScore(matchId, cleanedMatch);
               setMatch(updatedMatch);
@@ -1661,82 +1555,12 @@ const LiveScoring: React.FC<Props> = () => {
     }
 
     try {
-      const cleanMatchData = (match: Match): Match => {
-        return {
-          ...match,
-          team1: typeof match.team1 === 'object' ? match.team1._id : match.team1,
-          team2: typeof match.team2 === 'object' ? match.team2._id : match.team2,
-          currentInnings: match.currentInnings || 0,
-          matchSettings: match.matchSettings || {
-            oversPerBowler: 4,
-            maxPlayersPerTeam: 11
-          },
-          bowlerRotation: match.bowlerRotation || {
-            bowlerOversCount: {},
-            availableBowlers: []
-          },
-          innings: match.innings.map(inning => ({
-            battingTeam: typeof inning.battingTeam === 'object' ? inning.battingTeam._id : inning.battingTeam,
-            bowlingTeam: typeof inning.bowlingTeam === 'object' ? inning.bowlingTeam._id : inning.bowlingTeam,
-            totalRuns: inning.totalRuns,
-            wickets: inning.wickets,
-            overs: inning.overs,
-            balls: inning.balls || 0,
-            isCompleted: inning.isCompleted || false,
-            battingStats: inning.battingStats.map(stat => ({
-              player: typeof stat.player === 'object' ? stat.player._id : stat.player,
-              runs: stat.runs,
-              balls: stat.balls,
-              fours: stat.fours,
-              sixes: stat.sixes,
-              isOut: stat.isOut,
-              dismissalType: stat.dismissalType,
-              howOut: stat.howOut,
-              dismissedBy: stat.dismissedBy,
-              strikeRate: stat.strikeRate || 0,
-              isOnStrike: stat.isOnStrike || false
-            })),
-            bowlingStats: inning.bowlingStats.map(stat => ({
-              player: typeof stat.player === 'object' ? stat.player._id : stat.player,
-              overs: stat.overs,
-              balls: stat.balls || 0,
-              runs: stat.runs,
-              wickets: stat.wickets,
-              wides: stat.wides || 0,
-              noBalls: stat.noBalls || 0,
-              economy: stat.economy || 0,
-              lastBowledOver: stat.lastBowledOver
-            })),
-            currentState: inning.currentState || {
-              currentOver: 0,
-              currentBall: 0,
-              lastBallRuns: 0
-            },
-            extras: inning.extras || {
-              wides: 0,
-              noBalls: 0,
-              byes: 0,
-              legByes: 0,
-              total: 0
-            },
-            runRate: inning.runRate || 0,
-            requiredRunRate: inning.requiredRunRate,
-            currentOverBalls: inning.currentOverBalls || [],
-            recentBalls: inning.recentBalls || []
-          }))
-        };
-      };
-
       const cleanedMatch = cleanMatchData(updatedMatch);
-
-  // Saving to server (debug logs removed)
-  const { data } = await matchService.updateScore(matchId, cleanedMatch);
-
-  // Server response received (debug logs removed)
-      
+      // Saving to server (debug logs removed)
+      const { data } = await matchService.updateScore(matchId, cleanedMatch);
+      // Server response received (debug logs removed)
       // Update local state with the response data to keep in sync
       setMatch(data);
-
       // Track action for undo
       addToUndoHistory(undoAction);
     } catch (error: any) {
@@ -2004,69 +1828,6 @@ const LiveScoring: React.FC<Props> = () => {
     } catch (e) { /* ignore */ }
 
     try {
-      const cleanMatchData = (match: Match): Match => {
-        return {
-          ...match,
-          team1: typeof match.team1 === 'object' ? match.team1._id : match.team1,
-          team2: typeof match.team2 === 'object' ? match.team2._id : match.team2,
-          currentInnings: match.currentInnings || 0,
-          matchSettings: match.matchSettings || {
-            oversPerBowler: 4,
-            maxPlayersPerTeam: 11
-          },
-          bowlerRotation: match.bowlerRotation || {
-            bowlerOversCount: {},
-            availableBowlers: []
-          },
-          innings: match.innings.map(inning => ({
-            battingTeam: typeof inning.battingTeam === 'object' ? inning.battingTeam._id : inning.battingTeam,
-            bowlingTeam: typeof inning.bowlingTeam === 'object' ? inning.bowlingTeam._id : inning.bowlingTeam,
-            totalRuns: inning.totalRuns,
-            wickets: inning.wickets,
-            overs: inning.overs,
-            balls: inning.balls || 0,
-            isCompleted: inning.isCompleted || false,
-            battingStats: inning.battingStats.map(stat => ({
-              player: typeof stat.player === 'object' ? stat.player._id : stat.player,
-              runs: stat.runs,
-              balls: stat.balls,
-              fours: stat.fours,
-              sixes: stat.sixes,
-              isOut: stat.isOut,
-              dismissalType: stat.dismissalType,
-              howOut: stat.howOut,
-              dismissedBy: stat.dismissedBy,
-              strikeRate: stat.strikeRate || 0,
-              isOnStrike: stat.isOnStrike || false
-            })),
-            bowlingStats: inning.bowlingStats.map(stat => ({
-              player: typeof stat.player === 'object' ? stat.player._id : stat.player,
-              overs: stat.overs,
-              balls: stat.balls || 0,
-              runs: stat.runs,
-              wickets: stat.wickets,
-              wides: stat.wides || 0,
-              noBalls: stat.noBalls || 0,
-              economy: stat.economy || 0,
-              lastBowledOver: stat.lastBowledOver
-            })),
-            currentState: inning.currentState || {
-              currentOver: 0,
-              currentBall: 0,
-              lastBallRuns: 0
-            },
-            extras: {
-              ...inning.extras,
-              total: inning.extras.total || 0
-            },
-            runRate: inning.runRate || 0,
-            requiredRunRate: inning.requiredRunRate,
-            currentOverBalls: inning.currentOverBalls || [],
-            recentBalls: inning.recentBalls || []
-          }))
-        };
-      };
-
       const cleanedMatch = cleanMatchData(updatedMatch);
       const { data } = await matchService.updateScore(matchId, cleanedMatch);
       setMatch(data);
@@ -2393,69 +2154,7 @@ const LiveScoring: React.FC<Props> = () => {
     }
 
     try {
-      const cleanMatchData = (match: Match): Match => {
-        return {
-          ...match,
-          team1: typeof match.team1 === 'object' ? match.team1._id : match.team1,
-          team2: typeof match.team2 === 'object' ? match.team2._id : match.team2,
-          currentInnings: match.currentInnings || 0,
-          matchSettings: match.matchSettings || {
-            oversPerBowler: 4,
-            maxPlayersPerTeam: 11
-          },
-          bowlerRotation: match.bowlerRotation || {
-            bowlerOversCount: {},
-            availableBowlers: []
-          },
-          innings: match.innings.map(inning => ({
-            battingTeam: typeof inning.battingTeam === 'object' ? inning.battingTeam._id : inning.battingTeam,
-            bowlingTeam: typeof inning.bowlingTeam === 'object' ? inning.bowlingTeam._id : inning.bowlingTeam,
-            totalRuns: inning.totalRuns,
-            wickets: inning.wickets,
-            overs: inning.overs,
-            balls: inning.balls || 0,
-            isCompleted: inning.isCompleted || false,
-            battingStats: inning.battingStats.map(stat => ({
-              player: typeof stat.player === 'object' ? stat.player._id : stat.player,
-              runs: stat.runs,
-              balls: stat.balls,
-              fours: stat.fours,
-              sixes: stat.sixes,
-              isOut: stat.isOut,
-              dismissalType: stat.dismissalType,
-              howOut: stat.howOut,
-              dismissedBy: stat.dismissedBy,
-              strikeRate: stat.strikeRate || 0,
-              isOnStrike: stat.isOnStrike || false
-            })),
-            bowlingStats: inning.bowlingStats.map(stat => ({
-              player: typeof stat.player === 'object' ? stat.player._id : stat.player,
-              overs: stat.overs,
-              balls: stat.balls || 0,
-              runs: stat.runs,
-              wickets: stat.wickets,
-              wides: stat.wides || 0,
-              noBalls: stat.noBalls || 0,
-              economy: stat.economy || 0,
-              lastBowledOver: stat.lastBowledOver
-            })),
-            currentState: inning.currentState || {
-              currentOver: 0,
-              currentBall: 0,
-              lastBallRuns: 0
-            },
-            extras: {
-              ...inning.extras,
-              total: inning.extras.total || 0
-            },
-            runRate: inning.runRate || 0,
-            requiredRunRate: inning.requiredRunRate,
-            currentOverBalls: inning.currentOverBalls || [],
-            recentBalls: inning.recentBalls || []
-          }))
-        };
-      };
-
+      // Use shared cleanMatchData helper below when saving state
       // Check if match should end (for second innings)
       const matchEnded = checkMatchEnd(updatedMatch);
       if (matchEnded) {
@@ -2631,68 +2330,13 @@ const LiveScoring: React.FC<Props> = () => {
       return newHistory;
     });
 
-    // Save the restored state
+    // Save the restored state using shared helper
     try {
-      const cleanMatchData = (match: Match): Match => {
-        return {
-          ...match,
-          team1: typeof match.team1 === 'object' ? match.team1._id : match.team1,
-          team2: typeof match.team2 === 'object' ? match.team2._id : match.team2,
-          currentInnings: match.currentInnings || 0,
-          innings: match.innings.map(inning => ({
-            battingTeam: typeof inning.battingTeam === 'object' ? inning.battingTeam._id : inning.battingTeam,
-            bowlingTeam: typeof inning.bowlingTeam === 'object' ? inning.bowlingTeam._id : inning.bowlingTeam,
-            totalRuns: inning.totalRuns,
-            wickets: inning.wickets,
-            overs: inning.overs,
-            balls: inning.balls || 0,
-            isCompleted: inning.isCompleted || false,
-            battingStats: inning.battingStats.map(stat => ({
-              player: typeof stat.player === 'object' ? stat.player._id : stat.player,
-              runs: stat.runs,
-              balls: stat.balls,
-              fours: stat.fours,
-              sixes: stat.sixes,
-              isOut: stat.isOut,
-              dismissalType: stat.dismissalType,
-              howOut: stat.howOut,
-              dismissedBy: stat.dismissedBy,
-              strikeRate: stat.strikeRate || 0,
-              isOnStrike: stat.isOnStrike || false
-            })),
-            bowlingStats: inning.bowlingStats.map(stat => ({
-              player: typeof stat.player === 'object' ? stat.player._id : stat.player,
-              overs: stat.overs,
-              balls: stat.balls || 0,
-              runs: stat.runs,
-              wickets: stat.wickets,
-              wides: stat.wides || 0,
-              noBalls: stat.noBalls || 0,
-              economy: stat.economy || 0,
-              lastBowledOver: stat.lastBowledOver
-            })),
-            currentState: inning.currentState || {
-              currentOver: 0,
-              currentBall: 0,
-              lastBallRuns: 0
-            },
-            extras: {
-              ...inning.extras,
-              total: inning.extras.total || 0
-            },
-            runRate: inning.runRate || 0,
-            requiredRunRate: inning.requiredRunRate,
-            currentOverBalls: inning.currentOverBalls || [],
-            recentBalls: inning.recentBalls || []
-          }))
-        };
-      };
-
       const cleanedMatch = cleanMatchData(updatedMatch);
       const { data } = await matchService.updateScore(matchId, cleanedMatch);
       setMatch(data);
     } catch (error: any) {
-  toast.showError('Error undoing action');
+      toast.showError('Error undoing action');
       console.error('Error undoing action:', error?.response?.data || error?.message || error);
     }
   };
@@ -3099,43 +2743,7 @@ const LiveScoring: React.FC<Props> = () => {
         updatedMatch.innings.push(newInnings);
       }
       
-      // Save the innings transition to server
-      const cleanMatchData = (match: Match): Match => {
-        return {
-          ...match,
-          team1: typeof match.team1 === 'object' ? match.team1._id : match.team1,
-          team2: typeof match.team2 === 'object' ? match.team2._id : match.team2,
-          currentInnings: updatedMatch.currentInnings, // Use the updated currentInnings
-          innings: match.innings.map(inning => ({
-            battingTeam: typeof inning.battingTeam === 'object' ? inning.battingTeam._id : inning.battingTeam,
-            bowlingTeam: typeof inning.bowlingTeam === 'object' ? inning.bowlingTeam._id : inning.bowlingTeam,
-            totalRuns: inning.totalRuns,
-            wickets: inning.wickets,
-            overs: inning.overs,
-            balls: inning.balls || 0,
-            isCompleted: inning.isCompleted || false,
-            battingStats: inning.battingStats || [],
-            bowlingStats: inning.bowlingStats || [],
-            currentState: inning.currentState || {
-              currentOver: 0,
-              currentBall: 0,
-              lastBallRuns: 0
-            },
-            extras: inning.extras || {
-              wides: 0,
-              noBalls: 0,
-              byes: 0,
-              legByes: 0,
-              total: 0
-            },
-            runRate: inning.runRate || 0,
-            requiredRunRate: inning.requiredRunRate,
-            currentOverBalls: inning.currentOverBalls || [],
-            recentBalls: inning.recentBalls || []
-          }))
-        };
-      };
-
+      // Save the innings transition to server using shared helper
       const cleanedMatch = cleanMatchData(updatedMatch);
       const { data } = await matchService.updateScore(matchId, cleanedMatch);
       
