@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import { CssBaseline, ThemeProvider, createTheme, Box, Toolbar } from '@mui/material';
 import HomePage from './pages/HomePage';
 import TeamList from './pages/TeamList';
