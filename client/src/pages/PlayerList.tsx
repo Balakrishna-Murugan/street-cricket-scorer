@@ -36,11 +36,13 @@ import AddIcon from '@mui/icons-material/Add';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import PersonRemoveIcon from '@mui/icons-material/PersonRemove';
 import { Player, Team } from '../types';
+import FormField from '../components/FormField';
 import { playerService, teamService } from '../services/api.service';
 
-const defaultPlayer: Omit<Player, '_id'> = {
+// Use a looser shape for the create/edit form so number fields can be empty
+const defaultPlayer: any = {
   name: '',
-  age: 0,
+  age: '', // allow empty instead of defaulting to 0
   role: 'batsman',
   battingStyle: 'right-handed',
   bowlingStyle: '',
@@ -58,7 +60,7 @@ const PlayerList: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
-  const [newPlayer, setNewPlayer] = useState<Omit<Player, '_id'>>(defaultPlayer);
+  const [newPlayer, setNewPlayer] = useState<any>(defaultPlayer);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const toast = useToast();
   useEffect(() => {
@@ -116,7 +118,7 @@ const PlayerList: React.FC = () => {
       } else {
         response = await playerService.getAll(currentUser?._id);
       }
-      setPlayers(response.data);
+  setPlayers(response.data);
       // Notify user via toast if they've reached their creation limit (UX: header may hide the message)
       if ((currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer' || currentUser?.userRole === 'player') && response.data.length >= PLAYER_LIMIT) {
         toast.showError(`You have reached the player creation limit (${PLAYER_LIMIT}). Please contact admin to add more.`);
@@ -282,14 +284,15 @@ const PlayerList: React.FC = () => {
   };
 
   const handleSubmit = async (continueAdding: boolean = false) => {
-    if (!newPlayer.name || newPlayer.age <= 0) {
+    // Validate required fields. Age may be empty in the form; enforce numeric value on submit
+    if (!newPlayer.name || newPlayer.age === '' || Number(newPlayer.age) <= 0) {
       setError('Please fill in all required fields correctly');
       return;
     }
 
     // Team selection is optional now; do not block create when no team selected
 
-    if (currentUser && (currentUser.userRole === 'guest' || currentUser.userRole === 'viewer')) {
+    if (currentUser && (currentUser.userRole === 'guest' || currentUser.userRole === 'viewer' || currentUser.userRole === 'player')) {
       const selTeamId = getSelectedTeamId();
       if (selTeamId) {
         const teamPlayerCount = players.filter(p => (p.teams || []).some(t => (typeof t === 'string' ? t : (t as any)?._id) === selTeamId)).length;
@@ -307,7 +310,7 @@ const PlayerList: React.FC = () => {
         // Create clean update data with just the fields we want to update
         const updateData = {
           name: newPlayer.name,
-          age: newPlayer.age,
+          age: Number(newPlayer.age),
           role: newPlayer.role,
           battingStyle: newPlayer.battingStyle,
           bowlingStyle: newPlayer.bowlingStyle,
@@ -324,7 +327,9 @@ const PlayerList: React.FC = () => {
           handleClose();
         }
       } else {
-        await playerService.create(newPlayer);
+        // Ensure numeric age when creating
+        const createPayload = { ...newPlayer, age: Number(newPlayer.age) };
+        await playerService.create(createPayload);
 
         if (continueAdding) {
           // Clear form for next create but keep dialog open
@@ -442,6 +447,10 @@ const PlayerList: React.FC = () => {
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
           <CircularProgress />
+        </Box>
+      ) : !loading && players.length === 0 ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 6 }}>
+          <Typography variant="h6" color="text.secondary">No players have been created yet.</Typography>
         </Box>
       ) : isMobile ? (
         // Mobile Card Layout
@@ -701,23 +710,22 @@ const PlayerList: React.FC = () => {
                 },
               }}
             />
-            <TextField
+            <FormField
               label="Age"
               type="number"
               value={newPlayer.age}
-              onChange={(e) => setNewPlayer({ ...newPlayer, age: parseInt(e.target.value) || 0 })}
-              fullWidth
-              required
-              error={newPlayer.age <= 0 && error != null}
-              size={isMobile ? "small" : "medium"}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: 2,
-                  '&:hover fieldset': {
-                    borderColor: theme.palette.primary.main,
-                  },
-                },
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === '') {
+                  setNewPlayer({ ...newPlayer, age: '' });
+                } else {
+                  const cleaned = v.replace(/[^0-9]/g, '');
+                  setNewPlayer({ ...newPlayer, age: cleaned });
+                }
               }}
+              required
+              error={(newPlayer.age === '' || Number(newPlayer.age) <= 0) && error != null}
+              inputProps={{ min: 0 }}
             />
             <Autocomplete
               fullWidth
@@ -788,20 +796,37 @@ const PlayerList: React.FC = () => {
                 </Box>
               )}
             />
-            <TextField
-              label="Bowling Style"
-              value={newPlayer.bowlingStyle}
-              onChange={(e) => setNewPlayer({ ...newPlayer, bowlingStyle: e.target.value })}
+            <Autocomplete
               fullWidth
-              size={isMobile ? "small" : "medium"}
-              sx={{ 
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: 2,
-                  '&:hover fieldset': {
-                    borderColor: theme.palette.primary.main,
-                  },
-                },
+              options={[
+                { value: '', label: 'None' },
+                { value: 'right-arm-fast', label: 'Right-arm Fast' },
+                { value: 'left-arm-fast', label: 'Left-arm Fast' },
+                { value: 'right-arm-medium', label: 'Right-arm Medium' },
+                { value: 'left-arm-medium', label: 'Left-arm Medium' },
+                { value: 'off-spin', label: 'Off Spin' },
+                { value: 'leg-spin', label: 'Leg Spin' }
+              ]}
+              getOptionLabel={(option: any) => option.label}
+              value={{ value: newPlayer.bowlingStyle, label: newPlayer.bowlingStyle ? newPlayer.bowlingStyle : 'None' }}
+              onChange={(event, newValue: any) => {
+                setNewPlayer({ ...newPlayer, bowlingStyle: newValue ? newValue.value : '' });
               }}
+              renderInput={(params) => (
+                <TextField 
+                  {...params}
+                  label="Bowling Style"
+                  size={isMobile ? "small" : "medium"}
+                  sx={{ 
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                      '&:hover fieldset': {
+                        borderColor: theme.palette.primary.main,
+                      },
+                    },
+                  }}
+                />
+              )}
             />
             <Autocomplete
               fullWidth
@@ -841,7 +866,7 @@ const PlayerList: React.FC = () => {
             {newPlayer.teams?.[0] && (currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer' || currentUser?.userRole === 'player') && (
               (() => {
                 const selTeamId = newPlayer.teams[0];
-                const count = players.filter(p => (p.teams || []).some(t => (typeof t === 'string' ? t : (t as any)?._id) === selTeamId)).length;
+                const count = getTeamPlayerCount(selTeamId);
                 if (count >= PLAYER_LIMIT) {
                   return (
                     <Typography variant="caption" color="error" sx={{ mt: 1 }}>
@@ -884,12 +909,7 @@ const PlayerList: React.FC = () => {
             <Button
               onClick={() => handleSubmit(true)}
               variant="contained"
-              disabled={
-                loading || !newPlayer.name || newPlayer.age <= 0 || (
-                  (currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer' || currentUser?.userRole === 'player') &&
-                    getTeamPlayerCount(getSelectedTeamId()) >= PLAYER_LIMIT
-                )
-              }
+              disabled={loading || !newPlayer.name || Number(newPlayer.age) <= 0}
               size={isMobile ? "small" : "medium"}
               sx={{
                 mr: 1,
@@ -912,12 +932,7 @@ const PlayerList: React.FC = () => {
           <Button 
             onClick={() => handleSubmit(false)} 
             variant="contained" 
-            disabled={
-              loading || !newPlayer.name || newPlayer.age <= 0 || (
-                (currentUser?.userRole === 'guest' || currentUser?.userRole === 'viewer' || currentUser?.userRole === 'player') &&
-                getTeamPlayerCount(getSelectedTeamId()) >= PLAYER_LIMIT
-              )
-            }
+            disabled={loading || !newPlayer.name || Number(newPlayer.age) <= 0}
             size={isMobile ? "small" : "medium"}
             sx={{
               py: 1.5,

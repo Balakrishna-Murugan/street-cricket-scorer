@@ -30,6 +30,7 @@ import {
   Fab
 } from '@mui/material';
 import { Match, Team } from '../types';
+import FormField from '../components/FormField';
 import { matchService, teamService } from '../services/api.service';
 import { useNavigate } from 'react-router-dom';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -85,6 +86,7 @@ const MatchList: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [matches, setMatches] = useState<Match[]>([]);
+  const [loading, setLoading] = useState(false);
   const [teams, setTeams] = useState<Team[]>([]);
   const [open, setOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -112,11 +114,14 @@ const MatchList: React.FC = () => {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   const fetchMatches = useCallback(async () => {
+    setLoading(true);
     try {
       const response = await matchService.getAll(currentUserId || undefined);
       setMatches(response.data);
     } catch (error: any) {
       console.error('MatchList: Error fetching matches:', error);
+    } finally {
+      setLoading(false);
     }
   }, [currentUserId]);
 
@@ -165,6 +170,21 @@ const MatchList: React.FC = () => {
       if (!currentUserId) {
         console.error('User not authenticated - currentUserId is null');
         alert('You must be logged in to create a match. Please log in again.');
+        return;
+      }
+
+      // Validate that both teams are selected and each has at least two members
+      if (!newMatch.team1 || !newMatch.team2) {
+        toast.showError('Both Team 1 and Team 2 must be selected');
+        return;
+      }
+
+      const team1Obj = teams.find(t => t._id === newMatch.team1);
+      const team2Obj = teams.find(t => t._id === newMatch.team2);
+      const team1Count = team1Obj ? (team1Obj.members?.length || 0) : 0;
+      const team2Count = team2Obj ? (team2Obj.members?.length || 0) : 0;
+      if (team1Count < 2 || team2Count < 2) {
+        toast.showError('Both teams must have at least 2 members to create a match');
         return;
       }
 
@@ -534,96 +554,103 @@ const MatchList: React.FC = () => {
         </Fab>
       )}
 
-      {isMobile ? (
+      {/* Show empty state first (both mobile & desktop) */}
+      {!loading && matches.length === 0 ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 6 }}>
+          <Typography variant="h6" color="text.secondary">No matches have been created yet.</Typography>
+        </Box>
+      ) : isMobile ? (
         // Mobile Card Layout
-        <Stack spacing={2}>
-          {matches.map((match) => (
-            <Card 
-              key={match._id}
-              elevation={3}
-              sx={{ 
-                borderRadius: 2,
-                border: selectedMatches.includes(match._id || '') ? '2px solid #f44336' : '1px solid rgba(0,0,0,0.1)',
-                backgroundColor: selectedMatches.includes(match._id || '') ? 'rgba(244, 67, 54, 0.05)' : 'inherit'
-              }}
-            >
-                <CardContent sx={{ pb: 1 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                    {isSuperAdmin && (
-                      <Checkbox
-                        checked={selectedMatches.includes(match._id || '')}
-                        onChange={() => handleSelectMatch(match._id || '')}
-                        color="error"
-                        sx={{ mt: -0.5, mr: 1 }}
-                      />
-                    )}
-                    <Typography variant="h6" sx={{ fontWeight: 'bold', flex: 1 }}>
-                      {typeof match.team1 === 'object' ? match.team1.name : match.team1} 
-                      <Box component="span" sx={{ color: 'text.secondary', mx: 1 }}>vs</Box>
-                      {typeof match.team2 === 'object' ? match.team2.name : match.team2}
-                    </Typography>
-                    <Chip 
-                      label={match.status} 
-                      color={getStatusColor(match.status) as any}
-                      size="small"
-                    />
-                  </Box>
-                  
-                  <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      📅 {new Date(match.date).toLocaleDateString()}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      🏏 {match.overs} overs
-                    </Typography>
-                  </Stack>
-
-                  {match.innings && match.innings.length > 0 && (
-                    <Box sx={{ mb: 2 }}>
-                      {match.innings.map((inning, index) => (
-                        <Typography key={index} variant="body2" sx={{ mb: 0.5 }}>
-                          <strong>{index === 0 ? '1st Innings' : '2nd Innings'}:</strong> {inning.totalRuns}/{inning.wickets} ({inning.overs} ov)
-                        </Typography>
-                      ))}
-                      {match.result && (
-                        <Typography variant="body2" color="primary" sx={{ fontWeight: 'bold', mt: 1 }}>
-                          🏆 {match.result}
-                        </Typography>
+        <TableContainer component={Paper} sx={{ boxShadow: 'none' }}>
+          <Stack spacing={2}>
+            {matches.map((match) => (
+              <Card 
+                key={match._id}
+                elevation={3}
+                sx={{ 
+                  borderRadius: 2,
+                  border: selectedMatches.includes(match._id || '') ? '2px solid #f44336' : '1px solid rgba(0,0,0,0.1)',
+                  backgroundColor: selectedMatches.includes(match._id || '') ? 'rgba(244, 67, 54, 0.05)' : 'inherit'
+                }}
+              >
+                  <CardContent sx={{ pb: 1 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                      {isSuperAdmin && (
+                        <Checkbox
+                          checked={selectedMatches.includes(match._id || '')}
+                          onChange={() => handleSelectMatch(match._id || '')}
+                          color="error"
+                          sx={{ mt: -0.5, mr: 1 }}
+                        />
                       )}
+                      <Typography variant="h6" sx={{ fontWeight: 'bold', flex: 1 }}>
+                        {typeof match.team1 === 'object' ? match.team1.name : match.team1} 
+                        <Box component="span" sx={{ color: 'text.secondary', mx: 1 }}>vs</Box>
+                        {typeof match.team2 === 'object' ? match.team2.name : match.team2}
+                      </Typography>
+                      <Chip 
+                        label={match.status} 
+                        color={getStatusColor(match.status) as any}
+                        size="small"
+                      />
                     </Box>
-                  )}
-                </CardContent>
-                
-                <CardActions sx={{ pt: 0, px: 2, pb: 2 }}>
-                  <Stack direction="row" spacing={1} sx={{ width: '100%' }}>
-                    <Button
-                      size="medium"
-                      variant="outlined"
-                      startIcon={<VisibilityIcon />}
-                      onClick={() => {
-                        // Store navigation source for breadcrumb tracking
-                        sessionStorage.setItem('matchNavigationSource', 'matches');
-                        navigate(`/matches/${match._id}/overview`);
-                      }}
-                      sx={{ flex: 1 }}
-                    >
-                      View Details
-                    </Button>
-                    {isAdmin && match.status === 'upcoming' && (
-                      <Button 
-                        color="info" 
+                    
+                    <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        📅 {new Date(match.date).toLocaleDateString()}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        🏏 {match.overs} overs
+                      </Typography>
+                    </Stack>
+
+                    {match.innings && match.innings.length > 0 && (
+                      <Box sx={{ mb: 2 }}>
+                        {match.innings.map((inning, index) => (
+                          <Typography key={index} variant="body2" sx={{ mb: 0.5 }}>
+                            <strong>{index === 0 ? '1st Innings' : '2nd Innings'}:</strong> {inning.totalRuns}/{inning.wickets} ({inning.overs} ov)
+                          </Typography>
+                        ))}
+                        {match.result && (
+                          <Typography variant="body2" color="primary" sx={{ fontWeight: 'bold', mt: 1 }}>
+                            🏆 {match.result}
+                          </Typography>
+                        )}
+                      </Box>
+                    )}
+                  </CardContent>
+                  
+                  <CardActions sx={{ pt: 0, px: 2, pb: 2 }}>
+                    <Stack direction="row" spacing={1} sx={{ width: '100%' }}>
+                      <Button
                         size="medium"
                         variant="outlined"
-                        onClick={() => handleEditOpen(match)}
+                        startIcon={<VisibilityIcon />}
+                        onClick={() => {
+                          // Store navigation source for breadcrumb tracking
+                          sessionStorage.setItem('matchNavigationSource', 'matches');
+                          navigate(`/matches/${match._id}/overview`);
+                        }}
+                        sx={{ flex: 1 }}
                       >
-                        Edit
+                        View Details
                       </Button>
-                    )}
-                  </Stack>
-                </CardActions>
-              </Card>
-          ))}
-        </Stack>
+                      {isAdmin && match.status === 'upcoming' && (
+                        <Button 
+                          color="info" 
+                          size="medium"
+                          variant="outlined"
+                          onClick={() => handleEditOpen(match)}
+                        >
+                          Edit
+                        </Button>
+                      )}
+                    </Stack>
+                  </CardActions>
+                </Card>
+            ))}
+          </Stack>
+        </TableContainer>
       ) : (
         // Desktop Table Layout
         <TableContainer component={Paper}>
@@ -809,22 +836,20 @@ const MatchList: React.FC = () => {
               </Box>
             )}
           />
-          <TextField
-            margin="dense"
+          <FormField
             label="Number of Overs"
             type="number"
-            fullWidth
-            value={newMatch.overs}
-            onChange={(e) => setNewMatch({ ...newMatch, overs: Number(e.target.value) })}
-            inputProps={{ min: 1, max: (isViewer || isGuest) ? 2 : 100 }}
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                borderRadius: 2,
-                '&:hover fieldset': {
-                  borderColor: theme.palette.primary.main,
-                },
-              },
+            value={newMatch.overs || ''}
+            onChange={(e: any) => {
+              const v = e.target.value;
+              if (v === '') {
+                setNewMatch({ ...newMatch, overs: '' as any });
+              } else {
+                const cleaned = v.replace(/[^0-9]/g, '');
+                setNewMatch({ ...newMatch, overs: Number(cleaned) as any });
+              }
             }}
+            inputProps={{ min: 1, max: (isViewer || isGuest) ? 2 : 100 }}
             helperText={(isViewer || isGuest) ? 'Viewer/Guest matches are limited to a maximum of 2 overs' : ''}
           />
           <TextField
@@ -869,7 +894,7 @@ const MatchList: React.FC = () => {
             options={teams.filter(team => 
               team._id === newMatch.team1 || team._id === newMatch.team2
             )}
-            getOptionLabel={(option) => `${option.name} ${option._id === newMatch.team1 ? '(Team 1)' : '(Team 2)'}`}
+            getOptionLabel={(option) => option.name}
             value={teams.find(team => team._id === newMatch.tossWinner) || null}
             onChange={(event, newValue) => {
               setNewMatch({ ...newMatch, tossWinner: newValue?._id || '' });
@@ -892,7 +917,7 @@ const MatchList: React.FC = () => {
             )}
             renderOption={(props, option) => (
               <Box component="li" {...props}>
-                <Typography>{option.name} {option._id === newMatch.team1 ? '(Team 1)' : '(Team 2)'}</Typography>
+                <Typography>{option.name}</Typography>
               </Box>
             )}
           />
@@ -1172,10 +1197,7 @@ const MatchList: React.FC = () => {
                   const team2Id = typeof editMatch.team2 === 'string' ? editMatch.team2 : editMatch.team2._id;
                   return team._id === team1Id || team._id === team2Id;
                 })}
-                getOptionLabel={(option) => {
-                  const team1Id = typeof editMatch.team1 === 'string' ? editMatch.team1 : editMatch.team1._id;
-                  return `${option.name} ${option._id === team1Id ? '(Team 1)' : '(Team 2)'}`;
-                }}
+                getOptionLabel={(option) => option.name}
                 value={teams.find(team => team._id === editMatch.tossWinner) || undefined}
                 onChange={(event, newValue) => {
                   setEditMatch({ ...editMatch, tossWinner: newValue && newValue._id ? newValue._id : undefined });
@@ -1196,14 +1218,11 @@ const MatchList: React.FC = () => {
                     }}
                   />
                 )}
-                renderOption={(props, option) => {
-                  const team1Id = typeof editMatch.team1 === 'string' ? editMatch.team1 : editMatch.team1._id;
-                  return (
-                    <Box component="li" {...props}>
-                      <Typography>{option.name} {option._id === team1Id ? '(Team 1)' : '(Team 2)'}</Typography>
-                    </Box>
-                  );
-                }}
+                renderOption={(props, option) => (
+                  <Box component="li" {...props}>
+                    <Typography>{option.name}</Typography>
+                  </Box>
+                )}
               />
               
               <Autocomplete

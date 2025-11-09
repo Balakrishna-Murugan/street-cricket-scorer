@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
-import { Match, Player, BallOutcome } from '../types';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Match, Player, BallOutcome, PlayerRef } from '../types';
 import { matchService, playerService } from '../services/api.service';
 import MatchDetails from '../components/MatchDetails';
 import InningsTransition from '../components/InningsTransition';
@@ -191,6 +191,13 @@ const LiveScoring: React.FC<Props> = () => {
   const [isPlayerChangeDialogOpen, setIsPlayerChangeDialogOpen] = useState(false);
   const [changePlayerType, setChangePlayerType] = useState<'striker' | 'nonStriker' | 'bowler' | null>(null);
   const [changePlayerReason, setChangePlayerReason] = useState('');
+
+  // Track whether the user manually dismissed the player selection dialog
+  const [userDismissedDialog, setUserDismissedDialog] = useState(false);
+  // Track whether we've auto-opened the selection dialog on initial enter
+  const [hasAutoOpenedOnEnter, setHasAutoOpenedOnEnter] = useState(false);
+  // Prevent repeated auto-handling of insufficient batsmen
+  const [autoInsufficientHandled, setAutoInsufficientHandled] = useState(false);
 
   // Undo functionality state
   const [undoHistory, setUndoHistory] = useState<UndoAction[]>([]);
@@ -2986,42 +2993,7 @@ const LiveScoring: React.FC<Props> = () => {
       }
       
       // Save the innings transition to server
-      const cleanMatchData = (match: Match): Match => {
-        return {
-          ...match,
-          team1: typeof match.team1 === 'object' ? match.team1._id : match.team1,
-          team2: typeof match.team2 === 'object' ? match.team2._id : match.team2,
-          currentInnings: updatedMatch.currentInnings, // Use the updated currentInnings
-          innings: match.innings.map(inning => ({
-            battingTeam: typeof inning.battingTeam === 'object' ? inning.battingTeam._id : inning.battingTeam,
-            bowlingTeam: typeof inning.bowlingTeam === 'object' ? inning.bowlingTeam._id : inning.bowlingTeam,
-            totalRuns: inning.totalRuns,
-            wickets: inning.wickets,
-            overs: inning.overs,
-            balls: inning.balls || 0,
-            isCompleted: inning.isCompleted || false,
-            battingStats: inning.battingStats || [],
-            bowlingStats: inning.bowlingStats || [],
-            currentState: inning.currentState || {
-              currentOver: 0,
-              currentBall: 0,
-              lastBallRuns: 0
-            },
-            extras: inning.extras || {
-              wides: 0,
-              noBalls: 0,
-              byes: 0,
-              legByes: 0,
-              total: 0
-            },
-            runRate: inning.runRate || 0,
-            requiredRunRate: inning.requiredRunRate,
-            currentOverBalls: inning.currentOverBalls || [],
-            recentBalls: inning.recentBalls || []
-          }))
-        };
-      };
-
+      // Reuse the shared `cleanMatchData` helper (defined earlier) to prepare the payload
       const cleanedMatch = cleanMatchData(updatedMatch);
       const { data } = await matchService.updateScore(matchId, cleanedMatch);
       
@@ -3087,30 +3059,6 @@ const LiveScoring: React.FC<Props> = () => {
       >
         {details}
       </InningsTransition>
-    );
-  }
-
-            <Button
-              variant="contained"
-              size="large"
-              sx={{
-                px: 6,
-                py: 2,
-                fontSize: '1.2rem',
-                borderRadius: 3,
-                background: 'linear-gradient(45deg, #4caf50 30%, #66bb6a 90%)',
-                '&:hover': {
-                  background: 'linear-gradient(45deg, #388e3c 30%, #4caf50 90%)',
-                  transform: 'translateY(-2px)',
-                },
-              }}
-              onClick={handleStartSecondInnings}
-            >
-              🏏 Start Second Innings
-            </Button>
-          </Paper>
-        </Box>
-      </Container>
     );
   }
 

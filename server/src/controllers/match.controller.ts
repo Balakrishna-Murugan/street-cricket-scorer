@@ -46,6 +46,27 @@ export const matchController = {
         }
       }
 
+      // Validate that both teams exist and have at least 2 members each
+      if (!req.body.team1 || !req.body.team2) {
+        return res.status(400).json({ message: 'Both team1 and team2 must be provided' });
+      }
+
+      if (!mongoose.Types.ObjectId.isValid(req.body.team1) || !mongoose.Types.ObjectId.isValid(req.body.team2)) {
+        return res.status(400).json({ message: 'Invalid team ID format' });
+      }
+
+      const team1 = await Team.findById(req.body.team1);
+      const team2 = await Team.findById(req.body.team2);
+      if (!team1 || !team2) {
+        return res.status(404).json({ message: 'One or both teams not found' });
+      }
+
+      const team1Count = (team1.members && team1.members.length) || 0;
+      const team2Count = (team2.members && team2.members.length) || 0;
+      if (team1Count < 2 || team2Count < 2) {
+        return res.status(403).json({ message: 'Both teams must have at least 2 members to create a match' });
+      }
+
       const match = new Match({
         ...req.body,
         currentInnings: 0,
@@ -202,6 +223,15 @@ export const matchController = {
       // Validate ObjectId format
       if (!mongoose.Types.ObjectId.isValid(updateData.team1) || !mongoose.Types.ObjectId.isValid(updateData.team2)) {
         return res.status(400).json({ message: 'Invalid team ID format' });
+      }
+
+      // Ensure both teams have at least 2 members
+      const team1Check = await Team.findById(updateData.team1);
+      const team2Check = await Team.findById(updateData.team2);
+      const t1count = (team1Check?.members && team1Check.members.length) || 0;
+      const t2count = (team2Check?.members && team2Check.members.length) || 0;
+      if (t1count < 2 || t2count < 2) {
+        return res.status(403).json({ message: 'Both teams must have at least 2 members to create/update a match' });
       }
 
       if (updateData.tossWinner && !mongoose.Types.ObjectId.isValid(updateData.tossWinner)) {
