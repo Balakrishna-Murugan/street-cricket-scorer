@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Street Cricket Scorer — Developer Guide</title>
+  <style>
+    :root{--bg:#f5f7fb;--panel:#ffffff;--accent:#0f4c81;--muted:#546070}
+    body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:#0b1220}
+    header{background:linear-gradient(90deg,var(--accent),#2b6cb0);color:#fff;padding:22px}
+    header h1{margin:0;font-size:1.4rem}
+    .container{max-width:1100px;margin:20px auto;padding:18px}
+    .panel{background:var(--panel);padding:18px;border-radius:10px;box-shadow:0 8px 30px rgba(12,20,40,0.06);margin-bottom:18px}
+    h2{color:var(--accent);margin-top:0}
+    pre{background:#0b122008;padding:12px;border-radius:8px;overflow:auto}
+    table{width:100%;border-collapse:collapse}
+    table td,table th{padding:8px;border-bottom:1px solid #eef2f7}
+    .actions{display:flex;gap:8px;justify-content:flex-end}
+    button{background:var(--accent);color:white;border:none;padding:10px 12px;border-radius:8px;cursor:pointer}
+    button.secondary{background:#374151}
+    .muted{color:var(--muted)}
+    ul{margin-top:6px}
+    .toc{display:flex;gap:12px;flex-wrap:wrap}
+    .toc a{color:#0b1220;text-decoration:none;padding:6px 8px;border-radius:6px;background:#f0f5fb;border:1px solid #e6f0fb}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>Street Cricket Scorer — Developer Guide</h1>
+      <div class="muted">Comprehensive technical and functional overview to help contributors and maintainers</div>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="actions" style="margin-bottom:10px">
+      <button id="downloadDoc">Export Full Guide (.doc)</button>
+      <button id="downloadDocx" class="secondary">Export .docx (server)</button>
+    </div>
+
+    <div class="panel">
+      <h2>Quick links / Contents</h2>
+      <div class="toc">
+        <a href="#overview">Overview</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#code-structure">Code Structure</a>
+        <a href="#data-model">Data Model</a>
+        <a href="#api">API Endpoints</a>
+        <a href="#ui-pages">UI Pages & Components</a>
+        <a href="#dev-setup">Local Dev & Run</a>
+        <a href="#testing">Testing</a>
+        <a href="#ci">CI / GitHub Actions</a>
+        <a href="#debugging">Debugging & Useful Commands</a>
+        <a href="#extending">Extending & Best Practices</a>
+      </div>
+    </div>
+
+    <section id="overview" class="panel">
+      <h2>Overview</h2>
+      <p>This repository implements a lightweight cricket live-scoring app with two primary parts: a React + TypeScript client and a Node (TypeScript) Express server with MongoDB (Mongoose) as persistence. The client provides a LiveScoring page used by scorers to record balls, extras and wickets. The server exposes REST endpoints for matches, players and teams, and manages persistence, auth and validation. The application is designed to be extended with more features (statistics, user roles, match imports).</p>
+      <p>Key goals of this guide: give a self-contained developer reference that makes it possible to add features and fix bugs without hand-holding. It includes component maps, data shapes, example flows, and common tasks.</p>
+    </section>
+
+    <section id="architecture" class="panel">
+      <h2>High-level architecture</h2>
+      <p>Runtime flow (simplified):</p>
+      <ol>
+        <li>User interacts with React client (browser). Live scoring UI keeps local UI state and posts changes to server via Axios API.</li>
+        <li>Server (Express) receives REST requests, applies business logic and persists changes to MongoDB via Mongoose models.</li>
+        <li>Server returns updated match object; client updates UI and local undo history.</li>
+        <li>CI pipeline (GitHub Actions) runs tests and builds the client for deployment.</li>
+      </ol>
+      <h3>Technologies</h3>
+      <ul>
+        <li>Client: React 19 + TypeScript, MUI (Material UI), react-scripts (CRA), Axios, Jest/RTL</li>
+        <li>Server: Node.js + TypeScript, Express 5, Mongoose (MongoDB), Nodemailer</li>
+        <li>CI: GitHub Actions; builds and tests both client and server</li>
+      </ul>
+    </section>
+
+    <section id="code-structure" class="panel">
+      <h2>Code structure & where to look</h2>
+      <p>Top-level folders:</p>
+      <ul>
+        <li><code>client/</code> — React app source code (TSX). Key directories:
+          <ul>
+            <li><code>src/pages</code> — page-level containers (e.g., LiveScoring.tsx)</li>
+            <li><code>src/components</code> — small UI components and dialogs</li>
+            <li><code>src/services</code> — API wrappers (axios usage) in <code>api.service.ts</code></li>
+            <li><code>src/utils</code> — pure helpers (matchHelpers.ts) which should be unit-tested</li>
+          </ul>
+        </li>
+        <li><code>server/</code> — Express server code
+          <ul>
+            <li><code>src/controllers</code> — request handlers</li>
+            <li><code>src/models</code> — Mongoose schemas (match.model.ts, player.model.ts, team.model.ts)</li>
+            <li><code>src/routes</code> — route registration files
+            <li><code>src/services</code> — cross-cutting services (email, external integrations)</li>
+          </ul>
+        </li>
+        <li><code>docs/</code> — documentation pages (this and app_overview.html)</li>
+      </ul>
+
+      <h3>Important files</h3>
+      <table>
+        <tr><th>Path</th><th>Purpose</th></tr>
+        <tr><td><code>client/src/pages/LiveScoring.tsx</code></td><td>Main scorer UI. Contains most match state and handlers (ball, wicket, extras) — split into components over time</td></tr>
+        <tr><td><code>client/src/utils/matchHelpers.ts</code></td><td>Pure helpers: snapshot/undo apply, match calculations; unit tests target this file.</td></tr>
+        <tr><td><code>client/src/services/api.service.ts</code></td><td>Axios wrappers for API endpoints. Use typed responses.</td></tr>
+        <tr><td><code>server/src/models/match.model.ts</code></td><td>Mongoose model for match/innings data shape.</td></tr>
+        <tr><td><code>server/src/controllers/match.controller.ts</code></td><td>CRUD and scoring related API handlers.</td></tr>
+      </table>
+    </section>
+
+    <section id="data-model" class="panel">
+      <h2>Data model (match & innings)</h2>
+      <p>The application centers on a Match document with an array of Innings. Typical fields (simplified):</p>
+      <pre>
+Match {
+  _id: string,
+  team1: string|Team,
+  team2: string|Team,
+  overs: number,            // match length in overs
+  currentInnings: number,   // 0 or 1
+  innings: [ Inning, Inning ]
+}
+
+Inning {
+  battingTeam: string|Team,
+  bowlingTeam: string|Team,
+  totalRuns: number,
+  wickets: number,
+  overs: number,    // e.g., 4.2 (overs.balls) or stored separately as balls
+  balls: number,    // total legal deliveries
+  battingStats: [{ player: string|Player, runs, balls, isOut, isOnStrike }],
+  bowlingStats: [{ player: string|Player, overs, balls, runs, wickets }],
+  currentOverBalls: [ BallOutcome ],
+  recentBalls: [ BallOutcome ],
+  extras: { wides, noBalls, byes, legByes, total }
+}
+
+BallOutcome { ballNumber, runs, isWicket?, extras?, timestamp, sequenceNumber }
+      </pre>
+      <p>Notes:</p>
+      <ul>
+        <li>Some fields may be references (ObjectId) or embedded objects. API sanitizes before persisting.</li>
+        <li>Undo snapshots capture a subset of inning state (striker/nonStriker/bowler, strikerStats, bowlerStats, currentOverBalls, totals) to restore UI and game state.</li>
+      </ul>
+    </section>
+
+    <section id="api" class="panel">
+      <h2>API endpoints (key ones)</h2>
+      <p>Server exposes REST endpoints under <code>/api</code>. Important routes:</p>
+      <table>
+        <tr><th>Path</th><th>Method</th><th>Purpose</th></tr>
+        <tr><td><code>/api/matches</code></td><td>GET, POST</td><td>List or create matches</td></tr>
+        <tr><td><code>/api/matches/:id</code></td><td>GET, PUT</td><td>Get or update match (score updates, innings updates)</td></tr>
+        <tr><td><code>/api/players</code></td><td>GET</td><td>Players list</td></tr>
+        <tr><td><code>/api/teams</code></td><td>GET</td><td>Teams list</td></tr>
+        <tr><td><code>/api/auth/*</code></td><td>POST</td><td>Login / token endpoints</td></tr>
+        <tr><td><code>/api/docs/docx</code></td><td>POST</td><td>Accepts HTML and returns .docx/.doc (docs helper)</td></tr>
+      </table>
+
+      <h3>Payload patterns</h3>
+      <p>Score update flows typically send a fully cleaned match object; the server's controllers expect normalized IDs for teams/players. Use <code>client/src/services/api.service.ts</code> patterns to format payloads. See <code>cleanMatchData</code> helper inside LiveScoring for an example.</p>
+    </section>
+
+    <section id="ui-pages" class="panel">
+      <h2>UI pages & major components</h2>
+      <p>Important pages:</p>
+      <ul>
+        <li><code>LiveScoring.tsx</code> — the most complex page. Holds match state, undo history, bowler/striker selection flows and handlers for ball/outcome/extra/wicket. Extract presentational components where possible.</li>
+        <li><code>MatchList.tsx</code>, <code>MatchOverview.tsx</code> — listing and match summary pages</li>
+        <li><code>Login.tsx</code> — auth UI</li>
+      </ul>
+      <p>Major components to reuse or extend:</p>
+      <ul>
+        <li><code>OverControls</code> — numeric buttons for scoring deliveries. It contains the Undo Icon button (recommended primary undo control).</li>
+        <li><code>PlayerSelectionDialog</code> — pick players for striker/non-striker/bowler.</li>
+        <li><code>BallCommentary</code> — renders recentBalls/currentOverBalls for commentary.</li>
+      </ul>
+    </section>
+
+    <section id="dev-setup" class="panel">
+      <h2>Local development & run instructions</h2>
+      <h3>Prerequisites</h3>
+      <ul>
+        <li>Node.js 18+ (compatible with dependencies)</li>
+        <li>npm 8/9</li>
+        <li>MongoDB (local or cloud) — set <code>MONGODB_URI</code> in server/.env</li>
+      </ul>
+
+      <h3>Run full stack locally</h3>
+      <pre>
+# from project root
+# 1) Start server
+cd server
+npm install
+# either build & run
+npm run build
+npm start
+# or run in dev mode
+npm run dev
+
+# 2) Start client
+cd ../client
+npm install
+npm start
+# open http://localhost:3000 (proxy forwards API to server:5000)
+      </pre>
+
+      <h3>Environment variables (server)</h3>
+      <pre>
+# sample .env (server/.env)
+MONGODB_URI=mongodb://localhost:27017/street-cricket
+PORT=5000
+JWT_SECRET=your_jwt_secret
+SMTP_HOST= (optional)
+SMTP_USER= (optional)
+SMTP_PASS= (optional)
+      </pre>
+    </section>
+
+    <section id="testing" class="panel">
+      <h2>Testing strategy</h2>
+      <h3>Unit tests</h3>
+      <p>Put pure logic tests in <code>client/src/utils/__tests__</code> and similarly for server util modules under <code>server/test</code>. Use Jest + ts-jest for TypeScript tests.</p>
+
+      <h3>Integration / Controller tests</h3>
+      <p>Use Supertest + Jest to spin up the Express app and assert API responses. Example server test flow:</p>
+      <pre>
+import request from 'supertest';
+import app from '../src/index';
+
+describe('matches', ()=>{
+  it('creates a match', async ()=>{
+    const res = await request(app).post('/api/matches').send({...});
+    expect(res.status).toBe(201);
+  });
+});
+      </pre>
+
+      <h3>Manual end-to-end flows</h3>
+      <ul>
+        <li>Run server + client, create a match, start live scoring and exercise ball/outcome/extra/wicket flows.</li>
+        <li>Verify undo: create a few actions, then undo and ensure match/innings are restored to previous snapshot.</li>
+      </ul>
+    </section>
+
+    <section id="ci" class="panel">
+      <h2>CI / GitHub Actions</h2>
+      <p>Keep the CI simple and fast: install deps, run both client and server tests, and build the client. Use caching for node_modules. Example workflow is in docs/app_overview.html</p>
+      <p>Important checks for PRs:</p>
+      <ul>
+        <li>Type-check (tsc) for both client and server</li>
+        <li>Run unit tests (Jest)</li>
+        <li>Optional: run linting (eslint) if configured</li>
+      </ul>
+    </section>
+
+    <section id="debugging" class="panel">
+      <h2>Debugging tips & common tasks</h2>
+      <h3>Useful terminal commands</h3>
+      <pre>
+# Show changed files
+git status
+# Install deps for client + server
+npm install (in each folder)
+# Build client for production
+cd client
+npm run build
+# Run server in dev
+cd server
+npm run dev
+      </pre>
+
+      <h3>Common debugging scenarios</h3>
+      <ul>
+        <li>API 500 on update: inspect server logs (console), confirm request payload shape matches controller's expectation (check cleanMatchData logic in LiveScoring).</li>
+        <li>State mismatch after undo: check matchHelpers.applyUndoSnapshot and ensure it mutates or returns the expected fields; unit-test the helper.</li>
+        <li>Missing player IDs in DB: check whether Client sends object references vs IDs; ensure server expects IDs and uses Mongoose casting correctly.</li>
+      </ul>
+    </section>
+
+    <section id="extending" class="panel">
+      <h2>Extending the application — practical guidance</h2>
+      <h3>1) Add a new UI feature</h3>
+      <ol>
+        <li>Identify UI area (page/component). Create a small presentational component under <code>client/src/components</code> and add a container-level handler in the page under <code>client/src/pages</code>.</li>
+        <li>Keep state localized and prefer props for presentation components. Move pure logic into <code>client/src/utils</code> for unit testing.</li>
+        <li>Update the API contract only when necessary. Add server-side controllers/routes in <code>server/src/controllers</code> and <code>server/src/routes</code>.</li>
+        <li>Add unit tests for both client helpers and server controllers. Run CI to validate changes before PR.</li>
+      </ol>
+
+      <h3>2) Add a new field to match model</h3>
+      <ol>
+        <li>Add the field to Mongoose schema in <code>server/src/models/match.model.ts</code>. Provide a default value where appropriate.</li>
+        <li>Update any server controllers that create/update matches to include/sanitize the new field.</li>
+        <li>Update client code that reads/writes the match object (LiveScoring). Add conversion in <code>cleanMatchData</code> to persist only IDs where needed.</li>
+        <li>Add tests to cover the new field behavior (serialization/deserialization, UI display).</li>
+      </ol>
+
+      <h3>3) Replacing/Upgrading a dependency (example: Mongoose)</h3>
+      <ul>
+        <li>Run <code>npm install mongoose@x.y.z</code> in server. Run <code>npm run build</code> and run tests.</li>
+        <li>Search code for breaking API changes (use editor search for deprecated functions).</li>
+        <li>Run integration tests and manual checks (create/update matches, live scoring flows).</li>
+      </ul>
+    </section>
+
+    <section class="panel" style="text-align:center">
+      <h2>Checklist before opening a PR</h2>
+      <ul style="list-style:none;padding:0">
+        <li>Run unit tests locally (client & server)</li>
+        <li>Run type-check (tsc)</li>
+        <li>Ensure linter (if any) is satisfied</li>
+        <li>Update docs (this guide or app_overview.html) for any API changes</li>
+      </ul>
+    </section>
+
+    <footer class="panel muted" style="font-size:0.9rem">
+      <strong>Notes:</strong> This guide is intended as a living document. Please update this file with new patterns and important decisions so future contributors can work independently. For anything that requires infra changes (DB migrations, config secrets), coordinate with your DevOps/owner before pushing to main.
+    </footer>
+  </div>
+
+  <script>
+    function downloadDoc(filename, element){
+      const html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + document.title + '</title>' +
+        '<style>' + Array.from(document.querySelectorAll('style')).map(s=>s.innerText).join('\n') + '</style>' +
+        '</head><body>' + element.innerHTML + '</body></html>';
+      const blob = new Blob([html],{type:'application/msword'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(url); a.remove()},1000);
+    }
+    document.getElementById('downloadDoc').addEventListener('click', ()=>downloadDoc('street-cricket-developer-guide.doc', document.body));
+    document.getElementById('downloadDocx').addEventListener('click', async ()=>{
+      try{
+        const html = document.documentElement.outerHTML;
+        const resp = await fetch('/api/docs/docx',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({html})});
+        if(!resp.ok) throw new Error('Server conversion failed');
+        const blob = await resp.blob(); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='street-cricket-developer-guide.docx'; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(url); a.remove()},1000);
+      }catch(e){alert('Failed: '+(e && e.message? e.message: e));}
+    });
+  </script>
+</body>
+</html>
