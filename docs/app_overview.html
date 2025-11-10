@@ -5,22 +5,29 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Street Cricket Scorer — Architecture, Tech Stack & Cheatsheet</title>
   <style>
-    body { font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; margin: 24px; color: #222; }
-    header { display:flex; align-items:center; justify-content:space-between; }
-    h1 { font-size:1.6rem; margin:0; }
-    .badge { font-size:0.85rem; color:#666 }
-    .section { margin-top:24px; padding:18px; border:1px solid #eee; border-radius:8px; background:#fff; box-shadow:0 1px 4px rgba(0,0,0,0.03); }
+    :root{
+      --bg:#f6f8fa; --panel:#ffffff; --accent:#2b6cb0; --muted:#6b7280; --card-shadow:0 6px 18px rgba(11,22,39,0.06);
+    }
+    html,body{height:100%}
+    body { font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; margin: 28px; color: #111827; background:var(--bg); }
+    header { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+    h1 { font-size:1.5rem; margin:0; color:var(--accent) }
+    .badge { font-size:0.85rem; color:var(--muted) }
+    .section { margin-top:20px; padding:18px; border-radius:10px; background:var(--panel); box-shadow:var(--card-shadow); border:1px solid rgba(15,23,42,0.04); }
     .row { display:flex; gap:20px; }
     .col { flex:1 }
     /* Diagram styles */
     .diagram { text-align:center; padding:12px; }
-    .box { fill:#fff; stroke:#2b6cb0; stroke-width:2; rx:8; }
-    .connector { stroke:#666; stroke-width:2; marker-end:url(#arrow); }
+    .box { fill:#fff; stroke:var(--accent); stroke-width:2; rx:8; }
+    .connector { stroke:#475569; stroke-width:2; marker-end:url(#arrow); }
     .tech-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px; }
-    pre { background:#fafafa; padding:12px; border-radius:6px; overflow:auto; }
-    button { background:#2b6cb0; color:white; border:none; padding:10px 14px; border-radius:6px; cursor:pointer; }
-    button.secondary { background:#444; }
-    .small { font-size:0.9rem; color:#444 }
+    pre { background:#0f172a08; padding:12px; border-radius:8px; overflow:auto; font-family:Consolas,monospace; }
+    button { background:var(--accent); color:white; border:none; padding:10px 14px; border-radius:8px; cursor:pointer; box-shadow:0 6px 12px rgba(43,108,176,0.12); }
+    button.secondary { background:#374151; }
+    .small { font-size:0.92rem; color:var(--muted) }
+    table.tech { width:100%; border-collapse:collapse; }
+    table.tech td, table.tech th { padding:10px 8px; border-bottom:1px solid #eef2f7; }
+    table.tech th { text-align:left; color:var(--muted); font-size:0.95rem }
   </style>
 </head>
 <body>
@@ -88,64 +95,78 @@
     <h2>2) Tech stack (repository-specific)</h2>
     <div class="tech-grid">
       <div>
-        <h3>Client</h3>
-        <ul>
-          <li>React (Create React App) + TypeScript</li>
-          <li>Material UI (MUI) for UI</li>
-          <li>Axios for API calls</li>
-          <li>Jest & React Testing Library for unit tests</li>
-          <li>Build: react-scripts (npm run build)</li>
-        </ul>
+        <h3>Client (selected packages)</h3>
+        <table class="tech">
+          <tr><th>Package</th><th>Version</th></tr>
+          <tr><td>react</td><td>^19.2.0</td></tr>
+          <tr><td>react-dom</td><td>^19.2.0</td></tr>
+          <tr><td>typescript</td><td>^4.9.5</td></tr>
+          <tr><td>react-scripts</td><td>5.0.1</td></tr>
+          <tr><td>@mui/material</td><td>^7.3.4</td></tr>
+          <tr><td>axios</td><td>^1.12.2</td></tr>
+          <tr><td>react-router-dom</td><td>^7.9.4</td></tr>
+        </table>
       </div>
       <div>
-        <h3>Server</h3>
-        <ul>
-          <li>Node.js + TypeScript</li>
-          <li>Express for HTTP API</li>
-          <li>Mongoose for MongoDB models</li>
-          <li>Mocha/Jest for server tests (where present)</li>
-        </ul>
+        <h3>Server (selected packages)</h3>
+        <table class="tech">
+          <tr><th>Package</th><th>Version</th></tr>
+          <tr><td>node / runtime</td><td>Recommended: Node.js 18+ (not specified)</td></tr>
+          <tr><td>express</td><td>^5.1.0</td></tr>
+          <tr><td>mongoose</td><td>^7.8.1</td></tr>
+          <tr><td>typescript</td><td>^5.9.3</td></tr>
+          <tr><td>nodemailer</td><td>^6.9.3</td></tr>
+          <tr><td>html-docx-js</td><td>^0.3.1 (server-side docx helper)</td></tr>
+        </table>
       </div>
       <div>
-        <h3>Dev/CI/Infra</h3>
-        <ul>
-          <li>GitHub Actions for CI</li>
-          <li>Hosting: (project uses render.yaml — can deploy to Render or similar)</li>
-          <li>npm for package management</li>
-        </ul>
+        <h3>Dev / CI / Tooling</h3>
+        <table class="tech">
+          <tr><th>Tool</th><th>Version / Note</th></tr>
+          <tr><td>GitHub Actions</td><td>CI workflows (YAML) — uses actions/checkout, setup-node, etc.</td></tr>
+          <tr><td>npm</td><td>Used for package management (project uses react-scripts build)</td></tr>
+          <tr><td>react-app-rewired</td><td>^2.2.1 (custom CRA overrides)</td></tr>
+          <tr><td>jest</td><td>v29+ (client & server tests)</td></tr>
+        </table>
       </div>
     </div>
   </section>
 
   <section class="section">
     <h2>3) GitHub Actions & CI — Quick cheatsheet</h2>
-    <p class="small">Common workflow tasks you'll include in a CI workflow for this repo:</p>
-    <pre>
-- actions/checkout@v3
-- actions/setup-node@v4 (set node-version)
-- npm ci (or npm install)
-- npm run build (client)
-- npm test (unit tests)
-- run server lint/tests (tsc, node tests)
-- upload-artifact / deploy steps
+    <p class="small">Common workflow tasks you'll include in a CI workflow for this repo. Below are common commands and an example CI job snippet.</p>
+    <div style="display:grid;grid-template-columns:1fr;gap:10px;">
+      <div class="section" style="padding:12px">
+        <strong>Common commands (CI)</strong>
+        <ul>
+          <li><code>actions/checkout@v3</code> — check out repository code in CI runner.</li>
+          <li><code>actions/setup-node@v4</code> — set Node.js version for the job.</li>
+          <li><code>npm ci --prefix client</code> — install client deps reproducibly from package-lock.</li>
+          <li><code>npm run build --prefix client</code> — build the client production bundle.</li>
+          <li><code>npm ci --prefix server</code> &amp; <code>npm test --prefix server</code> — install and test server code.</li>
+          <li>Use <code>actions/cache</code> to cache node_modules between jobs for faster runs.</li>
+        </ul>
+      </div>
 
-Typical job snippets (YAML):
-
+      <div class="section" style="padding:12px">
+        <strong>Example job snippet</strong>
+        <pre>
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v4
-        with: { node-version: '18' }
+        with:
+          node-version: '18'
       - run: npm ci --prefix client
       - run: npm run build --prefix client
       - run: npm ci --prefix server
       - run: npm test --prefix client --silent
       - run: npm test --prefix server --silent
-
-Use caching to speed up installs (actions/cache)
-    </pre>
+        </pre>
+      </div>
+    </div>
   </section>
 
   <section class="section">
@@ -153,43 +174,59 @@ Use caching to speed up installs (actions/cache)
     <div class="row">
       <div class="col">
         <h3>Local dev (client)</h3>
-        <pre>
-# Install deps
-npm install
-# Start client dev server
-npm start
-# Build production bundle
-npm run build
-# Run client tests
-npm test
-        </pre>
+        <div class="small">
+          <strong>npm install</strong> — install dependencies (run once or when package.json changes).<br/>
+          <code>npm start</code> — start the CRA dev server (hot reload, usually on localhost:3000).<br/>
+          <code>npm run build</code> — produce an optimized production bundle in <code>client/build</code>.<br/>
+          <code>npm test</code> — run Jest tests (interactive by default with CRA).
+        </div>
       </div>
       <div class="col">
         <h3>Server</h3>
-        <pre>
-# Install deps (server)
-cd server
-npm install
-# Build or run server (ts-node or build then node)
-npm run build
-npm start
-# Run server tests
-npm test
-        </pre>
+        <div class="small">
+          <code>cd server</code> — change to server folder.<br/>
+          <code>npm install</code> — install server dependencies.<br/>
+          <code>npm run build</code> — compile TypeScript to <code>dist/</code> (if configured).<br/>
+          <code>npm start</code> — run the compiled server (<code>node dist/index.js</code>).<br/>
+          <code>npm run dev</code> — start a dev runner (ts-node-dev) with auto-reload for local development.<br/>
+          <code>npm test</code> — run server tests (Jest).
+        </div>
       </div>
     </div>
 
-    <h3>Common Git commands</h3>
-    <pre>
-# Branching
-git checkout -b feature/my-feature
-# Stage & commit
-git add -A
-git commit -m "feat: add ..."
-# Push branch and set upstream
-git push --set-upstream origin feature/my-feature
-# Create PR on GitHub (via web or gh cli)
-    </pre>
+    <h3>Commands explained — GitHub / React / Node.js</h3>
+    <div class="small">
+      <h4>Git & GitHub (terminal)</h4>
+      <ul>
+        <li><code>git checkout -b feature/my-feature</code> — create & switch to a new branch for your work.</li>
+        <li><code>git add -A</code> — stage all changed files for commit.</li>
+        <li><code>git commit -m "feat: description"</code> — commit staged changes with a message.</li>
+        <li><code>git push --set-upstream origin feature/my-feature</code> — push branch to remote and set upstream tracking.</li>
+        <li><code>git pull --rebase</code> — update local branch with remote changes, rebasing your commits on top.
+        </li>
+        <li><code>gh pr create --fill</code> (GitHub CLI) — open a Pull Request from the current branch (fills title/body from commit message).</li>
+      </ul>
+
+      <h4>React (client)</h4>
+      <ul>
+        <li><code>npm install</code> — installs client dependencies.</li>
+        <li><code>npm start</code> — runs the create-react-app dev server with fast refresh.</li>
+        <li><code>npm run build</code> — creates the production static bundle to deploy (in <code>client/build</code>).</li>
+        <li><code>npm test -- --watchAll=false</code> — run tests once (non-interactive), useful in CI.</li>
+        <li><code>npm run eject</code> — eject CRA config (irreversible); only use if you need to control webpack/ babel yourself.</li>
+      </ul>
+
+      <h4>Node / Server</h4>
+      <ul>
+        <li><code>cd server</code> — move into server project.
+        </li>
+        <li><code>npm install</code> — install server deps.</li>
+        <li><code>npm run build</code> — compile TypeScript (produces <code>dist/</code> files).</li>
+        <li><code>npm start</code> — run the compiled server (<code>node dist/index.js</code>).</li>
+        <li><code>npm run dev</code> — run server in dev mode with auto restart (uses ts-node-dev in this repo).</li>
+        <li><code>curl -X POST http://localhost:5000/api/docs/docx -H "Content-Type: application/json" -d "{ \"html\": \"<html>...\" }" --output out.docx</code> — example for testing the docs conversion endpoint from terminal.</li>
+      </ul>
+    </div>
   </section>
 
   <section class="section">
