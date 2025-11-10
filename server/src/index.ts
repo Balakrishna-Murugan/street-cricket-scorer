@@ -58,11 +58,13 @@ import { playerRoutes } from './routes/player.routes';
 import { teamRoutes } from './routes/team.routes';
 import { matchRoutes } from './routes/match.routes';
 import { authRoutes } from './routes/auth.routes';
+import { docsRoutes } from './routes/docs.routes';
 
 app.use('/api/players', playerRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/matches', matchRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/docs', docsRoutes);
 
 // Basic route
 app.get('/', (req, res) => {

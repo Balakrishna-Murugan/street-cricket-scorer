@@ -31,6 +31,7 @@
     </div>
     <div style="display:flex; gap:8px; align-items:center;">
       <button id="downloadDoc">Download as Word (.doc)</button>
+      <button id="downloadDocx" class="secondary">Download as .docx (server)</button>
       <button id="downloadCheat" class="secondary">Download Cheat Sheet (.doc)</button>
     </div>
   </header>
@@ -218,6 +219,31 @@ git push --set-upstream origin feature/my-feature
 
     document.getElementById('downloadDoc').addEventListener('click', () => {
       downloadDoc('street-cricket-architecture.doc', document.body);
+    });
+    document.getElementById('downloadDocx').addEventListener('click', async () => {
+      // POST the full page HTML to server endpoint which will convert to a .docx if available
+      try {
+        const html = document.documentElement.outerHTML;
+        const resp = await fetch('/api/docs/docx', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ html })
+        });
+        if (!resp.ok) throw new Error('Server conversion failed');
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        // try to infer filename from content-type
+        const ct = resp.headers.get('content-type') || '';
+        const ext = ct.includes('openxmlformats') ? 'docx' : ct.includes('msword') ? 'doc' : 'docx';
+        a.download = `street-cricket.${ext}`;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+      } catch (err) {
+        alert('Failed to download .docx from server: ' + (err && err.message ? err.message : err));
+      }
     });
 
     document.getElementById('downloadCheat').addEventListener('click', () => {
