@@ -14,49 +14,35 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
   try {
     const userData = localStorage.getItem('user');
-    if (userData) {
-      const parsed = JSON.parse(userData);
-      if (parsed && parsed._id) {
-        // config.headers is typed; cast to a loose map to set a custom header
-        const headers = config.headers as Record<string, any>;
-        headers['user-id'] = parsed._id;
-      }
-    }
-  } catch (e) {
-    // ignore
-  }
-  return config;
-}, (error) => Promise.reject(error));
+    if (!userData) return config;
 
-// Attach user-id header automatically from localStorage if available
-api.interceptors.request.use((config) => {
-  try {
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      const user = JSON.parse(userData);
-      if (user && user._id) {
-        // Axios v1 uses AxiosHeaders; set header via set if available
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        if (config.headers && typeof (config.headers as any).set === 'function') {
-          // @ts-ignore
-          (config.headers as any).set('user-id', user._id);
-          (config.headers as any).set('authorization', `Bearer ${user._id}`);
-        } else if (config.headers) {
-          // fallback for plain object
-          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-          // @ts-ignore
-          config.headers['user-id'] = user._id;
-          config.headers['Authorization'] = `Bearer ${user._id}`;
-        } else {
-          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-          // @ts-ignore
-          config.headers = { 'user-id': user._id, 'Authorization': `Bearer ${user._id}` };
+    const user = JSON.parse(userData);
+    if (!user || !user._id) return config;
+
+    // Type guard for Axios headers that expose a `set` method (AxiosHeaders)
+    const headers: any = config.headers || {};
+    const hasSet = headers && typeof headers.set === 'function';
+    if (hasSet) {
+      // AxiosHeaders-like API
+      headers.set('user-id', user._id);
+      headers.set('authorization', `Bearer ${user._id}`);
+      config.headers = headers;
+    } else {
+      // plain object fallback: mutate existing headers object when present
+      if (config.headers) {
+        try {
+          (config.headers as Record<string, string>)['user-id'] = user._id;
+          (config.headers as Record<string, string>)['Authorization'] = `Bearer ${user._id}`;
+        } catch (e) {
+          // fallback to assigning a new headers object with a safe cast
+          config.headers = ({ 'user-id': user._id, 'Authorization': `Bearer ${user._id}` } as unknown) as typeof config.headers;
         }
+      } else {
+        config.headers = ({ 'user-id': user._id, 'Authorization': `Bearer ${user._id}` } as unknown) as typeof config.headers;
       }
     }
   } catch (e) {
-    // ignore
+    // ignore JSON parse errors or localStorage access issues
   }
   return config;
 }, (error) => Promise.reject(error));

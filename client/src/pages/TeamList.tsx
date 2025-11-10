@@ -130,7 +130,7 @@ const TeamList: React.FC = () => {
     }
   }, [teams, editingTeam, toast]);
 
-  const fetchTeams = async () => {
+  const fetchTeams = useCallback(async () => {
     setLoading(true);
     try {
       let response;
@@ -150,21 +150,21 @@ const TeamList: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentUser, toast]);
 
   useEffect(() => {
     // Fetch only after currentUser is known so server-side filtering works
     if (!currentUser) return;
     fetchTeams();
     fetchPlayers();
-  }, [currentUser]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentUser, fetchTeams, fetchPlayers]);
 
   // Fetch players whenever teams data changes (but not when editingTeam changes to avoid loops)
   useEffect(() => {
     if (teams.length >= 0) { // teams is initialized as empty array
       fetchPlayers();
     }
-  }, [teams.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [teams.length, fetchPlayers]);
 
   const handleOpen = () => {
     setEditingTeam(null);

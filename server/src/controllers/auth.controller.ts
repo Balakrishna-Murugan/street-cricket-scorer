@@ -6,12 +6,11 @@ export const authController = {
   // Login with username/password
   login: async (req: Request, res: Response) => {
     try {
-      console.log('Login request received:', req.body);
+  // Login request received
 
       const { username, password } = req.body;
 
       if (!username || !password) {
-        console.log('Missing username or password');
         return res.status(400).json({ message: 'Username and password are required' });
       }
 
@@ -23,7 +22,7 @@ export const authController = {
         ]
       }).select('+password');
 
-      console.log('User lookup result:', user ? { username: user.username, hasPassword: !!user.password } : 'User not found');
+  // user lookup performed
 
       if (!user) {
         return res.status(401).json({ message: 'Invalid credentials' });
@@ -34,8 +33,7 @@ export const authController = {
         return res.status(401).json({ message: 'Invalid credentials' });
       }
 
-      const isValidPassword = await bcrypt.compare(password, user.password);
-      console.log('Password validation result:', isValidPassword);
+  const isValidPassword = await bcrypt.compare(password, user.password);
 
       if (!isValidPassword) {
         return res.status(401).json({ message: 'Invalid credentials' });
@@ -56,7 +54,6 @@ export const authController = {
         teams: user.teams
       };
 
-      console.log('Login successful for user:', user.username);
       res.json({
         message: 'Login successful',
         user: userData
@@ -133,12 +130,11 @@ export const authController = {
   // Guest login - create temporary guest user
   guestLogin: async (req: Request, res: Response) => {
     try {
-      console.log('Guest login request received:', req.body);
+  // Guest login request received
 
       const { name } = req.body;
 
       if (!name || name.trim().length === 0) {
-        console.log('Guest login: Name is required');
         return res.status(400).json({ message: 'Name is required for guest login' });
       }
 
@@ -161,7 +157,6 @@ export const authController = {
         }
       });
 
-      console.log('Guest user created:', guestPlayer.username);
 
       // Return user data
       const userData = {

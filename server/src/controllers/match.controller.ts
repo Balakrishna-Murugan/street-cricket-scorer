@@ -160,7 +160,7 @@ export const matchController = {
   // Get match by ID
   getById: async (req: Request, res: Response) => {
     try {
-      console.log('Fetching match with ID:', req.params.id);
+  // Fetching match by id
       
       const match = await Match.findById(req.params.id)
         .populate('team1', 'name')
@@ -183,18 +183,15 @@ export const matchController = {
         });
 
       if (!match) {
-        console.log('Match not found with ID:', req.params.id);
         return res.status(404).json({ message: 'Match not found' });
       }
 
       // Enforce ownership for non-admins
       if (req.user && (req.user.userRole === 'admin' || req.user.userRole === 'superadmin')) {
-        console.log('Match found (admin):', match.status);
         return res.json(match);
       }
 
       if (req.user && (match as any).createdBy && (match as any).createdBy.toString() === req.user._id.toString()) {
-        console.log('Match found (owner):', match.status);
         return res.json(match);
       }
 
@@ -274,9 +271,7 @@ export const matchController = {
         ...req.body
       };
 
-      console.log('Processing ball:', ballData);
-
-      const updatedMatch = await LiveScoringService.processBall(ballData);
+  const updatedMatch = await LiveScoringService.processBall(ballData);
       
       res.json(updatedMatch);
     } catch (error: any) {
@@ -305,9 +300,7 @@ export const matchController = {
       const { matchId } = req.params;
       const { bowlerId } = req.body;
 
-      console.log('Starting new over:', { matchId, bowlerId });
-
-      const updatedMatch = await LiveScoringService.startNewOver(matchId, bowlerId);
+  const updatedMatch = await LiveScoringService.startNewOver(matchId, bowlerId);
       
       // Return populated match
       const populatedMatch = await Match.findById(matchId)
@@ -548,11 +541,7 @@ export const matchController = {
       const { matchId } = req.params;
       const scoreUpdate = req.body;
 
-      console.log('Updating match score (legacy):', { matchId });
-      console.log('Ball tracking data received:', {
-        recentBalls: scoreUpdate.innings?.[0]?.recentBalls?.length || 0,
-        currentOverBalls: scoreUpdate.innings?.[0]?.currentOverBalls?.length || 0
-      });
+      // legacy score update received
       
       // Clean up the score update data
       const cleanScoreUpdate = {
@@ -586,12 +575,7 @@ export const matchController = {
         cleanScoreUpdate.status = 'in-progress';
       }
 
-      console.log('Clean score update:', {
-        firstInning: {
-          recentBalls: cleanScoreUpdate.innings?.[0]?.recentBalls?.length || 0,
-          currentOverBalls: cleanScoreUpdate.innings?.[0]?.currentOverBalls?.length || 0
-        }
-      });
+      // cleaned score update prepared
       
       const match = await Match.findByIdAndUpdate(
         matchId,
@@ -609,12 +593,7 @@ export const matchController = {
         return res.status(404).json({ message: 'Match not found' });
       }
       
-      console.log('Returning match with ball tracking:', {
-        firstInning: {
-          recentBalls: match.innings?.[0]?.recentBalls?.length || 0,
-          currentOverBalls: match.innings?.[0]?.currentOverBalls?.length || 0
-        }
-      });
+      // returning match with ball tracking
       
       res.json(match);
     } catch (error: any) {

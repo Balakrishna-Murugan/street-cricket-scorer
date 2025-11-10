@@ -9,22 +9,18 @@ export const teamController = {
   create: async (req: Request, res: Response) => {
     try {
       const teamData = { ...req.body };
-      console.log('Creating team with data:', JSON.stringify(teamData, null, 2)); // Better debug log
       
       // Handle captain field properly
       if (teamData.captain === '' || teamData.captain === null || teamData.captain === undefined) {
-        delete teamData.captain;
-        console.log('Captain field removed from teamData'); // Debug log
+  delete teamData.captain;
       } else {
         // Validate captain ID is a valid ObjectId and player exists
         if (!mongoose.Types.ObjectId.isValid(teamData.captain)) {
-          console.log('Invalid captain ID format:', teamData.captain); // Debug log
           return res.status(400).json({ message: 'Invalid captain ID format' });
         }
         
         const captainExists = await Player.findById(teamData.captain);
         if (!captainExists) {
-          console.log('Captain player not found:', teamData.captain); // Debug log
           return res.status(400).json({ message: 'Captain player not found' });
         }
       }
@@ -51,20 +47,11 @@ export const teamController = {
         }
       }
 
-      console.log('Final teamData before save:', JSON.stringify(teamData, null, 2)); // Debug log
       const team = new Team(teamData);
       const savedTeam = await team.save();
-      console.log('Team saved successfully:', savedTeam._id); // Debug log
       res.status(201).json(savedTeam);
     } catch (error: any) {
-      console.error('Detailed error creating team:', {
-        message: error.message,
-        name: error.name,
-        code: error.code,
-        keyPattern: error.keyPattern,
-        keyValue: error.keyValue,
-        errors: error.errors
-      }); // Detailed debug log
+      console.error('Detailed error creating team:', error?.message || error);
       
       // Handle specific MongoDB errors
       if (error.code === 11000) {
@@ -159,8 +146,7 @@ export const teamController = {
   // Update team
   update: async (req: Request, res: Response) => {
     try {
-      const updateData = { ...req.body };
-      console.log('Updating team with data:', updateData); // Debug log
+  const updateData = { ...req.body };
       
       // Handle captain field properly
       if (updateData.captain === '' || updateData.captain === null || updateData.captain === undefined) {
@@ -198,8 +184,8 @@ export const teamController = {
         return res.status(404).json({ message: 'Team not found' });
       }
       res.json(team);
-    } catch (error: any) {
-      console.error('Error updating team:', error); // Debug log
+      } catch (error: any) {
+      console.error('Error updating team:', error?.message || error);
       res.status(400).json({ message: error.message || 'Error updating team' });
     }
   },
