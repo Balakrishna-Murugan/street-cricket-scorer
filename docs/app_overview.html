@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Street Cricket Scorer — Architecture, Tech Stack & Cheatsheet</title>
+  <style>
+    body { font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; margin: 24px; color: #222; }
+    header { display:flex; align-items:center; justify-content:space-between; }
+    h1 { font-size:1.6rem; margin:0; }
+    .badge { font-size:0.85rem; color:#666 }
+    .section { margin-top:24px; padding:18px; border:1px solid #eee; border-radius:8px; background:#fff; box-shadow:0 1px 4px rgba(0,0,0,0.03); }
+    .row { display:flex; gap:20px; }
+    .col { flex:1 }
+    /* Diagram styles */
+    .diagram { text-align:center; padding:12px; }
+    .box { fill:#fff; stroke:#2b6cb0; stroke-width:2; rx:8; }
+    .connector { stroke:#666; stroke-width:2; marker-end:url(#arrow); }
+    .tech-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px; }
+    pre { background:#fafafa; padding:12px; border-radius:6px; overflow:auto; }
+    button { background:#2b6cb0; color:white; border:none; padding:10px 14px; border-radius:6px; cursor:pointer; }
+    button.secondary { background:#444; }
+    .small { font-size:0.9rem; color:#444 }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Street Cricket Scorer — Architecture & Cheat Sheet</h1>
+      <div class="badge">Generated: <!--DATE--> </div>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <button id="downloadDoc">Download as Word (.doc)</button>
+      <button id="downloadCheat" class="secondary">Download Cheat Sheet (.doc)</button>
+    </div>
+  </header>
+
+  <section class="section">
+    <h2>1) High-level Flow Diagram</h2>
+    <div class="diagram">
+      <!-- Inline SVG diagram -->
+      <svg width="900" height="280" viewBox="0 0 900 280" xmlns="http://www.w3.org/2000/svg" aria-label="high-level architecture">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerUnits="strokeWidth" markerWidth="8" markerHeight="6" orient="auto">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#666" />
+          </marker>
+        </defs>
+
+        <!-- Client -->
+        <rect class="box" x="40" y="40" width="200" height="100" rx="8" fill="#f7fafc" stroke="#3182ce"/>
+        <text x="140" y="70" font-size="14" font-weight="700" text-anchor="middle" fill="#1a202c">Client</text>
+        <text x="140" y="90" font-size="12" text-anchor="middle" fill="#4a5568">React + TypeScript (CRA)</text>
+        <text x="140" y="110" font-size="12" text-anchor="middle" fill="#4a5568">MUI, Axios, Jest</text>
+
+        <!-- API Gateway / Server -->
+        <rect class="box" x="340" y="20" width="220" height="140" rx="8" fill="#fff" stroke="#2b6cb0"/>
+        <text x="450" y="50" font-size="14" font-weight="700" text-anchor="middle" fill="#1a202c">Server (API)</text>
+        <text x="450" y="70" font-size="12" text-anchor="middle" fill="#4a5568">Node.js + TypeScript</text>
+        <text x="450" y="90" font-size="12" text-anchor="middle" fill="#4a5568">Express, Mongoose</text>
+
+        <!-- Database -->
+        <rect class="box" x="660" y="60" width="160" height="90" rx="8" fill="#fff" stroke="#2b6cb0"/>
+        <text x="740" y="90" font-size="14" font-weight="700" text-anchor="middle" fill="#1a202c">Database</text>
+        <text x="740" y="110" font-size="12" text-anchor="middle" fill="#4a5568">MongoDB (Mongoose)</text>
+
+        <!-- Arrows -->
+        <line class="connector" x1="240" y1="90" x2="340" y2="90" />
+        <text x="290" y="82" font-size="11" text-anchor="middle" fill="#555">REST / JSON (Axios)</text>
+
+        <line class="connector" x1="560" y1="90" x2="660" y2="95" />
+        <text x="610" y="82" font-size="11" text-anchor="middle" fill="#555">Mongoose / MongoDB</text>
+
+        <!-- Optional: Admin / CI -->
+        <rect class="box" x="40" y="170" width="200" height="80" rx="8" fill="#fff" stroke="#2b6cb0"/>
+        <text x="140" y="195" font-size="13" font-weight="700" text-anchor="middle" fill="#1a202c">Dev / CI</text>
+        <text x="140" y="215" font-size="12" text-anchor="middle" fill="#4a5568">GitHub Actions, Tests, Lint</text>
+
+        <line class="connector" x1="140" y1="140" x2="140" y2="170" />
+
+      </svg>
+    </div>
+
+    <p class="small">Description: The browser client (React) calls the Server (Node/Express) over REST JSON. The server persists match and player data in MongoDB via Mongoose. CI builds run on GitHub Actions; tests use Jest. The live scoring page maintains client-side match state and uses API endpoints to persist updates.</p>
+  </section>
+
+  <section class="section">
+    <h2>2) Tech stack (repository-specific)</h2>
+    <div class="tech-grid">
+      <div>
+        <h3>Client</h3>
+        <ul>
+          <li>React (Create React App) + TypeScript</li>
+          <li>Material UI (MUI) for UI</li>
+          <li>Axios for API calls</li>
+          <li>Jest & React Testing Library for unit tests</li>
+          <li>Build: react-scripts (npm run build)</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Server</h3>
+        <ul>
+          <li>Node.js + TypeScript</li>
+          <li>Express for HTTP API</li>
+          <li>Mongoose for MongoDB models</li>
+          <li>Mocha/Jest for server tests (where present)</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Dev/CI/Infra</h3>
+        <ul>
+          <li>GitHub Actions for CI</li>
+          <li>Hosting: (project uses render.yaml — can deploy to Render or similar)</li>
+          <li>npm for package management</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>3) GitHub Actions & CI — Quick cheatsheet</h2>
+    <p class="small">Common workflow tasks you'll include in a CI workflow for this repo:</p>
+    <pre>
+- actions/checkout@v3
+- actions/setup-node@v4 (set node-version)
+- npm ci (or npm install)
+- npm run build (client)
+- npm test (unit tests)
+- run server lint/tests (tsc, node tests)
+- upload-artifact / deploy steps
+
+Typical job snippets (YAML):
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v4
+        with: { node-version: '18' }
+      - run: npm ci --prefix client
+      - run: npm run build --prefix client
+      - run: npm ci --prefix server
+      - run: npm test --prefix client --silent
+      - run: npm test --prefix server --silent
+
+Use caching to speed up installs (actions/cache)
+    </pre>
+  </section>
+
+  <section class="section">
+    <h2>4) Terminal & Git cheat sheet (React + Node)</h2>
+    <div class="row">
+      <div class="col">
+        <h3>Local dev (client)</h3>
+        <pre>
+# Install deps
+npm install
+# Start client dev server
+npm start
+# Build production bundle
+npm run build
+# Run client tests
+npm test
+        </pre>
+      </div>
+      <div class="col">
+        <h3>Server</h3>
+        <pre>
+# Install deps (server)
+cd server
+npm install
+# Build or run server (ts-node or build then node)
+npm run build
+npm start
+# Run server tests
+npm test
+        </pre>
+      </div>
+    </div>
+
+    <h3>Common Git commands</h3>
+    <pre>
+# Branching
+git checkout -b feature/my-feature
+# Stage & commit
+git add -A
+git commit -m "feat: add ..."
+# Push branch and set upstream
+git push --set-upstream origin feature/my-feature
+# Create PR on GitHub (via web or gh cli)
+    </pre>
+  </section>
+
+  <section class="section">
+    <h2>5) Export & printing</h2>
+    <p class="small">Click the buttons at the top to download the full document or just the Cheat Sheet as a Word (.doc) file. This uses a simple HTML-to-Microsoft-Word technique (download an .doc file with HTML contents). The resulting .doc opens in Microsoft Word and preserves formatting reasonably well.</p>
+  </section>
+
+  <script>
+    // Replace date
+    document.querySelector('.badge').textContent = 'Generated: ' + new Date().toLocaleString();
+
+    function downloadDoc(filename, element) {
+      // Build a minimal HTML document wrapper
+      const html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + document.title + '</title>' +
+        '<style>' + Array.from(document.querySelectorAll('style')).map(s => s.innerText).join('\n') + '</style>' +
+        '</head><body>' + element.innerHTML + '</body></html>';
+
+      const blob = new Blob([html], { type: 'application/msword' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+    }
+
+    document.getElementById('downloadDoc').addEventListener('click', () => {
+      downloadDoc('street-cricket-architecture.doc', document.body);
+    });
+
+    document.getElementById('downloadCheat').addEventListener('click', () => {
+      // compose cheat sheet content only (sections 3 and 4)
+      const cheat = document.createElement('div');
+      const nodes = [document.querySelector('section:nth-of-type(3)'), document.querySelector('section:nth-of-type(4)')];
+      nodes.forEach(n => cheat.appendChild(n.cloneNode(true)));
+      downloadDoc('street-cricket-cheatsheet.doc', cheat);
+    });
+  </script>
+</body>
+</html>
